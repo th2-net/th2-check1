@@ -58,6 +58,12 @@ allprojects {
 
     artifactory {
         publish {
+            contextUrl = "${artifactory_url}"
+            repository {
+                repoKey = "${artifactory_deploy_repo_key}" // The Artifactory repository key to publish to
+                username = "${artifactory_user}" // The publisher user name
+                password = "${artifactory_password}" // The publisher password
+            }
             defaults {
                 // Reference to Gradle publications defined in the build script.
                 // This is how we tell the Artifactory Plugin which artifacts should be
@@ -67,6 +73,14 @@ allprojects {
                 publishBuildInfo = true
                 // Properties to be attached to the published artifacts.
                 publishPom = true
+            }
+        }
+        resolve {
+            contextUrl = "${artifactory_url}"
+            repository {
+                repoKey = "${artifactory_resolve_repo_key}" // The Artifactory repository key to publish to
+                username = "${artifactory_user}" // The publisher user name
+                password = "${artifactory_password}" // The publisher password
             }
         }
     }
@@ -135,3 +149,16 @@ docker {
 
     copySpec.from(tarTree("$buildDir/distributions/${archivesBaseName}.tar"))
 }
+
+tasks.register("getImageVersion") {
+    doLast {
+        println("$dockerImageVersion")
+    }
+}
+
+tasks.register("getImageName") {
+    doLast {
+        println(docker.name)
+    }
+}
+
