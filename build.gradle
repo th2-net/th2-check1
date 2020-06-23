@@ -3,10 +3,11 @@ plugins {
     id 'com.palantir.docker' version '0.25.0' apply false
     id "de.undercouch.download" version "4.0.4" apply false
     id "com.jfrog.artifactory" version '4.15.1'
+    id 'org.jetbrains.kotlin.jvm' version '1.3.72'
 }
 
 allprojects {
-    apply plugin: 'java'
+    apply plugin: 'kotlin'
     apply plugin: 'maven-publish'
     apply plugin: 'com.jfrog.artifactory'
 
@@ -19,6 +20,10 @@ allprojects {
 
     group = 'com.exactpro.th2'
     version = "${version_major}.${version_minor}-SNAPSHOT"
+
+    compileKotlin {
+        kotlinOptions.jvmTarget = "11"
+    }
 
     sourceCompatibility = 1.11
     targetCompatibility = 1.11
@@ -117,6 +122,8 @@ dependencies {
 
     compile "org.slf4j:slf4j-log4j12:${slf4jVersion}"
     compile "org.slf4j:slf4j-api:${slf4jVersion}"
+
+    compile "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
 
     testImplementation 'junit:junit:4.12'
 }
