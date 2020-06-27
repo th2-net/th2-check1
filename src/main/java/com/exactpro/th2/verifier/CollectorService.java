@@ -405,7 +405,7 @@ public class CollectorService {
         return settings;
     }
 
-    public class Result {
+    public static class Result {
         private final IMessage actual;
         private final MessageFilter messageFilter;
         private final ComparisonResult comparisonResult;
