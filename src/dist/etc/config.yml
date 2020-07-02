@@ -1,0 +1,17 @@
+#port: 8080
+#connectivityServices:
+#    fix_client:
+#      host: localhost
+#      port: 51051
+#    fix_server:
+#        host: localhost
+#        port: 51052
+#rabbitMQ:
+#    host: rabbitmq
+#    virtualHost: th2
+#    port: 5672
+#    username: guest
+#    password: guest
+#th2
+#    th2EventStorageGRPCHost:
+#    th2EventStorageGRPCPort:

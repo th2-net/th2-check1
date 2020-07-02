@@ -1,0 +1,59 @@
+syntax = "proto3";
+package th2;
+
+import "th2/infra.proto";
+import "th2/event-store.proto";
+
+option java_multiple_files = true;
+option java_package = "com.exactpro.th2.verifier.grpc";
+
+
+service Verifier {
+    rpc createCheckpoint (CheckpointRequest) returns (CheckpointResponse) {}
+    rpc submitCheckRule (CheckRuleRequest) returns (CheckRuleResponse) {}
+    rpc submitCheckSequenceRule(CheckSequenceRuleRequest) returns (CheckSequenceRuleResponse) {}
+}
+
+message CheckpointRequest {
+    string description = 1;
+    EventID parent_event_id = 2;
+}
+
+message CheckpointResponse {
+    Checkpoint checkpoint = 1;
+    RequestStatus status = 2;
+}
+
+message CheckRuleRequest {
+    ConnectionID connectivity_id = 1;
+    MessageFilter filter = 2;
+    Checkpoint checkpoint = 3; // Registered Checkpoint
+    int64 timeout = 4; // Timeout for rule execution
+    reserved 5; // ReportId reportId = 5; reserved now
+    EventID parent_event_id = 6;
+    string description = 7;
+}
+
+message CheckRuleResponse {
+    RequestStatus status = 1;
+}
+
+message CheckSequenceRuleRequest {
+    PreFilter pre_filter = 1;
+    repeated MessageFilter message_filters = 2;
+    Checkpoint checkpoint = 3; // Registered Checkpoint
+    int64 timeout = 4; // Timeout for rule execution
+    ConnectionID connectivity_id = 5;
+    reserved 6; // ReportId reportId = 5; reserved now
+    EventID parent_event_id = 7;
+    bool check_order = 8;
+    string description = 9;
+}
+
+message CheckSequenceRuleResponse {
+    RequestStatus status = 1;
+}
+
+message PreFilter {
+    map<string, ValueFilter> fields = 2;
+}
