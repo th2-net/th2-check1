@@ -19,22 +19,22 @@ package com.exactpro.th2.verifier
 import com.exactpro.th2.infra.grpc.Message
 import io.reactivex.Observable
 
-class ObservedSession(val sessionAlias : String,
-                      private val limitSize : Int,
-                      private val messageObservable : Observable<Message>) {
+class StreamContainer(val sessionAlias : String,
+                      limitSize : Int,
+                      messageObservable : Observable<Message>) {
     val bufferedMessages : Observable<Message>
     private val currentMessage : Observable<Message>
 
     init {
         currentMessage = messageObservable.replay(1).apply { connect() }
-        bufferedMessages = messageObservable.replay(limitSize).apply { connect() }
+        bufferedMessages = currentMessage.replay(limitSize).apply { connect() }
     }
 
     val lastMessage : Message
         get() = currentMessage.firstElement().blockingGet()
 
     override fun equals(other: Any?): Boolean =
-        if (other is ObservedSession) {
+        if (other is StreamContainer) {
             sessionAlias == other.sessionAlias
         } else false
 

@@ -19,7 +19,7 @@ import io.reactivex.observers.DisposableObserver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-abstract class AbstractSessionObserver : DisposableObserver<ObservedSession>() {
+abstract class AbstractSessionObserver<T> : DisposableObserver<T>() {
     override fun onComplete() {
         LOGGER.info("Observing completed for ${this::class.java.simpleName}")
     }
