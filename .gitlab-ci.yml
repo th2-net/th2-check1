@@ -9,7 +9,7 @@ build:
     - " docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
         --build-arg CI_PIPELINE_IID --build-arg VERSION_MAINTENANCE=${VERSION_MAINTENANCE} \
         --build-arg ARTIFACTORY_USER --build-arg ARTIFACTORY_PASS --build-arg ARTIFACTORY_REPO \
-        --build-arg ARTIFACTORY_URL -- build-arg ARTIFACTORY_RESOLVE_REPO ."
+        --build-arg ARTIFACTORY_URL --build-arg ARTIFACTORY_RESOLVE_REPO ."
     - "docker create -v $(pwd)/build:./build/libs -v $(pwd)/build:./build/distributions \
         -v $(pwd)/inspections:./inspections -v $(pwd)/imageName.txt:./imageName.txt"
     - "export IMAGE_NAME=$(cat ./imageName.txt)"
