@@ -26,6 +26,7 @@ import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.infra.grpc.EventID
+import com.exactpro.th2.infra.grpc.Message
 import com.exactpro.th2.infra.grpc.MessageFilter
 import io.reactivex.Observable
 import java.time.Instant
@@ -34,18 +35,18 @@ import java.util.concurrent.ScheduledThreadPoolExecutor
 /**
  *
  */
-class CheckRuleTask(description: String?,
-                    startTime: Instant,
-                    sessionAlias: String,
-                    timeout: Long,
-                    private val protoMessageFilter: MessageFilter,
-                    parentEventID: EventID,
-                    messageStream: Observable<StreamContainer>,
-                    scheduler: ScheduledThreadPoolExecutor,
-                    eventStoreStub: EventStoreServiceFutureStub) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, scheduler, eventStoreStub) {
+class SequenceCheckRuleTask(description: String?,
+                            startTime: Instant,
+                            sessionAlias: String,
+                            timeout: Long,
+                            private val protoMessagePreFilter: MessageFilter,
+                            parentEventID: EventID,
+                            messageStream: Observable<StreamContainer>,
+                            scheduler: ScheduledThreadPoolExecutor,
+                            eventStoreStub: EventStoreServiceFutureStub) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, scheduler, eventStoreStub) {
 
-    private val filter: IMessage = converter.fromProtoFilter(protoMessageFilter, protoMessageFilter.messageType)
-    private val settings: ComparatorSettings = protoMessageFilter.toCompareSettings()
+    private val filter: IMessage = converter.fromProtoFilter(protoMessagePreFilter, "PreFilter")
+    private val settings: ComparatorSettings = protoMessagePreFilter.toCompareSettings()
 
     override fun onStart() {
         super.onStart()
@@ -61,6 +62,10 @@ class CheckRuleTask(description: String?,
 
     }
 
+    override fun Observable<Message>.taskFilter(): Observable<Message> {
+        TODO("Not yet implemented")
+    }
+
     override fun onNext(singleCSHIterator: SingleCSHIterator) {
         try {
             val comparisonResults: List<Pair<IMessage, ComparisonResult>> = waitMessage(settings, filter,
@@ -72,7 +77,7 @@ class CheckRuleTask(description: String?,
 
             if (comparisonResults.isNotEmpty()) {
                 rootEvent.addSubEventWithSamePeriod()
-                    .appendEventWithVerification(singleCSHIterator.protoMessage, protoMessageFilter, comparisonResults[0].second)
+                    .appendEventWithVerification(singleCSHIterator.protoMessage, protoMessagePreFilter, comparisonResults[0].second)
                 checkComplete()
             }
         } catch (e: Exception) {

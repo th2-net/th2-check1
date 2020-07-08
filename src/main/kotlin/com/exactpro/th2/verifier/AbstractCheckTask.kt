@@ -24,88 +24,175 @@ import com.exactpro.th2.ProtoToIMessageConverter
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
+import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
+import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest
+import com.exactpro.th2.infra.grpc.Checkpoint
 import com.exactpro.th2.infra.grpc.Direction
+import com.exactpro.th2.infra.grpc.EventBatch
+import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.Message
 import com.exactpro.th2.infra.grpc.MessageFilter
-import com.exactpro.th2.verifier.CollectorServiceA.Companion
 import com.exactpro.th2.verifier.event.bean.builder.VerificationBuilder
 import com.exactpro.th2.verifier.util.VerificationUtil
-import com.google.protobuf.TextFormat
+import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
-import io.reactivex.Scheduler
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.SingleSubject
-import java.lang.IllegalStateException
 import java.time.Instant
-import java.util.concurrent.locks.ReadWriteLock
-import java.util.concurrent.locks.ReentrantLock
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
-import kotlin.concurrent.write
+import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit.MILLISECONDS
+import java.util.concurrent.atomic.AtomicBoolean
 
-abstract class AbstractCheckTask(private val description: String,
-                                    private val startTime: Instant,
-                                    private val sessionAlias: String,
-                                    private val messageStream: Observable<StreamContainer>) : AbstractSessionObserver<SingleCSHIterator>() {
-
+abstract class AbstractCheckTask(private val description: String?,
+                                 private val timeout: Long,
+                                 submitTime: Instant,
+                                 private val sessionAlias: String,
+                                 private val parentEventID: EventID,
+                                 private val messageStream: Observable<StreamContainer>,
+                                 private val scheduler: ScheduledThreadPoolExecutor,
+                                 private val eventStoreStub: EventStoreServiceFutureStub) : AbstractSessionObserver<SingleCSHIterator>() {
 
     private val sequenceSubject = SingleSubject.create<Long>()
-
-    private val nextTaskLock = ReentrantReadWriteLock()
-    private var _hasNextTask: Boolean = false
-    protected val hasNextTask: Boolean
-        get() = nextTaskLock.read { sequenceSubject.hasObservers() }
+    private val hasNextTask = AtomicBoolean(false)
+    private val eventPublished = AtomicBoolean(false)
+    private lateinit var endFuture: ScheduledFuture<*>
+    @Volatile
+    private var lastSequence = Long.MIN_VALUE
 
     protected val converter = ProtoToIMessageConverter(DefaultMessageFactoryProxy(), null, null)
-    protected val rootEvent = Event.from(startTime)
+    protected val rootEvent: Event = Event.from(submitTime)
         .description(description)
 
     /**
+     * Registers a task as the next task in continuous verification chain. Its {@link #begin} method will be called
+     * when current task completes check or timeout is over for it.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @throws IllegalStateException when method is called more than once.
      */
-    fun subscribeToLastSequence(checkTask: AbstractCheckTask) {
-        nextTaskLock.write {
-            if (_hasNextTask) {
-                throw IllegalStateException("Subscription to last sequence for task $description is already executed")
-            }
-            sequenceSubject.subscribe(checkTask::observeSequence)
-            _hasNextTask = true
+    fun subscribeNextTask(checkTask: AbstractCheckTask) {
+        if (hasNextTask.compareAndSet(false, true)) {
+            sequenceSubject.subscribe { sequence -> checkTask.begin(sequence!!) }
+        } else {
+            throw IllegalStateException("Subscription to last sequence for task $description is already executed")
         }
+    }
+
+    /**
+     * Observe a message sequence from checkpoint.
+     * Task subscribe to messages stream with sequence after call.
+     * This method should be called only once otherwise it throws IllegalStateException.
+     * @param checkpoint message sequence from previous task.
+     * @throws IllegalStateException when method is called more than once. TODO: implements
+     */
+    fun begin(checkpoint: Checkpoint? = null) {
+        begin(checkpoint?.getSequence(sessionAlias) ?: DEFAULT_SEQUENCE)
+    }
+
+    /**
+     * It is called when timeout is over
+     */
+    protected abstract fun onTimeout()
+
+    /**
+     * Emit last sequence to the single for to the next task. It should be called after completed of base check.
+     * This method can call {@link #onCompleteTask} if the next task already subscribed
+     */
+    protected fun checkComplete() {
+        try {
+            LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
+            dispose()
+            endFuture.cancel(true)
+            sequenceSubject.onSuccess(lastSequence)
+        } finally {
+            publishEvent()
+        }
+    }
+
+    /**
+     * Provides feature to define custom filter for observe.
+     */
+    protected open fun Observable<Message>.taskFilter() : Observable<Message> = this
+
+    /**
+     * Observe a message sequence from previous task.
+     * Task subscribe to messages stream with sequence after call.
+     * This method should be called only once otherwise it throws IllegalStateException.
+     * @param sequence message sequence from previous task.
+     * @throws IllegalStateException when method is called more than once. TODO: implements
+     */
+    private fun begin(sequence: Long = DEFAULT_SEQUENCE) {
+        LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionAlias, sequence, timeout)
+        lastSequence = sequence
+
+        messageStream.observeOn(TASK_SCHEDULER) // Defined scheduler to execution in one thread
+            .mapToMessage(sessionAlias, sequence)
+            .doOnNext {
+                with(it.metadata.id) {
+                    lastSequence = this.sequence
+                    rootEvent.messageID(this)
+                }
+            }
+            .taskFilter()
+            .mapToCSH()
+            .subscribe(this)
+
+        endFuture = scheduler.schedule(this::end, timeout, MILLISECONDS)
     }
 
     /**
      * Disposes task when timeout is over. Task unsubscribe from message stream.
      */
-    fun disposeOnTimeout() {
-        dispose()
+    private fun end() {
+        try {
+            LOGGER.info("Timeout is over for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
+            dispose()
+            sequenceSubject.onSuccess(lastSequence)
+            onTimeout()
+        } finally {
+            publishEvent()
+        }
     }
 
-    /**
-     * Observe a message sequence from checkpoint or previous task.
-     * Task subscribe to messages stream with sequence after call.
-     * This method should be called only once otherwise it throws IllegalStateException.
-     * @param sequence message sequence from checkpoint or previous task.
-     * @throws IllegalStateException when method is called more than once. TODO: implements
-     */
-    private fun observeSequence(sequence: Long) {
-        messageStream.observeOn(TASK_SCHEDULER)
-            .mapToMessage(sessionAlias, sequence)
-            .mapToCSH()
-            .subscribe(this)
+    private fun publishEvent() {
+        if (eventPublished.compareAndSet(false, true)) {
+            LOGGER.debug("Sending event thee id '{}' parent id '{}'", rootEvent.id, parentEventID)
+            val storeRequest = StoreEventBatchRequest.newBuilder()
+                .setEventBatch(EventBatch.newBuilder()
+                    .setParentEventId(parentEventID)
+                    .addAllEvents(rootEvent.toProtoEvents(parentEventID.id))
+                    .build())
+                .build()
+            val future = eventStoreStub.storeEventBatch(storeRequest)
+
+            future.addListener({
+                if (LOGGER.isDebugEnabled) {
+                    LOGGER.debug("Sent event batch '{}' with result {}", shortDebugString(storeRequest), shortDebugString(future.get()))
+                }
+            }, { ForkJoinPool.commonPool() })
+        } else {
+            LOGGER.warn("Event thee id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
+        }
     }
 
-    protected fun MessageFilter.toCompareSettings() : ComparatorSettings =
+    companion object {
+        /**
+         * Used for observe messages in one thread.
+         * It provides feature to write no thread-safe code in children classes
+         */
+        val TASK_SCHEDULER = Schedulers.newThread()
+        const val DEFAULT_SEQUENCE = Long.MIN_VALUE
+    }
+
+    protected fun MessageFilter.toCompareSettings(): ComparatorSettings =
         ComparatorSettings().also { it.metaContainer = VerificationUtil.toMetaContainer(this, false) }
-
-    protected fun Observable<Message>.mapToCSH() : Observable<SingleCSHIterator> =
-        map{ message -> SingleCSHIterator(converter, message) }
 
     protected fun Event.appendEventWithVerification(protoMessage: Message, protoMessageFilter: MessageFilter, comparisonResult: ComparisonResult) {
         val verificationComponent = VerificationBuilder()
-        comparisonResult.results.forEach {
-            (key: String?, value: ComparisonResult?) ->
-                verificationComponent.verification(key, value, protoMessageFilter, true) }
+        comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
+            verificationComponent.verification(key, value, protoMessageFilter, true)
+        }
 
         with(protoMessage.metadata) {
             name("Verification '${messageType}' message")
@@ -115,12 +202,15 @@ abstract class AbstractCheckTask(private val description: String,
         }
     }
 
-    private fun Observable<StreamContainer>.mapToMessage(sessionAlias : String, sequence: Long) : Observable<Message> =
-        filter{ streamContainer -> streamContainer.sessionAlias == sessionAlias }
-            .flatMap(StreamContainer::bufferedMessages)
-            .filter{ message -> message.metadata.id.sequence > sequence }
+    private fun Observable<Message>.mapToCSH(): Observable<SingleCSHIterator> =
+        map { message -> SingleCSHIterator(converter, message) }
 
-    private fun com.exactpro.th2.infra.grpc.Checkpoint.getSequence(sessionAlias: String) : Long {
+    private fun Observable<StreamContainer>.mapToMessage(sessionAlias: String, sequence: Long): Observable<Message> =
+        filter { streamContainer -> streamContainer.sessionAlias == sessionAlias }
+            .flatMap(StreamContainer::bufferedMessages)
+            .filter { message -> message.metadata.id.sequence > sequence }
+
+    private fun Checkpoint.getSequence(sessionAlias: String): Long {
         val sequence = sessionAliasToDirectionCheckpointMap[sessionAlias]
             ?.directionToSequenceMap?.get(Direction.FIRST.number)
 
@@ -131,14 +221,10 @@ abstract class AbstractCheckTask(private val description: String,
             }
             else -> {
                 if (CollectorServiceA.LOGGER.isWarnEnabled) {
-                    CollectorServiceA.LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", TextFormat.shortDebugString(this), sessionAlias)
+                    CollectorServiceA.LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionAlias)
                 }
-                Long.MIN_VALUE
+                DEFAULT_SEQUENCE
             }
         }
-    }
-
-    companion object {
-        val TASK_SCHEDULER = Schedulers.newThread()
     }
 }

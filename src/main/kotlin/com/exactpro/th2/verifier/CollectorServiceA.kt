@@ -21,7 +21,6 @@ import com.exactpro.sf.common.util.Pair
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.ComparisonUtil
-import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.sf.services.ICSHIterator
 import com.exactpro.th2.MessageWrapper
@@ -31,34 +30,24 @@ import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.event.bean.builder.MessageBuilder
-import com.exactpro.th2.common.event.bean.builder.TableBuilder
-import com.exactpro.th2.common.message.message
 import com.exactpro.th2.configuration.MicroserviceConfiguration
 import com.exactpro.th2.configuration.Th2Configuration.QueueNames
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceBlockingStub
+import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest
 import com.exactpro.th2.infra.grpc.ConnectionID
-import com.exactpro.th2.infra.grpc.Direction
-import com.exactpro.th2.infra.grpc.Direction.FIRST
 import com.exactpro.th2.infra.grpc.EventBatch
 import com.exactpro.th2.infra.grpc.EventID
-import com.exactpro.th2.infra.grpc.Message
 import com.exactpro.th2.infra.grpc.MessageBatch
 import com.exactpro.th2.infra.grpc.MessageFilter
 import com.exactpro.th2.infra.grpc.MessageID
 import com.exactpro.th2.verifier.CollectorService.Result
-import com.exactpro.th2.verifier.event.CheckSequenceUtils
-import com.exactpro.th2.verifier.event.bean.CheckSequenceRow
 import com.exactpro.th2.verifier.event.bean.builder.VerificationBuilder
 import com.exactpro.th2.verifier.grpc.CheckRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckpointRequestOrBuilder
-import com.exactpro.th2.verifier.util.VerificationUtil
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.InvalidProtocolBufferException
-import com.google.protobuf.TextFormat
 import com.google.protobuf.TextFormat.shortDebugString
 import com.rabbitmq.client.DeliverCallback
 import com.rabbitmq.client.Delivery
@@ -69,10 +58,9 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.time.Instant
-import java.util.ArrayList
 import java.util.Arrays
-import java.util.LinkedHashMap
 import java.util.Objects.requireNonNull
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.function.Consumer
 
@@ -85,12 +73,13 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
     private val subscribers: Collection<RabbitMqSubscriber>
     private val messageCollector: MessageCollector
     private val converter = ProtoToIMessageConverter(DefaultMessageFactoryProxy(), null, null)
-    private val eventStoreConnector: EventStoreServiceBlockingStub
 
-    private val streamObservable : Observable<StreamContainer>
-    private val checkpointSubscriber : CheckpointSubscriber
-    private val mqSubject : PublishSubject<ByteArray>
+    private val eventStoreStub: EventStoreServiceFutureStub
+    private val streamObservable: Observable<StreamContainer>
+    private val checkpointSubscriber: CheckpointSubscriber
+    private val mqSubject: PublishSubject<ByteArray>
     private val scheduler = ScheduledThreadPoolExecutor(1)
+    private val eventIdToLastCheckTask = ConcurrentHashMap<CheckTaskKey, AbstractCheckTask>()
 
     @Throws(InvalidProtocolBufferException::class)
     private fun handleIncamingMessage(consumerTag: String, delivery: Delivery) {
@@ -110,8 +99,25 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckRule(checkRuleRequest: CheckRuleRequest, startTime: Instant) {
-        val sessionAlias : String = requireNonNull(checkRuleRequest.connectivityId.sessionAlias, "Session alias cant't be null")
+    fun verifyCheckRule(request: CheckRuleRequest) {
+        val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
+        val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias cant't be null")
+        val filter: MessageFilter = requireNonNull(request.filter, "Message filter can't be null")
+
+        val task = CheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout, filter,
+            parentEventID, streamObservable, scheduler, eventStoreStub)
+
+        eventIdToLastCheckTask.compute(CheckTaskKey(request.parentEventId, request.connectivityId)) { _, value ->
+            if (value != null) {
+                value.subscribeNextTask(task)
+            } else {
+                task.begin(request.checkpoint)
+            }
+            task
+        }
+
+        // TODO: try to remove prune tasks
+
 //        streamObservable.mapToMessage(sessionAlias, checkRuleRequest.checkpoint.getSequence(sessionAlias))
 //        TODO
 //
@@ -159,7 +165,22 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckSequenceRule(checkSequenceRuleRequest: CheckSequenceRuleRequest, startTime: Instant?) {
+    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, startTime: Instant?) {
+        val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
+        val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias cant't be null")
+
+        val task = SequenceCheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout,
+            parentEventID, streamObservable, scheduler, eventStoreStub)
+
+        eventIdToLastCheckTask.compute(CheckTaskKey(request.parentEventId, request.connectivityId)) { _, value ->
+            if (value != null) {
+                value.subscribeNextTask(task)
+            } else {
+                task.begin(request.checkpoint)
+            }
+            task
+        }
+
 //        val verifyStartTime = Instant.now()
 //        val rootEvent = Event.from(startTime)
 //            .name("CheckSequenceRule " + checkSequenceRuleRequest.connectivityId.sessionAlias)
@@ -287,7 +308,7 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
                 .addAllEvents(event.toProtoEvents(parentEventID.id))
                 .build())
             .build()
-        val response = eventStoreConnector.storeEventBatch(storeRequest)
+        val response = eventStoreStub.storeEventBatch(storeRequest)
         if (logger.isDebugEnabled) {
             logger.debug("Sent event batch '{}' with result {}", shortDebugString(storeRequest), parentEventID, response)
         }
@@ -432,7 +453,7 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
         }
 
         val th2Configuration = configuration.th2
-        eventStoreConnector = EventStoreServiceGrpc.newBlockingStub(ManagedChannelBuilder.forAddress(
+        eventStoreStub = EventStoreServiceGrpc.newFutureStub(ManagedChannelBuilder.forAddress(
             th2Configuration.th2EventStorageGRPCHost, th2Configuration.th2EventStorageGRPCPort)
             .usePlaintext().build())
     }

@@ -18,8 +18,10 @@ package com.exactpro.th2.verifier;
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
+import io.reactivex.annotations.NonNull;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.observables.ConnectableObservable;
+import io.reactivex.observers.DisposableObserver;
 import io.reactivex.subjects.SingleSubject;
 import kotlin.Pair;
 import kotlin.Triple;
@@ -28,15 +30,15 @@ public class Test {
 
     public static void main(String[] args) throws InterruptedException {
 
-        SingleSubject<Long> b = SingleSubject.create();
-        b.subscribe(a -> System.out.println("test1 " + a));
-        b.subscribe(a -> System.out.println("test1 " + a));
-
-        b.onSuccess(1L);
-
-        System.out.println(b.hasObservers());
-
-        if (true) return;
+//        SingleSubject<Long> b = SingleSubject.create();
+//        b.subscribe(a -> System.out.println("test1 " + a));
+//        b.subscribe(a -> System.out.println("test1 " + a));
+//
+//        b.onSuccess(1L);
+//
+//        System.out.println(b.hasObservers());
+//
+//        if (true) return;
 
         ConnectableObservable<Triple<Long, ConnectableObservable<Long>, ConnectableObservable<Long>>> map = Observable.intervalRange(0, 20, 0, 200, TimeUnit.MILLISECONDS)
                 .groupBy(it -> it % 2)
@@ -55,9 +57,26 @@ public class Test {
                 .flatMap(Triple::component3)
                 .subscribe(a -> System.out.println("test1 " + a));
 
-        Disposable subscribe2 = map.filter(pair -> pair.component1() == 1)
+        DisposableObserver subscribe2 = new DisposableObserver<Long>() {
+            @Override
+            public void onNext(@NonNull Long aLong) {
+                System.out.println("test2 " + aLong);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable e) {
+                System.out.println("test2 error");
+            }
+
+            @Override
+            public void onComplete() {
+                System.out.println("test2 complete");
+            }
+        };
+
+        map.filter(pair -> pair.component1() == 1)
                 .flatMap(Triple::component3)
-                .subscribe(a -> System.out.println("test2 " + a));
+                .subscribe(subscribe2);
 
         Thread.sleep(1000);
         subscribe1.dispose();
