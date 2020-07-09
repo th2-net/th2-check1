@@ -1,12 +1,16 @@
-image: 'openjdk:11.0.2'
-stages:
-  - build
+image: docker
+services:
+  - name: docker:dind
+    alias: docker
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
 build:
-  image: docker
   stage: build
   script:
     - "export VERSION_MAINTENANCE=$(docker run --rm -v $(pwd):/git/ alpine/git:v2.26.2 rev-list --count VERSION-1.1..HEAD)"
-    - " docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
+    - "docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
         --build-arg CI_PIPELINE_IID --build-arg VERSION_MAINTENANCE=${VERSION_MAINTENANCE} \
         --build-arg ARTIFACTORY_USER --build-arg ARTIFACTORY_PASS --build-arg ARTIFACTORY_REPO \
         --build-arg ARTIFACTORY_URL --build-arg ARTIFACTORY_RESOLVE_REPO ."
