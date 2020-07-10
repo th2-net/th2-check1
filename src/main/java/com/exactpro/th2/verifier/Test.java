@@ -17,12 +17,15 @@ package com.exactpro.th2.verifier;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.poi.ss.formula.functions.T;
+
 import io.reactivex.Observable;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.observables.ConnectableObservable;
 import io.reactivex.observers.DisposableObserver;
 import io.reactivex.subjects.SingleSubject;
+import io.reactivex.subjects.Subject;
 import kotlin.Pair;
 import kotlin.Triple;
 
@@ -30,15 +33,37 @@ public class Test {
 
     public static void main(String[] args) throws InterruptedException {
 
-//        SingleSubject<Long> b = SingleSubject.create();
-//        b.subscribe(a -> System.out.println("test1 " + a));
-//        b.subscribe(a -> System.out.println("test1 " + a));
-//
-//        b.onSuccess(1L);
-//
-//        System.out.println(b.hasObservers());
-//
-//        if (true) return;
+        Observable<Long> b = Subject.intervalRange(0, 10, 0, 500, TimeUnit.MILLISECONDS)
+                .publish()
+                .autoConnect();
+
+        var c = new DisposableObserver<Long>() {
+
+            @Override
+            public void onError(@NonNull Throwable e) {
+                System.out.println("error");
+            }
+
+            @Override
+            public void onComplete() {
+                System.out.println("Complete");
+            }
+
+            @Override
+            public void onNext(@NonNull Long t) {
+                System.out.println("next " + t);
+            }
+        };
+
+        b.subscribe(c);
+
+        Thread.sleep(1000);
+
+        c.dispose();
+
+        Thread.sleep(1000);
+
+        if (true) return;
 
         ConnectableObservable<Triple<Long, ConnectableObservable<Long>, ConnectableObservable<Long>>> map = Observable.intervalRange(0, 20, 0, 200, TimeUnit.MILLISECONDS)
                 .groupBy(it -> it % 2)

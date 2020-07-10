@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.verifier
+package com.exactpro.th2.verifier.rule
 
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
@@ -24,6 +24,7 @@ import com.exactpro.th2.ProtoToIMessageConverter
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
+import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest
 import com.exactpro.th2.infra.grpc.Checkpoint
@@ -32,15 +33,21 @@ import com.exactpro.th2.infra.grpc.EventBatch
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.Message
 import com.exactpro.th2.infra.grpc.MessageFilter
+import com.exactpro.th2.verifier.AbstractSessionObserver
+import com.exactpro.th2.verifier.CollectorServiceA
+import com.exactpro.th2.verifier.DefaultMessageFactoryProxy
+import com.exactpro.th2.verifier.StreamContainer
 import com.exactpro.th2.verifier.event.bean.builder.VerificationBuilder
+import com.exactpro.th2.verifier.rule.sequence.ComparisonContainer
 import com.exactpro.th2.verifier.util.VerificationUtil
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
+import io.reactivex.Single
+import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.SingleSubject
 import java.time.Instant
 import java.util.concurrent.ForkJoinPool
-import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
@@ -48,22 +55,38 @@ import java.util.concurrent.atomic.AtomicBoolean
 abstract class AbstractCheckTask(private val description: String?,
                                  private val timeout: Long,
                                  submitTime: Instant,
-                                 private val sessionAlias: String,
+                                 protected val sessionAlias: String,
                                  private val parentEventID: EventID,
                                  private val messageStream: Observable<StreamContainer>,
                                  private val scheduler: ScheduledThreadPoolExecutor,
-                                 private val eventStoreStub: EventStoreServiceFutureStub) : AbstractSessionObserver<SingleCSHIterator>() {
-
-    private val sequenceSubject = SingleSubject.create<Long>()
-    private val hasNextTask = AtomicBoolean(false)
-    private val eventPublished = AtomicBoolean(false)
-    private lateinit var endFuture: ScheduledFuture<*>
-    @Volatile
-    private var lastSequence = Long.MIN_VALUE
+                                 private val eventStoreStub: EventStoreServiceFutureStub) : AbstractSessionObserver<MessageContainer>() {
+    protected var handledMessageCounter: Long = 0
 
     protected val converter = ProtoToIMessageConverter(DefaultMessageFactoryProxy(), null, null)
     protected val rootEvent: Event = Event.from(submitTime)
         .description(description)
+
+    private val sequenceSubject = SingleSubject.create<Long>()
+    private val hasNextTask = AtomicBoolean(false)
+    private val eventPublished = AtomicBoolean(false)
+
+    private lateinit var endFuture: Disposable
+
+    private var lastSequence = Long.MIN_VALUE
+
+    override fun onStart() {
+        super.onStart()
+
+        //Init or re-init variable in TASK_SCHEDULER thread
+        handledMessageCounter = 0
+    }
+
+    override fun onError(e: Throwable) {
+        super.onError(e)
+
+        rootEvent.status(FAILED)
+            .bodyData(EventUtils.createMessageBean(e.message))
+    }
 
     /**
      * Registers a task as the next task in continuous verification chain. Its {@link #begin} method will be called
@@ -103,7 +126,7 @@ abstract class AbstractCheckTask(private val description: String?,
         try {
             LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
             dispose()
-            endFuture.cancel(true)
+            endFuture.dispose()
             sequenceSubject.onSuccess(lastSequence)
         } finally {
             publishEvent()
@@ -113,38 +136,41 @@ abstract class AbstractCheckTask(private val description: String?,
     /**
      * Provides feature to define custom filter for observe.
      */
-    protected open fun Observable<Message>.taskFilter() : Observable<Message> = this
+    protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
 
     /**
      * Observe a message sequence from previous task.
      * Task subscribe to messages stream with sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param sequence message sequence from previous task.
-     * @throws IllegalStateException when method is called more than once. TODO: implements
+     * @throws IllegalStateException when method is called more than once. TODO: implements, it should thread-safe
      */
     private fun begin(sequence: Long = DEFAULT_SEQUENCE) {
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionAlias, sequence, timeout)
-        lastSequence = sequence
 
         messageStream.observeOn(TASK_SCHEDULER) // Defined scheduler to execution in one thread
-            .mapToMessage(sessionAlias, sequence)
+            .continueObserve(sessionAlias, sequence)
             .doOnNext {
+                handledMessageCounter++
+
                 with(it.metadata.id) {
                     lastSequence = this.sequence
                     rootEvent.messageID(this)
                 }
             }
-            .taskFilter()
-            .mapToCSH()
+            .mapToMessageContainer()
+            .taskPipeline()
             .subscribe(this)
 
-        endFuture = scheduler.schedule(this::end, timeout, MILLISECONDS)
+        endFuture = Single.timer(timeout, MILLISECONDS)
+            .observeOn(TASK_SCHEDULER)
+            .subscribe(this::end)
     }
 
     /**
      * Disposes task when timeout is over. Task unsubscribe from message stream.
      */
-    private fun end() {
+    private fun end(signal: Long) {
         try {
             LOGGER.info("Timeout is over for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
             dispose()
@@ -186,9 +212,11 @@ abstract class AbstractCheckTask(private val description: String?,
     }
 
     protected fun MessageFilter.toCompareSettings(): ComparatorSettings =
-        ComparatorSettings().also { it.metaContainer = VerificationUtil.toMetaContainer(this, false) }
+        ComparatorSettings().also {
+            it.metaContainer = VerificationUtil.toMetaContainer(this, false)
+        }
 
-    protected fun Event.appendEventWithVerification(protoMessage: Message, protoMessageFilter: MessageFilter, comparisonResult: ComparisonResult) {
+    protected fun Event.appendEventWithVerification(protoMessage: Message, protoMessageFilter: MessageFilter, comparisonResult: ComparisonResult): Event {
         val verificationComponent = VerificationBuilder()
         comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
             verificationComponent.verification(key, value, protoMessageFilter, true)
@@ -200,12 +228,27 @@ abstract class AbstractCheckTask(private val description: String?,
                 .messageID(id)
                 .bodyData(verificationComponent.build())
         }
+        return this
     }
 
-    private fun Observable<Message>.mapToCSH(): Observable<SingleCSHIterator> =
-        map { message -> SingleCSHIterator(converter, message) }
+    protected fun Event.appendEventWithVerifications(comparisonContainers: Collection<ComparisonContainer>): Event {
+        for (comparisonContainer in comparisonContainers) {
+            addSubEventWithSamePeriod().appendEventWithVerification(comparisonContainer.protoActual, comparisonContainer.protoFilter, comparisonContainer.comparisonResult!!)
+        }
+        return this
+    }
 
-    private fun Observable<StreamContainer>.mapToMessage(sessionAlias: String, sequence: Long): Observable<Message> =
+    private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
+        map { message -> MessageContainer(message, converter.fromProtoMessage(message, false)) }
+
+//    private fun Observable<Message>.mapToCSH(): Observable<SingleCSHIterator> =
+//        map { message -> SingleCSHIterator(converter, message) }
+
+    /**
+     * Filters incoming {@link StreamContainer} via session alias and then
+     * filters message which sequence grete than passed
+     */
+    private fun Observable<StreamContainer>.continueObserve(sessionAlias: String, sequence: Long): Observable<Message> =
         filter { streamContainer -> streamContainer.sessionAlias == sessionAlias }
             .flatMap(StreamContainer::bufferedMessages)
             .filter { message -> message.metadata.id.sequence > sequence }

@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.verifier
+package com.exactpro.th2.verifier.rule.check
 
-import com.exactpro.sf.aml.script.actions.WaitAction.waitMessage
 import com.exactpro.sf.common.messages.IMessage
-import com.exactpro.sf.common.util.Pair
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
+import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageFilter
+import com.exactpro.th2.verifier.rule.MessageContainer
+import com.exactpro.th2.verifier.StreamContainer
+import com.exactpro.th2.verifier.rule.AbstractCheckTask
 import io.reactivex.Observable
 import java.time.Instant
 import java.util.concurrent.ScheduledThreadPoolExecutor
@@ -47,39 +49,33 @@ class CheckRuleTask(description: String?,
     private val filter: IMessage = converter.fromProtoFilter(protoMessageFilter, protoMessageFilter.messageType)
     private val settings: ComparatorSettings = protoMessageFilter.toCompareSettings()
 
+    init {
+        rootEvent
+            .name("Check rule $sessionAlias")
+            .type("Check rule")
+    }
+
     override fun onStart() {
         super.onStart()
-        rootEvent
-            .name("Check rule")
-            .type("Check rule")
 
-        rootEvent.addSubEvent(Event.start())
+        val subEvent = Event.start()
             .endTimestamp()
             .name("Message filter")
             .type("Filter")
             .bodyData(EventUtils.createMessageBean("Passed filter will be placed there")) // TODO: Write filter
 
+        rootEvent.addSubEvent(subEvent)
+
     }
 
-    override fun onNext(singleCSHIterator: SingleCSHIterator) {
-        try {
-            val comparisonResults: List<Pair<IMessage, ComparisonResult>> = waitMessage(settings, filter,
-                singleCSHIterator, 0, emptyList(), false)
+    override fun onNext(messageContainer: MessageContainer) {
+        val comparisonResult: ComparisonResult? = MessageComparator.compare(messageContainer.sailfishMessage, filter, settings)
+        LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
 
-            if (LOGGER.isDebugEnabled) {
-                comparisonResults.forEach { LOGGER.debug("'${it.first.name}': ${it.second}") }
-            }
-
-            if (comparisonResults.isNotEmpty()) {
-                rootEvent.addSubEventWithSamePeriod()
-                    .appendEventWithVerification(singleCSHIterator.protoMessage, protoMessageFilter, comparisonResults[0].second)
-                checkComplete()
-            }
-        } catch (e: Exception) {
-            throw e.also {
-                rootEvent.status(FAILED)
-                    .bodyData(EventUtils.createMessageBean(it.message))
-            }
+        if (comparisonResult != null) {
+            rootEvent.addSubEventWithSamePeriod()
+                .appendEventWithVerification(messageContainer.protoMessage, protoMessageFilter, comparisonResult)
+            checkComplete()
         }
     }
 

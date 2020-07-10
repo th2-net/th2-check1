@@ -46,6 +46,8 @@ import com.exactpro.th2.verifier.event.bean.builder.VerificationBuilder
 import com.exactpro.th2.verifier.grpc.CheckRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckpointRequestOrBuilder
+import com.exactpro.th2.verifier.rule.AbstractCheckTask
+import com.exactpro.th2.verifier.rule.check.CheckRuleTask
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.InvalidProtocolBufferException
 import com.google.protobuf.TextFormat.shortDebugString
@@ -169,17 +171,17 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
         val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
         val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias cant't be null")
 
-        val task = SequenceCheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout,
-            parentEventID, streamObservable, scheduler, eventStoreStub)
-
-        eventIdToLastCheckTask.compute(CheckTaskKey(request.parentEventId, request.connectivityId)) { _, value ->
-            if (value != null) {
-                value.subscribeNextTask(task)
-            } else {
-                task.begin(request.checkpoint)
-            }
-            task
-        }
+//        val task = SequenceCheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout, request.preFilter,
+//            parentEventID, streamObservable, scheduler, eventStoreStub)
+//
+//        eventIdToLastCheckTask.compute(CheckTaskKey(request.parentEventId, request.connectivityId)) { _, value ->
+//            if (value != null) {
+//                value.subscribeNextTask(task)
+//            } else {
+//                task.begin(request.checkpoint)
+//            }
+//            task
+//        }
 
 //        val verifyStartTime = Instant.now()
 //        val rootEvent = Event.from(startTime)

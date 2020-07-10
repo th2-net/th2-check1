@@ -17,6 +17,7 @@ package com.exactpro.th2.verifier.event;
 
 import java.util.List;
 
+import com.exactpro.th2.infra.grpc.Message;
 import com.exactpro.th2.infra.grpc.MessageFilter;
 import com.exactpro.th2.infra.grpc.ValueFilter;
 import com.exactpro.th2.verifier.CollectorService.Result;
@@ -39,13 +40,17 @@ public class CheckSequenceUtils {
     }
 
     /**
-     * In the case when actual message was found for the MessageFitler.
+     * In the case when actual message was found for the MessageFilter.
      */
-    public static CheckSequenceRow createBothSide(Result result, String connectivityId) {
+    public static CheckSequenceRow createBothSide(IMessage actual, MessageFilter filter, String sessionAlias) {
         CheckSequenceRow row = new CheckSequenceRow();
-        row.setActualMessage(result.getActual().getName() + ", " + connectivityId + getKeyFields(result.getActual(), result.getMessageFilter()));
-        row.setExpectedMessage(result.getMessageFilter().getMessageType() + ", " + connectivityId + getKeyFields(result.getMessageFilter()));
+        row.setActualMessage(actual.getName() + ", " + sessionAlias + getKeyFields(actual, filter));
+        row.setExpectedMessage(filter.getMessageType() + ", " + sessionAlias + getKeyFields(filter));
         return row;
+    }
+
+    public static CheckSequenceRow createBothSide(Result result, String sessionAlias) {
+        return createBothSide(result.getActual(), result.getMessageFilter(), sessionAlias);
     }
 
     /**
