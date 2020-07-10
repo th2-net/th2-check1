@@ -148,8 +148,8 @@ public class CollectorService {
             }
         } catch (InterruptedException | RuntimeException e) {
             rootEvent
-                    .name("verifyCheckRule error")
-                    .name("Error")
+                    .name("verifyCheckRule failed")
+                    .type("Error")
                     .status(Status.FAILED)
                     .bodyData(createMessageBean(e.getMessage()));
             throw e;
