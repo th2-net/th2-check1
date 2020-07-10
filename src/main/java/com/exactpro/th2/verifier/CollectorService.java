@@ -136,6 +136,7 @@ public class CollectorService {
 
                 if (comparisonResults.isEmpty()) {
                     rootEvent.name("No message found by target keys")
+                            .type("Error")
                             .status(Status.FAILED);
                     logger.error("CheckRule failed. No message found by target keys. Request = " + checkRuleRequest);
                     return;
@@ -146,7 +147,10 @@ public class CollectorService {
                 messageCollector.removeIterator(checkRuleRequest.getConnectivityId().getSessionAlias(), Direction.FIRST, iterator);
             }
         } catch (InterruptedException | RuntimeException e) {
-            rootEvent.status(Status.FAILED)
+            rootEvent
+                    .name("verifyCheckRule error")
+                    .name("Error")
+                    .status(Status.FAILED)
                     .bodyData(createMessageBean(e.getMessage()));
             throw e;
         } finally {
@@ -391,6 +395,7 @@ public class CollectorService {
 
         event.name("Verification '" + actualMessage.getName() + "' message")
                 .status(getStatusType(comparisonResult) == FAILED ? Status.FAILED : Status.PASSED)
+                .type("Verification")
                 .messageID(actualMessage.getMessageId())
                 .bodyData(verificationComponent.build());
     }
