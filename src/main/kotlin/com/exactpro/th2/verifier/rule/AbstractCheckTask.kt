@@ -48,7 +48,6 @@ import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.SingleSubject
 import java.time.Instant
 import java.util.concurrent.ForkJoinPool
-import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -58,7 +57,6 @@ abstract class AbstractCheckTask(private val description: String?,
                                  protected val sessionAlias: String,
                                  private val parentEventID: EventID,
                                  private val messageStream: Observable<StreamContainer>,
-                                 private val scheduler: ScheduledThreadPoolExecutor,
                                  private val eventStoreStub: EventStoreServiceFutureStub) : AbstractSessionObserver<MessageContainer>() {
     protected var handledMessageCounter: Long = 0
 
@@ -164,13 +162,13 @@ abstract class AbstractCheckTask(private val description: String?,
 
         endFuture = Single.timer(timeout, MILLISECONDS)
             .observeOn(TASK_SCHEDULER)
-            .subscribe(this::end)
+            .subscribe { _ -> end() }
     }
 
     /**
      * Disposes task when timeout is over. Task unsubscribe from message stream.
      */
-    private fun end(signal: Long) {
+    private fun end() {
         try {
             LOGGER.info("Timeout is over for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
             dispose()

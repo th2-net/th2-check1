@@ -19,17 +19,11 @@ import static com.exactpro.th2.infra.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.infra.grpc.RequestStatus.Status.SUCCESS;
 import static com.google.protobuf.TextFormat.shortDebugString;
 
-import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.exactpro.th2.common.event.Event;
-import com.exactpro.th2.infra.grpc.EventID;
 import com.exactpro.th2.infra.grpc.RequestStatus;
 import com.exactpro.th2.verifier.grpc.CheckRuleRequest;
 import com.exactpro.th2.verifier.grpc.CheckRuleResponse;
@@ -38,19 +32,16 @@ import com.exactpro.th2.verifier.grpc.CheckSequenceRuleResponse;
 import com.exactpro.th2.verifier.grpc.CheckpointRequest;
 import com.exactpro.th2.verifier.grpc.CheckpointResponse;
 import com.exactpro.th2.verifier.grpc.VerifierGrpc.VerifierImplBase;
-import com.google.protobuf.TextFormat;
 
 import io.grpc.stub.StreamObserver;
 
 public class VerifierHandler extends VerifierImplBase {
     private final Logger logger = LoggerFactory.getLogger(getClass().getName() + "@" + hashCode());
 
-    private final CollectorService collectorService;
-    private final ExecutorService executorService;
+    private final CollectorServiceA collectorService;
 
-    public VerifierHandler(CollectorService collectorService, ExecutorService executorService) {
+    public VerifierHandler(CollectorServiceA collectorService, ExecutorService executorService) {
         this.collectorService = collectorService;
-        this.executorService = executorService;
     }
 
     @Override
@@ -79,21 +70,18 @@ public class VerifierHandler extends VerifierImplBase {
     @Override
     public void submitCheckRule(CheckRuleRequest request, StreamObserver<CheckRuleResponse> responseObserver) {
         try {
-            if (logger.isInfoEnabled()) { logger.info("SubmitCheckRule request: " + shortDebugString(request)); }
+            if (logger.isInfoEnabled()) {
+                logger.info("SubmitCheckRule request: " + shortDebugString(request));
+            }
             RequestStatus status = RequestStatus.newBuilder()
                     .setStatus(SUCCESS)
                     .build();
             try {
-                Instant submitTime = Instant.now();
-                executorService.submit(() -> {
-                    try {
-                        collectorService.verifyCheckRule(request, submitTime);
-                    } catch (Exception e) {
-                        if (logger.isErrorEnabled()) { logger.error("CheckRule failed in CollectorService. Request " + shortDebugString(request), e); }
-                    }
-                });
-            } catch (RejectedExecutionException e) {
-                if (logger.isErrorEnabled()) { logger.error("CheckRule failed. Task not submited. Request " + shortDebugString(request), e); }
+                collectorService.verifyCheckRule(request);
+            } catch (Exception e) {
+                if (logger.isErrorEnabled()) {
+                    logger.error("CheckRule failed in CollectorService. Request " + shortDebugString(request), e);
+                }
                 status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
                         .setMessage("submitCheckRule interrupted by internal process")
@@ -104,7 +92,9 @@ public class VerifierHandler extends VerifierImplBase {
                     .build());
             responseObserver.onCompleted();
         } catch (Throwable e) {
-            if (logger.isErrorEnabled()) { logger.error("CheckRule failed. Request " + shortDebugString(request), e); }
+            if (logger.isErrorEnabled()) {
+                logger.error("CheckRule failed. Request " + shortDebugString(request), e);
+            }
             responseObserver.onNext(CheckRuleResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("CheckRule failed. See the logs.").build())
                     .build());
@@ -119,18 +109,17 @@ public class VerifierHandler extends VerifierImplBase {
                     .setStatus(SUCCESS)
                     .build();
             try {
-                Instant submitTime = Instant.now();
-                executorService.submit(() -> {
-                    try {
-                        if (logger.isInfoEnabled()) { logger.info("Sequence rule for request '"+ shortDebugString(request) +"' started"); }
-                        collectorService.verifyCheckSequenceRule(request, submitTime);
-                        if (logger.isInfoEnabled()) { logger.info("Sequence rule for request '"+ shortDebugString(request) +"' finished"); }
-                    } catch (Exception e) {
-                        if (logger.isErrorEnabled()) { logger.error("Sequence rule for request '"+ shortDebugString(request) +"' failed", e); }
-                    }
-                });
-            } catch (RejectedExecutionException e) {
-                if (logger.isErrorEnabled()) { logger.error("Sequence rule task for request '"+ shortDebugString(request) +"' isn't submited", e); }
+                if (logger.isInfoEnabled()) {
+                    logger.info("Sequence rule for request '" + shortDebugString(request) + "' started");
+                }
+                collectorService.verifyCheckSequenceRule(request);
+                if (logger.isInfoEnabled()) {
+                    logger.info("Sequence rule for request '" + shortDebugString(request) + "' finished");
+                }
+            } catch (Exception e) {
+                if (logger.isErrorEnabled()) {
+                    logger.error("Sequence rule for request '" + shortDebugString(request) + "' failed", e);
+                }
                 status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
                         .setMessage("Sequence rule rejected by internal process: " + e.getMessage())
@@ -141,11 +130,13 @@ public class VerifierHandler extends VerifierImplBase {
                     .build());
             responseObserver.onCompleted();
         } catch (RuntimeException e) {
-            if (logger.isErrorEnabled()) { logger.error("Sequence rule task for request '"+ shortDebugString(request) +"' isn't submited", e); }
+            if (logger.isErrorEnabled()) {
+                logger.error("Sequence rule task for request '" + shortDebugString(request) + "' isn't submited", e);
+            }
             responseObserver.onNext(CheckSequenceRuleResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR)
-                        .setMessage("Sequence rule rejected by internal process: " + e.getMessage())
-                        .build())
+                            .setMessage("Sequence rule rejected by internal process: " + e.getMessage())
+                            .build())
                     .build());
             responseObserver.onCompleted();
         }

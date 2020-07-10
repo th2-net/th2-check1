@@ -41,7 +41,6 @@ import com.exactpro.th2.verifier.rule.MessageContainer
 import io.reactivex.Observable
 import java.time.Instant
 import java.util.LinkedHashMap
-import java.util.concurrent.ScheduledThreadPoolExecutor
 
 /**
  *
@@ -55,8 +54,7 @@ class SequenceCheckRuleTask(description: String?,
                             private val checkOrder: Boolean,
                             parentEventID: EventID,
                             messageStream: Observable<StreamContainer>,
-                            scheduler: ScheduledThreadPoolExecutor,
-                            eventStoreStub: EventStoreServiceFutureStub) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, scheduler, eventStoreStub) {
+                            eventStoreStub: EventStoreServiceFutureStub) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, eventStoreStub) {
 
     private val protoPreMessageFilter: MessageFilter = protoPreFilter.toMessageFilter()
     private val preFilter: IMessage = converter.fromProtoPreFilter(protoPreMessageFilter)
@@ -199,8 +197,6 @@ class SequenceCheckRuleTask(description: String?,
         .setMessageType(PRE_FILTER_MESSAGE_NAME)
         .putAllFields(fieldsMap)
         .build()
-
-    private class MessageFilterContainer(val protoMessageFilter: MessageFilter, val sailfishMessageFilter: IMessage, val comparatorSettings: ComparatorSettings)
 
     companion object {
         const val PRE_FILTER_MESSAGE_NAME = "PreFilter"

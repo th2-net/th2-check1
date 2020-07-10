@@ -19,4 +19,4 @@ import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.th2.infra.grpc.MessageFilter
 
-open class MessageFilterContainer(val protoMessageFilter: MessageFilter, val sailfishMessageFilter: IMessage, val comparatorSettings: ComparatorSettings)
+class MessageFilterContainer(val protoMessageFilter: MessageFilter, val sailfishMessageFilter: IMessage, val comparatorSettings: ComparatorSettings)

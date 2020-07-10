@@ -31,7 +31,6 @@ import com.exactpro.th2.verifier.StreamContainer
 import com.exactpro.th2.verifier.rule.AbstractCheckTask
 import io.reactivex.Observable
 import java.time.Instant
-import java.util.concurrent.ScheduledThreadPoolExecutor
 
 /**
  *
@@ -43,8 +42,7 @@ class CheckRuleTask(description: String?,
                     private val protoMessageFilter: MessageFilter,
                     parentEventID: EventID,
                     messageStream: Observable<StreamContainer>,
-                    scheduler: ScheduledThreadPoolExecutor,
-                    eventStoreStub: EventStoreServiceFutureStub) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, scheduler, eventStoreStub) {
+                    eventStoreStub: EventStoreServiceFutureStub) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, eventStoreStub) {
 
     private val filter: IMessage = converter.fromProtoFilter(protoMessageFilter, protoMessageFilter.messageType)
     private val settings: ComparatorSettings = protoMessageFilter.toCompareSettings()
