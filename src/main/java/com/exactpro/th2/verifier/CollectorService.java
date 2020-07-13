@@ -1,12 +1,9 @@
 /*
  * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,14 +19,11 @@ import static com.exactpro.th2.verifier.event.CheckSequenceUtils.createBothSide;
 import static com.exactpro.th2.verifier.event.CheckSequenceUtils.createOnlyActualSide;
 import static com.exactpro.th2.verifier.event.CheckSequenceUtils.createOnlyExpectedSide;
 import static com.exactpro.th2.verifier.util.VerificationUtil.toMetaContainer;
-import static io.grpc.ManagedChannelBuilder.forAddress;
 import static java.lang.String.format;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -37,8 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeoutException;
-
-import com.exactpro.th2.configuration.Th2Configuration.QueueNames;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -60,9 +52,8 @@ import com.exactpro.th2.common.event.bean.builder.MessageBuilder;
 import com.exactpro.th2.common.event.bean.builder.TableBuilder;
 import com.exactpro.th2.configuration.MicroserviceConfiguration;
 import com.exactpro.th2.configuration.RabbitMQConfiguration;
-import com.exactpro.th2.configuration.Th2Configuration;
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc;
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceBlockingStub;
+import com.exactpro.th2.configuration.Th2Configuration.QueueNames;
+import com.exactpro.th2.eventstore.grpc.EventStoreServiceService;
 import com.exactpro.th2.eventstore.grpc.Response;
 import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest;
 import com.exactpro.th2.infra.grpc.ConnectionID;
@@ -72,16 +63,18 @@ import com.exactpro.th2.infra.grpc.EventID;
 import com.exactpro.th2.infra.grpc.MessageBatch;
 import com.exactpro.th2.infra.grpc.MessageFilter;
 import com.exactpro.th2.infra.grpc.MessageID;
+import com.exactpro.th2.schema.grpc.router.GrpcRouter;
+import com.exactpro.th2.schema.message.MessageRouter;
+import com.exactpro.th2.schema.message.SubscriberMonitor;
+import com.exactpro.th2.verifier.configuration.VerifierConfiguration;
 import com.exactpro.th2.verifier.event.bean.CheckSequenceRow;
 import com.exactpro.th2.verifier.event.bean.builder.VerificationBuilder;
 import com.exactpro.th2.verifier.grpc.CheckRuleRequest;
 import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest;
 import com.exactpro.th2.verifier.grpc.CheckpointRequestOrBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import com.rabbitmq.client.DeliverCallback;
-import com.rabbitmq.client.Delivery;
 
 public class CollectorService {
     private final Logger logger = LoggerFactory.getLogger(getClass().getName() + '@' + hashCode());
@@ -89,34 +82,28 @@ public class CollectorService {
     /**
      * Queue name to subscriber. Messages with different connectivity can be transferred with one queue.
      */
-    private final Collection<RabbitMqSubscriber> subscribers;
+    private final SubscriberMonitor subscriberMonitor;
     private final MessageCollector messageCollector;
     private final ProtoToIMessageConverter converter = new ProtoToIMessageConverter(new DefaultMessageFactoryProxy(), null, null);
-    private final EventStoreServiceBlockingStub eventStoreConnector;
+    private final EventStoreServiceService eventStoreConnector;
 
-    public CollectorService(MicroserviceConfiguration configuration) throws InterruptedException {
-        // TODO get limit size from configuration
-        int limitSize = 1000;
-        messageCollector = new MessageCollector(limitSize);
-        subscribers = subscribe(configuration, this::handleIncamingMessage).values();
-        Th2Configuration th2Configuration = configuration.getTh2();
-        this.eventStoreConnector = EventStoreServiceGrpc.newBlockingStub(forAddress(
-                th2Configuration.getTh2EventStorageGRPCHost(), th2Configuration.getTh2EventStorageGRPCPort())
-                .usePlaintext().build());
+    public CollectorService(MessageRouter<MessageBatch> parsedMessageRouter, GrpcRouter grpcRouter, VerifierConfiguration configuration) throws InterruptedException {
+        messageCollector = new MessageCollector(configuration.getCollectorMaxSize());
+
+        subscriberMonitor = parsedMessageRouter.subscribeAll(this::handleIncamingMessage);
+        try {
+            eventStoreConnector = grpcRouter.getService(EventStoreServiceService.class);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("Can not find event store class", e);
+        }
     }
 
-    private void handleIncamingMessage(String consumerTag, Delivery delivery) throws InvalidProtocolBufferException {
+    private void handleIncamingMessage(String consumerTag, MessageBatch batch) {
         try {
-            MessageBatch batch = MessageBatch.parseFrom(delivery.getBody());
             messageCollector.handle(batch);
-        } catch (InvalidProtocolBufferException e) {
-            if (logger.isErrorEnabled()) {
-                logger.error("Parse batch failure, tag '{}', body '{}'", consumerTag, Arrays.toString(delivery.getBody()), e);
-            }
-            throw e;
         } catch (RuntimeException e) {
             if (logger.isErrorEnabled()) {
-                logger.error("Handle batch problem, tag '{}', body '{}'", consumerTag, Arrays.toString(delivery.getBody()), e);
+                logger.error("Handle batch problem, tag '{}', body '{}'", consumerTag, batch, e);
             }
         }
     }
@@ -313,12 +300,10 @@ public class CollectorService {
     }
 
     public void close() {
-        for (RabbitMqSubscriber subscriber : subscribers) {
-            try {
-                subscriber.close();
-            } catch (IOException e) {
-                logger.error("Close subscriber failure", e);
-            }
+        try {
+            subscriberMonitor.unsubscribe();
+        } catch (Exception e) {
+            throw new RuntimeException("Can not unsubscribe from all queues", e);
         }
     }
 
