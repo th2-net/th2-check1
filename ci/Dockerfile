@@ -1,4 +1,4 @@
-FROM gradle:6.4 AS build
+FROM gradle:6.4-jdk11 AS build
 COPY ./ .
 RUN gradle --no-daemon clean
 #FROM rycus86/intellij-idea:2020.1.2 AS inspect
