@@ -1,12 +1,12 @@
 FROM gradle:6.4-jdk11 AS build
 COPY ./ .
 RUN gradle --no-daemon clean
-#FROM rycus86/intellij-idea:2020.1.2 AS inspect
-#USER developer
-#COPY --from=build /home/gradle ./
-#COPY ./ci/idea ./
-#RUN git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.exactpro.com/vivarium/th2/intellij-idea-settings.git
-#RUN /opt/idea/bin/inspect.sh ./ ./intellij-idea-settings/inspection/Evolution.xml ./results -v2 --format plain
+FROM slon19/ideainspection AS inspect
+COPY --from=build /home/gradle ./
+COPY ./ci/idea ./
+ENV IDEA_PROPERIES=/opt/idea/idea.ci.properties
+RUN git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.exactpro.com/vivarium/th2/intellij-idea-settings.git
+RUN /opt/idea/bin/inspect.sh ./ ./intellij-idea-settings/inspection/Evolution.xml ./results -v2 --format plain
 FROM build as compile
 RUN gradle build artifactoryPublish -Pversion_build=${CI_PIPELINE_IID} \
     -Pversion_maintenance=${VERSION_MAINTENANCE} \
@@ -27,6 +27,6 @@ ENV RABBITMQ_HOST=rabbitmq \
     RABBITMQ_VHOST=th2 \
     GRPC_PORT=8080
 WORKDIR /home
-#COPY --from=inspect /opt/idea ./inspections
-COPY --from=compile /home/gralde ./
+COPY --from=inspect /opt/idea ./inspections
+COPY --from=compile /home/gradle ./
 ENTRYPOINT ["/home/verifier-service/bin/verifier-service", "/home/verifier-service/etc/config.yml"]
