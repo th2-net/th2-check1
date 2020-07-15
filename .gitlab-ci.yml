@@ -26,6 +26,9 @@ build:
       - 'build/*.tar'
       - 'build/*.zip'
       - 'inspection/results/*.xml'
+  cache:
+    paths:
+      - 'inspection/cache'
   only:
     variables:
       - $CI_COMMIT_BRANCH == "master"
