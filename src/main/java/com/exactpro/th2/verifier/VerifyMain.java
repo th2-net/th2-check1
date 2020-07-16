@@ -16,7 +16,7 @@
 package com.exactpro.th2.verifier;
 
 import com.exactpro.th2.configuration.RabbitMQConfiguration;
-import com.exactpro.th2.configuration.MicroserviceConfiguration;
+import com.exactpro.th2.verifier.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,10 +36,11 @@ public class VerifyMain {
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_USER}
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_PASS}
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_VHOST}
+     *  {@link Configuration#MESSAGE_CACHE_SIZE}
      */
     public static void main(String[] args) {
         try {
-            MicroserviceConfiguration configuration = readConfiguration(args);
+            Configuration configuration = readConfiguration(args);
             CollectorService collectorService = new CollectorService(configuration);
             ExecutorService executorService = Executors.newFixedThreadPool(10);//TODO config in future
             Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
@@ -55,10 +56,10 @@ public class VerifyMain {
         }
     }
 
-    private static MicroserviceConfiguration readConfiguration(String[] args) {
-        MicroserviceConfiguration configuration = args.length > 0
-                ? safeLoad(MicroserviceConfiguration::load, MicroserviceConfiguration::new, args[0])
-                : new MicroserviceConfiguration();
+    private static Configuration readConfiguration(String[] args) {
+        Configuration configuration = args.length > 0
+                ? safeLoad(Configuration::load, Configuration::new, args[0])
+                : new Configuration();
         LOGGER.info("Loading verify with configuration: {}", configuration);
         return configuration;
     }

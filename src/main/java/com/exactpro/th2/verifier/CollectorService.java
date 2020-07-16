@@ -40,6 +40,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.exactpro.th2.configuration.Th2Configuration.QueueNames;
 
+import com.exactpro.th2.verifier.configuration.Configuration;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,10 +95,8 @@ public class CollectorService {
     private final ProtoToIMessageConverter converter = new ProtoToIMessageConverter(new DefaultMessageFactoryProxy(), null, null);
     private final EventStoreServiceBlockingStub eventStoreConnector;
 
-    public CollectorService(MicroserviceConfiguration configuration) throws InterruptedException {
-        // TODO get limit size from configuration
-        int limitSize = 1000;
-        messageCollector = new MessageCollector(limitSize);
+    public CollectorService(Configuration configuration) throws InterruptedException {
+        messageCollector = new MessageCollector(configuration.getMessageCacheSize());
         subscribers = subscribe(configuration, this::handleIncamingMessage).values();
         Th2Configuration th2Configuration = configuration.getTh2();
         this.eventStoreConnector = EventStoreServiceGrpc.newBlockingStub(forAddress(
