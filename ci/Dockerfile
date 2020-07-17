@@ -4,9 +4,11 @@ RUN gradle --no-daemon clean
 FROM slon19/ideainspection AS inspect
 COPY --from=build /home/gradle ./
 COPY ./ci/idea ./
+ARG CI_JOB_TOKEN
 ENV IDEA_PROPERIES=/opt/idea/idea.ci.properties
+ENV CI_JOB_TOKEN=$CI_JOB_TOKEN
 RUN git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.exactpro.com/vivarium/th2/intellij-idea-settings.git
-RUN /opt/idea/bin/inspect.sh ./ ./intellij-idea-settings/inspection/Evolution.xml ./results -v2 --format plain
+RUN /opt/idea/bin/inspect.sh ./ ./intellij-idea-settings/inspection/Evolution.xml ./results -v2 -format plain
 FROM build as compile
 RUN gradle build artifactoryPublish -Pversion_build=${CI_PIPELINE_IID} \
     -Pversion_maintenance=${VERSION_MAINTENANCE} \
