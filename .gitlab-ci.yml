@@ -1,12 +1,35 @@
+image: docker
+services:
+  - name: docker:dind
+    alias: docker
 variables:
-  APP_NAME: "th2-verifier"
-  MAJOR_VERSION: "1"
-  MINOR_VERSION: "1"
-  INSPECTION_ENABLED: 'true'
-  TEST_ENABLED: 'false'
-  ARTIFACTORY_PUBLISH: 'true'
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+build:
+  stage: build
+  script:
+    - "export VERSION_MAINTENANCE=$(docker run --rm -v $(pwd):/git/ alpine/git:v2.26.2 rev-list --count VERSION-1.1..HEAD)"
+    - "docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
+        --build-arg CI_PIPELINE_IID --build-arg VERSION_MAINTENANCE=${VERSION_MAINTENANCE} \
+        --build-arg ARTIFACTORY_USER --build-arg ARTIFACTORY_PASS --build-arg ARTIFACTORY_REPO \
+        --build-arg ARTIFACTORY_URL --build-arg ARTIFACTORY_RESOLVE_REPO ."
+    - "docker create -v $(pwd)/build:./build/libs -v $(pwd)/build:./build/distributions \
+        -v $(pwd)/inspections:./inspections -v $(pwd)/imageName.txt:./imageName.txt"
+    - "export IMAGE_NAME=$(cat ./imageName.txt)"
+    - "docker tag pipeline:${CI_PIPELINE_IID} ${IMAGE_NAME}"
+    - "docker login -u ${TH2_REGISTRY_USR} -p ${TH2_REGISTRY_PSW} ${TH2_REGISTRY_URL}"
+#    - "docker push ${IMAGE_NAME}"
+  artifacts:
+    paths:
+      - 'build/*.jar'
+      - 'build/*.tar'
+      - 'build/*.zip'
+      - 'inspection/results/*.xml'
+  cache:
+    paths:
+      - 'inspection/cache'
+#  only:
+#    variables:
+#      - $CI_COMMIT_BRANCH == "master"
 
-include:
-  - project: 'vivarium/th2/pipelines'
-    ref: th2-269
-    file: '/.gitlab-ci-java.yml'
