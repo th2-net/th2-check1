@@ -14,8 +14,8 @@ build:
         --build-arg CI_PIPELINE_IID --build-arg VERSION_MAINTENANCE=${VERSION_MAINTENANCE} \
         --build-arg ARTIFACTORY_USER --build-arg ARTIFACTORY_PASS --build-arg ARTIFACTORY_REPO \
         --build-arg ARTIFACTORY_URL --build-arg ARTIFACTORY_RESOLVE_REPO ."
-    - "docker create -v $(pwd)/build:./build/libs -v $(pwd)/build:./build/distributions \
-        -v $(pwd)/inspections:./inspections -v $(pwd)/imageName.txt:./imageName.txt pipeline:${CI_PIPELINE_IID}"
+    - "docker create -v $(pwd)/build:/home/build/libs -v $(pwd)/build:/home/build/distributions \
+        -v $(pwd)/inspections:/home/inspections -v $(pwd)/imageName.txt:/home/imageName.txt pipeline:${CI_PIPELINE_IID}"
     - "export IMAGE_NAME=$(cat ./imageName.txt)"
     - "docker tag pipeline:${CI_PIPELINE_IID} ${IMAGE_NAME}"
     - "docker login -u ${TH2_REGISTRY_USR} -p ${TH2_REGISTRY_PSW} ${TH2_REGISTRY_URL}"
