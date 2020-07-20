@@ -10,7 +10,7 @@ ENV CI_JOB_TOKEN=$CI_JOB_TOKEN
 RUN git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.exactpro.com/vivarium/th2/intellij-idea-settings.git
 RUN /opt/idea/bin/inspect.sh ./ ./intellij-idea-settings/inspection/Evolution.xml ./results -v2 -format plain
 FROM build as compile
-RUN gradle build artifactoryPublish -Pversion_build=${CI_PIPELINE_IID} \
+RUN gradle build -Pversion_build=${CI_PIPELINE_IID} \
     -Pversion_maintenance=${VERSION_MAINTENANCE} \
     -Partifactory_user=${ARTIFACTORY_USER} \
     -Partifactory_password=${ARTIFACTORY_PASS} \

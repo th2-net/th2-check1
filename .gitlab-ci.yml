@@ -19,7 +19,7 @@ build:
     - "export IMAGE_NAME=$(cat ./imageName.txt)"
     - "docker tag pipeline:${CI_PIPELINE_IID} ${IMAGE_NAME}"
     - "docker login -u ${TH2_REGISTRY_USR} -p ${TH2_REGISTRY_PSW} ${TH2_REGISTRY_URL}"
-    - "docker push ${IMAGE_NAME}"
+#    - "docker push ${IMAGE_NAME}"
   artifacts:
     paths:
       - 'build/*.jar'
@@ -29,7 +29,7 @@ build:
   cache:
     paths:
       - 'inspection/cache'
-  only:
-    variables:
-      - $CI_COMMIT_BRANCH == "master"
+#  only:
+#    variables:
+#      - $CI_COMMIT_BRANCH == "master"
 
