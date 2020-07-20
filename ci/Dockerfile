@@ -19,8 +19,10 @@ RUN gradle build -Pversion_build=${CI_PIPELINE_IID} \
     -Partifactory_resolve_repo=${ARTIFACTORY_RESOLVE_REPO}
 RUN gradle -q getImageVersion -Pversion_build=${CI_PIPELINE_IID} \
            -Pversion_maintenance=${VERSION_MAINTENANCE} > version.txt && \
+           cat version.txt && \
     gradle -q getImageName -Pversion_build=${CI_PIPELINE_IID} \
-           -Pversion_maintenance=${VERSION_MAINTENANCE} > imageName.txt
+           -Pversion_maintenance=${VERSION_MAINTENANCE} > imageName.txt && \
+           cat imageName.txt
 FROM openjdk:12-alpine
 ENV RABBITMQ_HOST=rabbitmq \
     RABBITMQ_PORT=5672 \
