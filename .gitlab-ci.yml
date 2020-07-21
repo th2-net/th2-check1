@@ -6,7 +6,7 @@ variables:
   DOCKER_HOST: tcp://docker:2375
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: ""
-  GIT_DEPTH: "0"
+  GIT_FETCH_EXTRA_FLAGS: "--tags"
 build:
   stage: build
   script:
