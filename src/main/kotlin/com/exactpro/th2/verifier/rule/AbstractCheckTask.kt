@@ -94,7 +94,7 @@ abstract class AbstractCheckTask(private val description: String?,
      */
     fun subscribeNextTask(checkTask: AbstractCheckTask) {
         if (hasNextTask.compareAndSet(false, true)) {
-            sequenceSubject.subscribe { sequence -> checkTask.begin(sequence!!) }
+            sequenceSubject.subscribe { sequence -> checkTask.begin(sequence) }
         } else {
             throw IllegalStateException("Subscription to last sequence for task $description is already executed")
         }
@@ -160,8 +160,7 @@ abstract class AbstractCheckTask(private val description: String?,
             .taskPipeline()
             .subscribe(this)
 
-        endFuture = Single.timer(timeout, MILLISECONDS)
-            .observeOn(TASK_SCHEDULER)
+        endFuture = Single.timer(timeout, MILLISECONDS, TASK_SCHEDULER)
             .subscribe { _ -> end() }
     }
 
@@ -190,11 +189,14 @@ abstract class AbstractCheckTask(private val description: String?,
                 .build()
             val future = eventStoreStub.storeEventBatch(storeRequest)
 
-            future.addListener({
-                if (LOGGER.isDebugEnabled) {
-                    LOGGER.debug("Sent event batch '{}' with result {}", shortDebugString(storeRequest), shortDebugString(future.get()))
-                }
-            }, { ForkJoinPool.commonPool() })
+            future.addListener(
+                Runnable {
+                    if (LOGGER.isDebugEnabled) {
+                        LOGGER.debug("Sent event batch '{}' with result {}", shortDebugString(storeRequest), shortDebugString(future.get()))
+                    }
+                },
+                RESPONSE_EXECUTOR
+            )
         } else {
             LOGGER.warn("Event thee id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
         }
@@ -207,6 +209,8 @@ abstract class AbstractCheckTask(private val description: String?,
          */
         val TASK_SCHEDULER = Schedulers.newThread()
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
+
+        private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
     }
 
     protected fun MessageFilter.toCompareSettings(): ComparatorSettings =
@@ -238,9 +242,6 @@ abstract class AbstractCheckTask(private val description: String?,
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
         map { message -> MessageContainer(message, converter.fromProtoMessage(message, false)) }
-
-//    private fun Observable<Message>.mapToCSH(): Observable<SingleCSHIterator> =
-//        map { message -> SingleCSHIterator(converter, message) }
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then

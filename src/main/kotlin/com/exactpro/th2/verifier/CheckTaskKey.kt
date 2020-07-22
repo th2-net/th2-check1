@@ -18,5 +18,4 @@ package com.exactpro.th2.verifier
 import com.exactpro.th2.infra.grpc.ConnectionID
 import com.exactpro.th2.infra.grpc.EventID
 
-// TODO: Check equal and hash code methods
-class CheckTaskKey(val parentEventID: EventID, val connectionID: ConnectionID)
+data class CheckTaskKey(val parentEventID: EventID, val connectionID: ConnectionID)

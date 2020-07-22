@@ -48,6 +48,7 @@ import java.io.IOException
 import java.time.Instant
 import java.util.Objects.requireNonNull
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ForkJoinPool
 
 class CollectorServiceA(configuration: MicroserviceConfiguration) {
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
@@ -60,7 +61,7 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
     private val streamObservable: Observable<StreamContainer>
     private val checkpointSubscriber: CheckpointSubscriber
     private val mqSubject: PublishSubject<ByteArray>
-    private val eventIdToLastCheckTask = ConcurrentHashMap<CheckTaskKey, AbstractCheckTask>()
+    private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, AbstractCheckTask> = ConcurrentHashMap()
 
     @Throws(InterruptedException::class)
     fun verifyCheckRule(request: CheckRuleRequest) {
@@ -110,10 +111,12 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
                 .addAllEvents(event.toProtoEvents(parentEventID.id))
                 .build())
             .build()
-        val response = eventStoreStub.storeEventBatch(storeRequest)
-        if (logger.isDebugEnabled) {
-            logger.debug("Sent event batch '{}' with result {}", shortDebugString(storeRequest), parentEventID, response)
-        }
+        val future = eventStoreStub.storeEventBatch(storeRequest)
+        future.addListener(Runnable {
+            if (logger.isDebugEnabled) {
+                logger.debug("Sent event batch '{}' with result {}", shortDebugString(storeRequest), parentEventID, future.get())
+            }
+        }, ForkJoinPool.commonPool())
     }
 
     fun createCheckpoint(request: CheckpointRequestOrBuilder): Checkpoint {
@@ -124,12 +127,12 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
         return try {
             val checkpoint = checkpointSubscriber.createCheckpoint()
             rootEvent.endTimestamp()
-                .bodyData(EventUtils.createMessageBean("Checkpoint id '" + checkpoint.id + '\''))
+                .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
             checkpoint.asMap().forEach { (sessionKey: SessionKey, sequence: Long) ->
                 val messageID = sessionKey.toMessageID(sequence)
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()
-                    .name("Checkpoint for session alias '" + sessionKey.sessionAlias + "' direction '" + sessionKey.direction + "' sequence '" + sequence + '\'')
+                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '$sequence'")
                     .type("Checkpoint for session")
                     .messageID(messageID)
             }
@@ -185,9 +188,7 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
             .replay().apply { connect() }
 
-        checkpointSubscriber = CheckpointSubscriber().apply {
-            streamObservable.subscribe(this)
-        }
+        checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
 
         val th2Configuration = configuration.th2
         eventStoreStub = EventStoreServiceGrpc.newFutureStub(ManagedChannelBuilder.forAddress(
@@ -205,7 +206,7 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
 
     companion object {
         @Suppress("JAVA_CLASS_ON_COMPANION")
-        @JvmStatic
+        @JvmField
         val LOGGER: Logger = LoggerFactory.getLogger(javaClass.enclosingClass)
     }
 }

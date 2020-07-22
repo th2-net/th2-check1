@@ -30,7 +30,7 @@ abstract class AbstractSessionObserver<T> : DisposableObserver<T>() {
 
     companion object {
         @Suppress("JAVA_CLASS_ON_COMPANION")
-        @JvmStatic
+        @JvmField
         val LOGGER: Logger = LoggerFactory.getLogger(javaClass.enclosingClass)
     }
 }

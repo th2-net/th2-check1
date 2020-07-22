@@ -19,11 +19,11 @@ package com.exactpro.th2.verifier
 import com.exactpro.th2.infra.grpc.Direction.FIRST
 import io.vertx.core.impl.ConcurrentHashSet
 
-class CheckpointSubscriber() : AbstractSessionObserver<StreamContainer>() {
-    private val sessionSet : Set<StreamContainer> = ConcurrentHashSet()
+class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
+    private val sessionSet : MutableSet<StreamContainer> = ConcurrentHashSet()
 
     override fun onNext(item: StreamContainer) {
-        sessionSet.plus(item)
+        sessionSet += item
     }
 
     fun createCheckpoint() : Checkpoint = Checkpoint(sessionSet.associateBy(
