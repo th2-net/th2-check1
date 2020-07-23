@@ -11,7 +11,7 @@ pipeline {
                             ).trim()}""" //TODO: Calculate revision from a specific tag instead of a root commit
         TH2_REGISTRY = credentials('TH2_REGISTRY_USER')
         TH2_REGISTRY_URL = credentials('TH2_REGISTRY')
-        GRADLE_SWITCHES = " -Pversion_build=${BUILD_NUMBER} -Pversion_maintenance=${VERSION_MAINTENANCE}"
+        GRADLE_SWITCHES = " -Pversion_build=${BUILD_NUMBER} -Pversion_maintenance=${VERSION_MAINTENANCE} ${USER_GRADLE_SWITCHES}"
         GCHAT_WEB_HOOK = credentials('th2-dev-environment-web-hook')
         GCHAT_THREAD_NAME = credentials('th2-dev-environment-release-docker-images-thread')
         IDEA_PROPERTIES="idea.ci.properties"
