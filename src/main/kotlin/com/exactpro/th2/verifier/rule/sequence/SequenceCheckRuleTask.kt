@@ -174,7 +174,7 @@ class SequenceCheckRuleTask(description: String?,
         }
 
         rootEvent.addSubEventWithSamePeriod()
-            .name("Check sequence (expected ${protoMessageFilters.size} / actual ${preFilteringResults.size} , check order " + checkOrder + ')')
+            .name("Check sequence (expected ${protoMessageFilters.size} / actual ${preFilteringResults.size} , check order $checkOrder)")
             .type("checkSequence")
             .status(if (protoMessageFilters.size == preFilteringResults.size
                 && !(checkOrder && reordered)) PASSED else FAILED)

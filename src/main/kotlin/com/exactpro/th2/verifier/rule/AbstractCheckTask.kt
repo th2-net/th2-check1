@@ -50,6 +50,7 @@ import java.time.Instant
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 abstract class AbstractCheckTask(private val description: String?,
                                  private val timeout: Long,
@@ -66,7 +67,14 @@ abstract class AbstractCheckTask(private val description: String?,
 
     private val sequenceSubject = SingleSubject.create<Long>()
     private val hasNextTask = AtomicBoolean(false)
-    private val eventPublished = AtomicBoolean(false)
+    private val taskState = AtomicReference(State.CREATED)
+
+    protected enum class State {
+        CREATED,
+        BEGIN,
+        DONE,
+        PUBLISHED
+    }
 
     private lateinit var endFuture: Disposable
 
@@ -105,14 +113,14 @@ abstract class AbstractCheckTask(private val description: String?,
      * Task subscribe to messages stream with sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param checkpoint message sequence from previous task.
-     * @throws IllegalStateException when method is called more than once. TODO: implements
+     * @throws IllegalStateException when method is called more than once.
      */
     fun begin(checkpoint: Checkpoint? = null) {
         begin(checkpoint?.getSequence(sessionAlias) ?: DEFAULT_SEQUENCE)
     }
 
     /**
-     * It is called when timeout is over
+     * It is called when timeout is over and task in not complete yet
      */
     protected abstract fun onTimeout()
 
@@ -123,9 +131,13 @@ abstract class AbstractCheckTask(private val description: String?,
     protected fun checkComplete() {
         try {
             LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
-            dispose()
-            endFuture.dispose()
-            sequenceSubject.onSuccess(lastSequence)
+            if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
+                dispose()
+                endFuture.dispose()
+                sequenceSubject.onSuccess(lastSequence)
+            } else {
+                LOGGER.warn("Task for session alias '{}' is already completed. Skip calling 'checkComplete'", sessionAlias)
+            }
         } finally {
             publishEvent()
         }
@@ -141,9 +153,12 @@ abstract class AbstractCheckTask(private val description: String?,
      * Task subscribe to messages stream with sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param sequence message sequence from previous task.
-     * @throws IllegalStateException when method is called more than once. TODO: implements, it should thread-safe
+     * @throws IllegalStateException when method is called more than once.
      */
     private fun begin(sequence: Long = DEFAULT_SEQUENCE) {
+        if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
+            throw IllegalStateException("Task $description already has been started")
+        }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionAlias, sequence, timeout)
 
         messageStream.observeOn(TASK_SCHEDULER) // Defined scheduler to execution in one thread
@@ -170,16 +185,21 @@ abstract class AbstractCheckTask(private val description: String?,
     private fun end() {
         try {
             LOGGER.info("Timeout is over for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
-            dispose()
-            sequenceSubject.onSuccess(lastSequence)
-            onTimeout()
+            if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
+                dispose()
+                sequenceSubject.onSuccess(lastSequence)
+                onTimeout()
+            } else {
+                LOGGER.warn("Task for session alias '{}' is already completed. Skip calling 'onTimeout'", sessionAlias)
+            }
         } finally {
             publishEvent()
         }
     }
 
     private fun publishEvent() {
-        if (eventPublished.compareAndSet(false, true)) {
+        val currentState = taskState.compareAndExchange(State.DONE, State.PUBLISHED)
+        if (currentState != State.PUBLISHED) {
             LOGGER.debug("Sending event thee id '{}' parent id '{}'", rootEvent.id, parentEventID)
             val storeRequest = StoreEventBatchRequest.newBuilder()
                 .setEventBatch(EventBatch.newBuilder()
@@ -197,8 +217,11 @@ abstract class AbstractCheckTask(private val description: String?,
                 },
                 RESPONSE_EXECUTOR
             )
+            if (currentState != State.DONE) {
+                LOGGER.error("Event tree id '{}' parent id '{}' is published in unexpected state '{}'", rootEvent.id, parentEventID, currentState)
+            }
         } else {
-            LOGGER.warn("Event thee id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
+            LOGGER.warn("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
         }
     }
 
@@ -256,17 +279,14 @@ abstract class AbstractCheckTask(private val description: String?,
         val sequence = sessionAliasToDirectionCheckpointMap[sessionAlias]
             ?.directionToSequenceMap?.get(Direction.FIRST.number)
 
-        return when (sequence) {
-            is Long -> {
-                CollectorServiceA.LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionAlias)
-                sequence
+        if (sequence == null) {
+            if (CollectorServiceA.LOGGER.isWarnEnabled) {
+                CollectorServiceA.LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionAlias)
             }
-            else -> {
-                if (CollectorServiceA.LOGGER.isWarnEnabled) {
-                    CollectorServiceA.LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionAlias)
-                }
-                DEFAULT_SEQUENCE
-            }
+        } else {
+            CollectorServiceA.LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionAlias)
         }
+
+        return sequence ?: DEFAULT_SEQUENCE
     }
 }
