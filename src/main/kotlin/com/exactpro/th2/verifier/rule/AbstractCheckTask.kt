@@ -52,13 +52,15 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-abstract class AbstractCheckTask(private val description: String?,
-                                 private val timeout: Long,
-                                 submitTime: Instant,
-                                 protected val sessionAlias: String,
-                                 private val parentEventID: EventID,
-                                 private val messageStream: Observable<StreamContainer>,
-                                 private val eventStoreStub: EventStoreServiceFutureStub) : AbstractSessionObserver<MessageContainer>() {
+abstract class AbstractCheckTask(
+    val description: String?,
+    private val timeout: Long,
+    submitTime: Instant,
+    protected val sessionAlias: String,
+    private val parentEventID: EventID,
+    private val messageStream: Observable<StreamContainer>,
+    private val eventStoreStub: EventStoreServiceFutureStub
+) : AbstractSessionObserver<MessageContainer>() {
     protected var handledMessageCounter: Long = 0
 
     protected val converter = ProtoToIMessageConverter(DefaultMessageFactoryProxy(), null, null)
@@ -68,6 +70,9 @@ abstract class AbstractCheckTask(private val description: String?,
     private val sequenceSubject = SingleSubject.create<Long>()
     private val hasNextTask = AtomicBoolean(false)
     private val taskState = AtomicReference(State.CREATED)
+    private var _endTime: Instant? = null
+    val endTime: Instant?
+        get() = _endTime
 
     protected enum class State {
         CREATED,
@@ -200,6 +205,7 @@ abstract class AbstractCheckTask(private val description: String?,
     private fun publishEvent() {
         val currentState = taskState.compareAndExchange(State.DONE, State.PUBLISHED)
         if (currentState != State.PUBLISHED) {
+            _endTime = Instant.now()
             LOGGER.debug("Sending event thee id '{}' parent id '{}'", rootEvent.id, parentEventID)
             val storeRequest = StoreEventBatchRequest.newBuilder()
                 .setEventBatch(EventBatch.newBuilder()
@@ -249,7 +255,7 @@ abstract class AbstractCheckTask(private val description: String?,
 
         with(protoMessage.metadata) {
             name("Verification '${messageType}' message")
-                .status(if (ComparisonUtil.getStatusType(comparisonResult) == StatusType.FAILED) FAILED else PASSED)
+                .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
                 .messageID(id)
                 .bodyData(verificationComponent.build())
         }
@@ -262,6 +268,8 @@ abstract class AbstractCheckTask(private val description: String?,
         }
         return this
     }
+
+    protected fun ComparisonResult.getStatusType(): StatusType = ComparisonUtil.getStatusType(this)
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
         map { message -> MessageContainer(message, converter.fromProtoMessage(message, false)) }
@@ -280,11 +288,11 @@ abstract class AbstractCheckTask(private val description: String?,
             ?.directionToSequenceMap?.get(Direction.FIRST.number)
 
         if (sequence == null) {
-            if (CollectorServiceA.LOGGER.isWarnEnabled) {
-                CollectorServiceA.LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionAlias)
+            if (LOGGER.isWarnEnabled) {
+                LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionAlias)
             }
         } else {
-            CollectorServiceA.LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionAlias)
+            LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionAlias)
         }
 
         return sequence ?: DEFAULT_SEQUENCE

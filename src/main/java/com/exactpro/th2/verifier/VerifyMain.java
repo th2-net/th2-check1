@@ -16,6 +16,7 @@
 package com.exactpro.th2.verifier;
 
 import com.exactpro.th2.configuration.RabbitMQConfiguration;
+import com.exactpro.th2.verifier.cfg.CollectorServiceConfiguration;
 import com.exactpro.th2.verifier.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,12 +26,14 @@ import static com.exactpro.th2.ConfigurationUtils.safeLoad;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.exactpro.th2.configuration.MicroserviceConfiguration;
+
 public class VerifyMain {
     private final static Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);
 
     /**
      * Environment variables:
-     *  {@link com.exactpro.th2.configuration.Configuration#ENV_GRPC_PORT}
+     *  {@link Configuration#ENV_GRPC_PORT}
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_HOST}
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_PORT}
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_USER}
@@ -40,15 +43,16 @@ public class VerifyMain {
      */
     public static void main(String[] args) {
         try {
-            Configuration configuration = readConfiguration(args);
+            MicroserviceConfiguration microserviceConfiguration = readConfiguration(args);
+            CollectorServiceConfiguration configuration = new CollectorServiceConfiguration(microserviceConfiguration);
             CollectorServiceA collectorService = new CollectorServiceA(configuration);
             ExecutorService executorService = Executors.newFixedThreadPool(10);//TODO config in future
             Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
             Runtime.getRuntime().addShutdownHook(new Thread(executorService::shutdown));//TODO fix
             VerifierHandler verifierHandler = new VerifierHandler(collectorService, executorService);
-            VerifierServer verifierServer = new VerifierServer(configuration.getPort(), verifierHandler);
+            VerifierServer verifierServer = new VerifierServer(microserviceConfiguration.getPort(), verifierHandler);
             verifierServer.start();
-            LOGGER.info("verify started on {} port", configuration.getPort());
+            LOGGER.info("verify started on {} port", microserviceConfiguration.getPort());
             verifierServer.blockUntilShutdown();
         } catch (Throwable e) {
             LOGGER.error("Fatal error: {}", e.getMessage(), e);

@@ -33,16 +33,18 @@ import io.reactivex.Observable
 import java.time.Instant
 
 /**
- *
+ * This rule checks the presents of the single message in the messages stream.
  */
-class CheckRuleTask(description: String?,
-                    startTime: Instant,
-                    sessionAlias: String,
-                    timeout: Long,
-                    private val protoMessageFilter: MessageFilter,
-                    parentEventID: EventID,
-                    messageStream: Observable<StreamContainer>,
-                    eventStoreStub: EventStoreServiceFutureStub) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, eventStoreStub) {
+class CheckRuleTask(
+    description: String?,
+    startTime: Instant,
+    sessionAlias: String,
+    timeout: Long,
+    private val protoMessageFilter: MessageFilter,
+    parentEventID: EventID,
+    messageStream: Observable<StreamContainer>,
+    eventStoreStub: EventStoreServiceFutureStub
+) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, eventStoreStub) {
 
     private val filter: IMessage = converter.fromProtoFilter(protoMessageFilter, protoMessageFilter.messageType)
     private val settings: ComparatorSettings = protoMessageFilter.toCompareSettings()

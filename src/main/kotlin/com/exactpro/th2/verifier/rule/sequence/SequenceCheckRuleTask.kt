@@ -43,18 +43,25 @@ import java.time.Instant
 import java.util.LinkedHashMap
 
 /**
+ * This rule checks the sequence of specified messages.
  *
+ * If **protoFilter** parameter is specified the messages will be pre-filtered before going to the actual comparison.
+ *
+ * If **checkOrder** parameter is set to `true` the messages must be received in the exact same order as filters were specified.
+ * If this parameter is `false` the order won't be checked.
  */
-class SequenceCheckRuleTask(description: String?,
-                            startTime: Instant,
-                            sessionAlias: String,
-                            timeout: Long,
-                            protoPreFilter: PreFilter,
-                            private val protoMessageFilters: List<MessageFilter>,
-                            private val checkOrder: Boolean,
-                            parentEventID: EventID,
-                            messageStream: Observable<StreamContainer>,
-                            eventStoreStub: EventStoreServiceFutureStub) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, eventStoreStub) {
+class SequenceCheckRuleTask(
+    description: String?,
+    startTime: Instant,
+    sessionAlias: String,
+    timeout: Long,
+    protoPreFilter: PreFilter,
+    private val protoMessageFilters: List<MessageFilter>,
+    private val checkOrder: Boolean,
+    parentEventID: EventID,
+    messageStream: Observable<StreamContainer>,
+    eventStoreStub: EventStoreServiceFutureStub
+) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, eventStoreStub) {
 
     private val protoPreMessageFilter: MessageFilter = protoPreFilter.toMessageFilter()
     private val preFilter: IMessage = converter.fromProtoPreFilter(protoPreMessageFilter)
@@ -99,9 +106,7 @@ class SequenceCheckRuleTask(description: String?,
             LOGGER.debug("Pre-filter compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
             ComparisonContainer(messageContainer, protoPreMessageFilter, comparisonResult)
         }.filter { preFilterContainer -> // Filter  check result of pre-filter
-            with(preFilterContainer.comparisonResult) {
-                this != null && getStatusType(this) != StatusType.FAILED
-            }
+            preFilterContainer.comparisonResult?.getStatusType() != StatusType.FAILED
         }.doOnNext { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer.messageContainer.protoMessage) {
                 preFilterEvent.addSubEventWithSamePeriod()
@@ -115,11 +120,19 @@ class SequenceCheckRuleTask(description: String?,
     override fun onNext(messageContainer: MessageContainer) {
         for (index in messageFilters.indices) {
             val messageFilter = messageFilters[index]
-            val comparisonResult = MessageComparator.compare(messageContainer.sailfishMessage, messageFilter.sailfishMessageFilter, messageFilter.comparatorSettings)
+            val comparisonResult = MessageComparator.compare(
+                messageContainer.sailfishMessage,
+                messageFilter.sailfishMessageFilter,
+                messageFilter.comparatorSettings
+            )
 
             if (comparisonResult != null) {
-                reordered = reordered && index == 0
-                messageFilteringResults[messageContainer.protoMessage.metadata.id] = ComparisonContainer(messageContainer, messageFilter.protoMessageFilter, comparisonResult)
+                reordered = reordered || index != 0
+                messageFilteringResults[messageContainer.protoMessage.metadata.id] = ComparisonContainer(
+                    messageContainer,
+                    messageFilter.protoMessageFilter,
+                    comparisonResult
+                )
                 messageFilters.removeAt(index)
                 break
             }
@@ -164,10 +177,11 @@ class SequenceCheckRuleTask(description: String?,
     private fun fillSequenceEvent() {
         val sequenceTable = TableBuilder<CheckSequenceRow>()
         preFilteringResults.forEach { (messageID: MessageID, comparisonContainer: ComparisonContainer) ->
-            when (val messageFilteringResult = messageFilteringResults[messageID]) {
-                null -> sequenceTable.row(CheckSequenceUtils.createOnlyActualSide(comparisonContainer.sailfishActual, sessionAlias))
-                else -> sequenceTable.row(CheckSequenceUtils.createBothSide(messageFilteringResult.sailfishActual, messageFilteringResult.protoFilter, sessionAlias))
-            }
+            sequenceTable.row(
+                messageFilteringResults[messageID]?.let {
+                    CheckSequenceUtils.createBothSide(it.sailfishActual, it.protoFilter, sessionAlias)
+                } ?: CheckSequenceUtils.createOnlyActualSide(comparisonContainer.sailfishActual, sessionAlias)
+            )
         }
         messageFilters.forEach { messageFilter: MessageFilterContainer ->
             sequenceTable.row(CheckSequenceUtils.createOnlyExpectedSide(messageFilter.protoMessageFilter, sessionAlias))

@@ -29,6 +29,7 @@ import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageBatch
 import com.exactpro.th2.infra.grpc.MessageFilter
 import com.exactpro.th2.infra.grpc.MessageID
+import com.exactpro.th2.verifier.cfg.CollectorServiceConfiguration
 import com.exactpro.th2.verifier.grpc.CheckRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckpointRequestOrBuilder
@@ -46,11 +47,14 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Objects.requireNonNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
 
-class CollectorServiceA(configuration: MicroserviceConfiguration) {
+class CollectorServiceA(
+    configuration: CollectorServiceConfiguration
+) {
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
 
     /**
@@ -63,6 +67,28 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
     private val mqSubject: PublishSubject<ByteArray>
     private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, AbstractCheckTask> = ConcurrentHashMap()
 
+    private val olderThanDelta = configuration.cleanupOlderThan
+    private val olderThanTimeUnit = configuration.cleanupTimeUnit
+
+    init {
+        val limitSize = configuration.messageBufferLimit
+        mqSubject = PublishSubject.create()
+
+        subscribers = subscribe(configuration.microserviceConfiguration, DeliverCallback { _: String, delivery: Delivery -> mqSubject.onNext(delivery.body) })
+        streamObservable = mqSubject.map(MessageBatch::parseFrom)
+            .flatMapIterable(MessageBatch::getMessagesList)
+            .groupBy { message -> message.metadata.id.connectionId.sessionAlias }
+            .map { group -> StreamContainer(group.key!!, limitSize, group) }
+            .replay().apply { connect() }
+
+        checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
+
+        val th2Configuration = configuration.microserviceConfiguration.th2
+        eventStoreStub = EventStoreServiceGrpc.newFutureStub(ManagedChannelBuilder.forAddress(
+            th2Configuration.th2EventStorageGRPCHost, th2Configuration.th2EventStorageGRPCPort)
+            .usePlaintext().build())
+    }
+
     @Throws(InterruptedException::class)
     fun verifyCheckRule(request: CheckRuleRequest) {
         val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
@@ -72,6 +98,8 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
         val task = CheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout, filter,
             parentEventID, streamObservable, eventStoreStub)
 
+        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+
         eventIdToLastCheckTask.compute(CheckTaskKey(request.parentEventId, request.connectivityId)) { _, value ->
             if (value != null) {
                 value.subscribeNextTask(task)
@@ -80,8 +108,6 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
             }
             task
         }
-
-        // TODO: try to remove prune tasks
     }
 
     @Throws(InterruptedException::class)
@@ -92,6 +118,8 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
         val task = SequenceCheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout, request.preFilter,
             request.messageFiltersList, request.checkOrder, parentEventID, streamObservable, eventStoreStub)
 
+        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+
         eventIdToLastCheckTask.compute(CheckTaskKey(request.parentEventId, request.connectivityId)) { _, value ->
             if (value != null) {
                 value.subscribeNextTask(task)
@@ -99,6 +127,16 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
                 task.begin(request.checkpoint)
             }
             task
+        }
+    }
+
+    private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
+        val now = Instant.now()
+        eventIdToLastCheckTask.values.removeIf {
+            val endTime = it.endTime
+            val remove = endTime != null && unit.between(endTime, now) > delta
+            if (remove) { logger.debug("Remove task ${it.description} ($endTime) from tasks map") }
+            remove
         }
     }
 
@@ -176,26 +214,6 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
             }
     }
 
-    init {
-        // TODO get limit size from configuration
-        val limitSize = 1000
-        mqSubject = PublishSubject.create()
-
-        subscribers = subscribe(configuration, DeliverCallback { _: String, delivery: Delivery -> mqSubject.onNext(delivery.body) })
-        streamObservable = mqSubject.map(MessageBatch::parseFrom)
-            .flatMapIterable(MessageBatch::getMessagesList)
-            .groupBy { message -> message.metadata.id.connectionId.sessionAlias }
-            .map { group -> StreamContainer(group.key!!, limitSize, group) }
-            .replay().apply { connect() }
-
-        checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
-
-        val th2Configuration = configuration.th2
-        eventStoreStub = EventStoreServiceGrpc.newFutureStub(ManagedChannelBuilder.forAddress(
-            th2Configuration.th2EventStorageGRPCHost, th2Configuration.th2EventStorageGRPCPort)
-            .usePlaintext().build())
-    }
-
     private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
         .setConnectionId(ConnectionID.newBuilder()
             .setSessionAlias(sessionAlias)
@@ -203,10 +221,4 @@ class CollectorServiceA(configuration: MicroserviceConfiguration) {
         .setSequence(sequence)
         .setDirection(direction)
         .build()
-
-    companion object {
-        @Suppress("JAVA_CLASS_ON_COMPANION")
-        @JvmField
-        val LOGGER: Logger = LoggerFactory.getLogger(javaClass.enclosingClass)
-    }
 }
