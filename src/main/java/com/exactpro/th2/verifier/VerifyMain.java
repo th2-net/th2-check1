@@ -43,7 +43,7 @@ public class VerifyMain {
     public static void main(String[] args) {
         try {
             CommonFactory commonFactory = CommonFactory.createFromArguments(args);
-            MessageRouter<MessageBatch> messageRouter = commonFactory.getMessageRouterParsedBatch();
+            MessageRouter<MessageBatch> messageRouter = (MessageRouter<MessageBatch>) commonFactory.getMessageRouterParsedBatch();
             GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
             VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
 
