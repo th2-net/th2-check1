@@ -30,6 +30,7 @@ import com.exactpro.th2.infra.grpc.MessageBatch
 import com.exactpro.th2.infra.grpc.MessageFilter
 import com.exactpro.th2.infra.grpc.MessageID
 import com.exactpro.th2.verifier.cfg.CollectorServiceConfiguration
+import com.exactpro.th2.verifier.grpc.ChainID
 import com.exactpro.th2.verifier.grpc.CheckRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckpointRequestOrBuilder
@@ -43,7 +44,6 @@ import com.rabbitmq.client.Delivery
 import io.grpc.ManagedChannelBuilder
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.time.Instant
@@ -90,45 +90,64 @@ class CollectorServiceA(
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckRule(request: CheckRuleRequest) {
+    fun verifyCheckRule(request: CheckRuleRequest): ChainID {
         val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
         val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias cant't be null")
         val filter: MessageFilter = requireNonNull(request.filter, "Message filter can't be null")
+
+        val chainID = request.getChainIdOrGenerate()
 
         val task = CheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout, filter,
             parentEventID, streamObservable, eventStoreStub)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(request.parentEventId, request.connectivityId)) { _, value ->
-            if (value != null) {
-                value.subscribeNextTask(task)
-            } else {
-                task.begin(request.checkpoint)
-            }
-            task
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
+        return chainID
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest) {
+    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): ChainID {
         val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
         val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias cant't be null")
+
+        val chainID = request.getChainIdOrGenerate()
 
         val task = SequenceCheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout, request.preFilter,
             request.messageFiltersList, request.checkOrder, parentEventID, streamObservable, eventStoreStub)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(request.parentEventId, request.connectivityId)) { _, value ->
-            if (value != null) {
-                value.subscribeNextTask(task)
-            } else {
-                task.begin(request.checkpoint)
-            }
-            task
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            task.apply { addToChainOrBegin(value, request.checkpoint) }
+        }
+        return chainID
+    }
+
+    private fun AbstractCheckTask.addToChainOrBegin(
+        value: AbstractCheckTask?,
+        checkpoint: com.exactpro.th2.infra.grpc.Checkpoint
+    ): Unit = value?.subscribeNextTask(this) ?: begin(checkpoint)
+
+    private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
+        return if (hasChainId()) {
+            chainId
+        } else {
+            generateChainID()
         }
     }
+
+    private fun CheckSequenceRuleRequest.getChainIdOrGenerate(): ChainID {
+        return if (hasChainId()) {
+            chainId
+        } else {
+            generateChainID()
+        }
+    }
+
+    private fun generateChainID() = ChainID.newBuilder().setId(EventUtils.generateUUID()).build()
 
     private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
         val now = Instant.now()

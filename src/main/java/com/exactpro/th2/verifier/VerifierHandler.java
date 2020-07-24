@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.exactpro.th2.infra.grpc.RequestStatus;
+import com.exactpro.th2.verifier.grpc.ChainID;
 import com.exactpro.th2.verifier.grpc.CheckRuleRequest;
 import com.exactpro.th2.verifier.grpc.CheckRuleResponse;
 import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest;
@@ -73,23 +74,23 @@ public class VerifierHandler extends VerifierImplBase {
             if (logger.isInfoEnabled()) {
                 logger.info("SubmitCheckRule request: " + shortDebugString(request));
             }
-            RequestStatus status = RequestStatus.newBuilder()
-                    .setStatus(SUCCESS)
-                    .build();
+
+            CheckRuleResponse.Builder response = CheckRuleResponse.newBuilder();
             try {
-                collectorService.verifyCheckRule(request);
+                ChainID chainID = collectorService.verifyCheckRule(request);
+                response.setChainId(chainID)
+                        .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
                     logger.error("CheckRule failed in CollectorService. Request " + shortDebugString(request), e);
                 }
-                status = RequestStatus.newBuilder()
+                RequestStatus status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
                         .setMessage("submitCheckRule interrupted by internal process")
                         .build();
+                response.setStatus(status);
             }
-            responseObserver.onNext(CheckRuleResponse.newBuilder()
-                    .setStatus(status)
-                    .build());
+            responseObserver.onNext(response.build());
             responseObserver.onCompleted();
         } catch (Throwable e) {
             if (logger.isErrorEnabled()) {
@@ -105,33 +106,32 @@ public class VerifierHandler extends VerifierImplBase {
     @Override
     public void submitCheckSequenceRule(CheckSequenceRuleRequest request, StreamObserver<CheckSequenceRuleResponse> responseObserver) {
         try {
-            RequestStatus status = RequestStatus.newBuilder()//TODO determine status in future
-                    .setStatus(SUCCESS)
-                    .build();
+            CheckSequenceRuleResponse.Builder response = CheckSequenceRuleResponse.newBuilder();
             try {
                 if (logger.isInfoEnabled()) {
                     logger.info("Sequence rule for request '" + shortDebugString(request) + "' started");
                 }
-                collectorService.verifyCheckSequenceRule(request);
+                ChainID chainID = collectorService.verifyCheckSequenceRule(request);
                 if (logger.isInfoEnabled()) {
                     logger.info("Sequence rule for request '" + shortDebugString(request) + "' finished");
                 }
+                response.setChainId(chainID)
+                        .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
                     logger.error("Sequence rule for request '" + shortDebugString(request) + "' failed", e);
                 }
-                status = RequestStatus.newBuilder()
+                RequestStatus status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
                         .setMessage("Sequence rule rejected by internal process: " + e.getMessage())
                         .build();
+                response.setStatus(status);
             }
-            responseObserver.onNext(CheckSequenceRuleResponse.newBuilder()
-                    .setStatus(status)
-                    .build());
+            responseObserver.onNext(response.build());
             responseObserver.onCompleted();
         } catch (RuntimeException e) {
             if (logger.isErrorEnabled()) {
-                logger.error("Sequence rule task for request '" + shortDebugString(request) + "' isn't submited", e);
+                logger.error("Sequence rule task for request '" + shortDebugString(request) + "' isn't submitted", e);
             }
             responseObserver.onNext(CheckSequenceRuleResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR)
