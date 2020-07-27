@@ -13,7 +13,7 @@ git_version:
 build:
   stage: build
   script:
-    - "export VERSION_MAINTENANCE=$(docker run --rm -v $(pwd):/git/ -e GIT_DISCOVERY_ACROSS_FILESYSTEM=1 alpine/git:v2.26.2 rev-list --count VERSION-1.1..HEAD -- /git)"
+    - "export VERSION_MAINTENANCE=$(docker run --rm -v $(pwd):/git/ -e GIT_DISCOVERY_ACROSS_FILESYSTEM=1 alpine/git:v2.26.2 rev-list --count VERSION-1.1..HEAD -- /git/)"
     - "docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
         --build-arg CI_PIPELINE_IID --build-arg VERSION_MAINTENANCE=${VERSION_MAINTENANCE} \
         --build-arg ARTIFACTORY_USER --build-arg ARTIFACTORY_PASS --build-arg ARTIFACTORY_REPO \
