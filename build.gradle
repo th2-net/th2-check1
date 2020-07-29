@@ -97,8 +97,6 @@ ext {
     th2ConnectivityVersion = '1.1-SNAPSHOT'
 
     cassandraVersion   = '3.6.0' //FIXME: Migrate to another library for UUID
-
-    dockerImageVersion  = "${version_major}.${version_minor}.${version_maintenance}.${version_build}"
 }
 
 archivesBaseName = 'verifier-service'
@@ -144,21 +142,9 @@ dockerPrepare {
 }
 
 docker {
-    name "${target_docker_repository}/${docke_image_name}:${dockerImageVersion}"
-    tag 'local-version', "${docke_image_name}:${dockerImageVersion}"
+    name docker_image_name
+    tag 'local-version', docker_image_name
 
     copySpec.from(tarTree("$buildDir/distributions/${archivesBaseName}.tar"))
-}
-
-tasks.register("getImageVersion") {
-    doLast {
-        println("$dockerImageVersion")
-    }
-}
-
-tasks.register("getImageName") {
-    doLast {
-        println(docker.name)
-    }
 }
 
