@@ -23,16 +23,15 @@ build:
         --build-arg DOCKER_IMAGE_NAME=${FULL_DOCKER_IMAGE_NAME} \
         --build-arg ARTIFACTORY_URL --build-arg ARTIFACTORY_RESOLVE_REPO ."
     - "docker create -v $(pwd)/build:/home/build/libs -v $(pwd)/build:/home/build/distributions \
-        -v $(pwd)/inspections:/home/inspections pipeline:${CI_PIPELINE_IID}"
+         pipeline:${CI_PIPELINE_IID}"
     - "docker tag pipeline:${CI_PIPELINE_IID} ${FULL_DOCKER_IMAGE_NAME}"
-    - "docker login -u ${TH2_REGISTRY_USR} -p ${TH2_REGISTRY_PSW} ${TH2_REGISTRY_URL}"
+    - "docker login -u $TH2_REGISTRY_USR -p $TH2_REGISTRY_PSW $TH2_REGISTRY_URL"
 #    - "docker push ${FULL_DOCKER_IMAGE_NAME}"
   artifacts:
     paths:
       - 'build/*.jar'
       - 'build/*.tar'
       - 'build/*.zip'
-      - 'inspection/results/*.xml'
   cache:
     paths:
       - 'inspection/cache'
