@@ -1,29 +1,32 @@
 image: docker:19.03.6
-#services:
-#  - name: docker:dind
-#    alias: docker
+services:
+  - name: docker:dind
+    alias: docker
 variables:
-  DOCKER_HOST: tcp://localhost:2375
-  DOCKER_DRIVER: host
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: ""
   GIT_FETCH_EXTRA_FLAGS: "--tags"
-git_version:
-  script:
-    - docker run --rm -v $(pwd):/git/ -v $(pwd)/.git:/git/.git alpine/git:v2.26.2 rev-list --count VERSION-1.1..HEAD -- /git
+  MAJOR_VERSION: "0"
+  MINOR_VERSION: "1"
+  MAINTENANCE_VERSION: "0"
+  DOCKER_TARGET_REPOSITORY: "target_docker_repository"
+  DOCKER_IMAGE_NAME: "th2-verifier"
 build:
   stage: build
   script:
-    - "export VERSION_MAINTENANCE=$(docker run --rm -v $(pwd):/git/ -v $(pwd)/.git:/git/.git -e GIT_DISCOVERY_ACROSS_FILESYSTEM=1 alpine/git:v2.26.2 rev-list --count VERSION-1.1..HEAD -- /git/)"
+    - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}\""
+    - "export FULL_DOCKER_IMAGE_NAME=\"${DOCKER_TARGET_REPOSITORY}/${DOCKER_IMAGE_NAME}:${VERSION}\""
     - "docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
-        --build-arg CI_PIPELINE_IID --build-arg VERSION_MAINTENANCE=${VERSION_MAINTENANCE} \
+        --build-arg CI_PIPELINE_IID --build-arg MAJOR_VERSION --build-arg MINOR_VERSION \
         --build-arg ARTIFACTORY_USER --build-arg ARTIFACTORY_PASS --build-arg ARTIFACTORY_REPO \
+        --build-arg DOCKER_IMAGE_NAME=${FULL_DOCKER_IMAGE_NAME} \
         --build-arg ARTIFACTORY_URL --build-arg ARTIFACTORY_RESOLVE_REPO ."
     - "docker create -v $(pwd)/build:/home/build/libs -v $(pwd)/build:/home/build/distributions \
-        -v $(pwd)/inspections:/home/inspections -v $(pwd)/imageName.txt:/home/imageName.txt pipeline:${CI_PIPELINE_IID}"
-    - "export IMAGE_NAME=$(cat ./imageName.txt)"
-    - "docker tag pipeline:${CI_PIPELINE_IID} ${IMAGE_NAME}"
+        -v $(pwd)/inspections:/home/inspections pipeline:${CI_PIPELINE_IID}"
+    - "docker tag pipeline:${CI_PIPELINE_IID} ${FULL_DOCKER_IMAGE_NAME}"
     - "docker login -u ${TH2_REGISTRY_USR} -p ${TH2_REGISTRY_PSW} ${TH2_REGISTRY_URL}"
-#    - "docker push ${IMAGE_NAME}"
+#    - "docker push ${FULL_DOCKER_IMAGE_NAME}"
   artifacts:
     paths:
       - 'build/*.jar'
