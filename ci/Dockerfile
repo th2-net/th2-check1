@@ -27,5 +27,5 @@ ENV RABBITMQ_HOST=rabbitmq \
     GRPC_PORT=8080
 WORKDIR /home
 COPY --from=inspect /opt/idea ./inspections
-COPY --from=compile /home/gradle/buid/docker ./
+COPY --from=compile /home/gradle/build/docker ./
 ENTRYPOINT ["/home/verifier-service/bin/verifier-service", "/home/verifier-service/etc/config.yml"]
