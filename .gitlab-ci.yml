@@ -38,4 +38,15 @@ build:
 #  only:
 #    variables:
 #      - $CI_COMMIT_BRANCH == "master"
+inspection:
+  stage: build
+  script:
+    - "docker build -f ./ci/Inspection -t pipeline/inspection:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN ."
+    - "docker create -v $(pwd)/inspections:/opt/idea -v $(pwd)/cache:/opt/idea/cache pipeline/inspection:${CI_PIPELINE_IID}"
+  cache:
+    paths:
+      - 'cache'
+  artifacts:
+    paths:
+      - 'results/*.xml'
 
