@@ -1,6 +1,6 @@
 FROM gradle:6.4-jdk11 AS build
 COPY ./ .
-RUN gradle clean build dockerPrepare -Pversion_build=${CI_PIPELINE_IID} \
+RUN gradle clean build dockerPrepare artifactoryPublish -Pversion_build=${CI_PIPELINE_IID} \
     -Partifactory_user=${ARTIFACTORY_USER} \
     -Pversion_major=${MAJOR_VERSION} -Pversion_minor=${MINOR_VERSION} \
     -Partifactory_password=${ARTIFACTORY_PASS} \
