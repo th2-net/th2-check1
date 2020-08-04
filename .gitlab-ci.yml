@@ -1,4 +1,4 @@
-image: docker:19.03.6
+image: docker
 services:
   - name: docker:dind
     alias: docker
@@ -26,7 +26,7 @@ build:
          pipeline:${CI_PIPELINE_IID}"
     - "docker tag pipeline:${CI_PIPELINE_IID} ${FULL_DOCKER_IMAGE_NAME}"
     - "docker login -u $TH2_REGISTRY_USR -p $TH2_REGISTRY_PSW $TH2_REGISTRY_URL"
-#    - "docker push ${FULL_DOCKER_IMAGE_NAME}"
+    - "docker push ${FULL_DOCKER_IMAGE_NAME}"
   artifacts:
     paths:
       - 'build/*.jar'
@@ -35,9 +35,6 @@ build:
   cache:
     paths:
       - 'inspection/cache'
-#  only:
-#    variables:
-#      - $CI_COMMIT_BRANCH == "master"
 inspection:
   stage: build
   script:
