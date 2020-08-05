@@ -1,7 +1,3 @@
-image: docker
-services:
-  - name: docker:dind
-    alias: docker
 variables:
   DOCKER_HOST: tcp://docker:2375
   DOCKER_DRIVER: overlay2
@@ -50,6 +46,10 @@ artifactory_publish:
     paths:
       - 'build/*'
 docker_publish:
+  image: docker
+  services:
+    - name: docker:dind
+      alias: docker
   stage: publish
   script:
     - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}$(if [ $CI_COMMIT_BRANCH != 'master' ]; then echo \"-$CI_COMMIT_BRANCH\"; fi)\" && \
@@ -62,6 +62,10 @@ docker_publish:
     paths:
       - 'build/*'
 inspection:
+  image: docker
+  services:
+    - name: docker:dind
+      alias: docker
   stage: build
   script:
     - "docker build -f ./ci/Inspection -t pipeline/inspection:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN ."
