@@ -21,6 +21,7 @@ build:
            -Pversion_major=${MAJOR_VERSION} -Pversion_minor=${MINOR_VERSION} \
            -Pdocker_image_name=${FULL_DOCKER_IMAGE_NAME}"
   cache:
+    key: "buildData"
     paths:
       - 'build/'
   artifacts:
@@ -43,13 +44,11 @@ artifactory_publish:
                -Partifactory_url=${ARTIFACTORY_URL} \
                -Partifactory_resolve_repo=${ARTIFACTORY_RESOLVE_REPO}"
   cache:
+    key: "buildData"
     paths:
       - 'build/'
 docker_publish:
   image: docker
-  services:
-    - name: docker:dind
-      alias: docker
   stage: publish
   script:
     - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}$(if [ $CI_COMMIT_BRANCH != 'master' ]; then echo \"-$CI_COMMIT_BRANCH\"; fi)\" && \
@@ -59,8 +58,9 @@ docker_publish:
     - "docker login -u $TH2_REGISTRY_USR -p $TH2_REGISTRY_PSW $TH2_REGISTRY_URL"
     - "docker push ${FULL_DOCKER_IMAGE_NAME}"
   cache:
+    key: "buildData"
     paths:
-      - 'build/docker/'
+      - 'build/'
 inspection:
   image: slon19/ideainspection
   stage: build
@@ -69,9 +69,10 @@ inspection:
     - "git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.exactpro.com/vivarium/th2/intellij-idea-settings.git"
     - "/opt/idea/bin/inspect.sh ./ ./intellij-idea-settings/inspection/Evolution.xml ./results -v2 -format plain"
   cache:
+    key: "projectIndex"
     paths:
       - 'cache'
   artifacts:
     paths:
-      - 'results/*.xml'
+      - 'results/*.txt'
 
