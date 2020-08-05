@@ -22,7 +22,7 @@ build:
            -Pdocker_image_name=${FULL_DOCKER_IMAGE_NAME}"
   cache:
     paths:
-      - 'build/*'
+      - 'build/'
   artifacts:
     paths:
       - 'build/libs/*.jar'
@@ -44,7 +44,7 @@ artifactory_publish:
                -Partifactory_resolve_repo=${ARTIFACTORY_RESOLVE_REPO}"
   cache:
     paths:
-      - 'build/*'
+      - 'build/'
 docker_publish:
   image: docker
   services:
@@ -60,7 +60,7 @@ docker_publish:
     - "docker push ${FULL_DOCKER_IMAGE_NAME}"
   cache:
     paths:
-      - 'build/*'
+      - 'build/docker/'
 inspection:
   image: slon19/ideainspection
   stage: build
