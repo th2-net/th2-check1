@@ -15,7 +15,7 @@ variables:
 build:
   stage: build
   script:
-    - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}\""
+    - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}$(if [ $CI_COMMIT_BRANCH != 'master' ]; then echo \"-$CI_COMMIT_BRANCH\"; fi)\""
     - "export FULL_DOCKER_IMAGE_NAME=\"${DOCKER_TARGET_REPOSITORY}/${DOCKER_IMAGE_NAME}:${VERSION}\""
     - "docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
         --build-arg CI_PIPELINE_IID --build-arg MAJOR_VERSION --build-arg MINOR_VERSION \
