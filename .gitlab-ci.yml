@@ -62,14 +62,12 @@ docker_publish:
     paths:
       - 'build/*'
 inspection:
-  image: docker
-  services:
-    - name: docker:dind
-      alias: docker
+  image: slon19/ideainspection
   stage: build
   script:
-    - "docker build -f ./ci/Inspection -t pipeline/inspection:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN ."
-    - "docker create -v $(pwd)/inspections:/opt/idea -v $(pwd)/cache:/opt/idea/cache pipeline/inspection:${CI_PIPELINE_IID}"
+    - "export IDEA_PROPERIES=/opt/idea/idea.ci.properties"
+    - "git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.exactpro.com/vivarium/th2/intellij-idea-settings.git"
+    - "/opt/idea/bin/inspect.sh ./ ./intellij-idea-settings/inspection/Evolution.xml ./results -v2 -format plain"
   cache:
     paths:
       - 'cache'
