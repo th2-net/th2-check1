@@ -10,13 +10,12 @@ variables:
   MAJOR_VERSION: "0"
   MINOR_VERSION: "1"
   MAINTENANCE_VERSION: "0"
-  DOCKER_TARGET_REPOSITORY: "target_docker_repository"
   DOCKER_IMAGE_NAME: "th2-verifier"
 build:
   stage: build
   script:
     - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}$(if [ $CI_COMMIT_BRANCH != 'master' ]; then echo \"-$CI_COMMIT_BRANCH\"; fi)\""
-    - "export FULL_DOCKER_IMAGE_NAME=\"${DOCKER_TARGET_REPOSITORY}/${DOCKER_IMAGE_NAME}:${VERSION}\""
+    - "export FULL_DOCKER_IMAGE_NAME=\"${TH2_REGISTRY_URL}/${DOCKER_IMAGE_NAME}:${VERSION}\""
     - "docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
         --build-arg CI_PIPELINE_IID --build-arg MAJOR_VERSION --build-arg MINOR_VERSION \
         --build-arg ARTIFACTORY_USER --build-arg ARTIFACTORY_PASS --build-arg ARTIFACTORY_REPO \
