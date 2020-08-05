@@ -65,14 +65,15 @@ inspection:
   image: slon19/ideainspection
   stage: build
   script:
-    - "export IDEA_PROPERIES=/opt/idea/idea.ci.properties"
+    - "export IDEA_PROPERTIES=$(pwd)/ci/idea/idea.ci.properties"
     - "git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.exactpro.com/vivarium/th2/intellij-idea-settings.git"
     - "/opt/idea/bin/inspect.sh ./ ./intellij-idea-settings/inspection/Evolution.xml ./results -v2 -format plain"
   cache:
     key: "projectIndex"
     paths:
+      - '.gradle'
       - 'cache'
   artifacts:
     paths:
-      - 'results/*.txt'
+      - 'results'
 
