@@ -11,27 +11,56 @@ variables:
   MINOR_VERSION: "1"
   MAINTENANCE_VERSION: "0"
   DOCKER_IMAGE_NAME: "th2-verifier"
+stages:
+  - build
+  - publish
 build:
   stage: build
+  image: gradle:6.4-jdk11
+  script:
+    - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}$(if [ $CI_COMMIT_BRANCH != 'master' ]; then echo \"-$CI_COMMIT_BRANCH\"; fi)\" && \
+            echo \"Version = $VERSION\""
+    - "export FULL_DOCKER_IMAGE_NAME=\"${TH2_REGISTRY_URL}/${DOCKER_IMAGE_NAME}:${VERSION}\""
+    - "gradle clean build dockerPrepare -Pversion_build=${CI_PIPELINE_IID} \
+           -Pversion_major=${MAJOR_VERSION} -Pversion_minor=${MINOR_VERSION} \
+           -Pdocker_image_name=${FULL_DOCKER_IMAGE_NAME}"
+  cache:
+    paths:
+      - 'build/*'
+  artifacts:
+    paths:
+      - 'build/libs/*.jar'
+      - 'build/distributions/*.tar'
+      - 'build/distributions/*.zip'
+artifactory_publish:
+  stage: publish
+  image: gradle:6.4-jdk11
+  script:
+    - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}$(if [ $CI_COMMIT_BRANCH != 'master' ]; then echo \"-$CI_COMMIT_BRANCH\"; fi)\" && \
+                  echo \"Version = $VERSION\""
+    - "export FULL_DOCKER_IMAGE_NAME=\"${TH2_REGISTRY_URL}/${DOCKER_IMAGE_NAME}:${VERSION}\""
+    - "gradle artifactoryPublish -Pversion_build=${CI_PIPELINE_IID} \
+               -Partifactory_user=${ARTIFACTORY_USER} \
+               -Pversion_major=${MAJOR_VERSION} -Pversion_minor=${MINOR_VERSION} \
+               -Partifactory_password=${ARTIFACTORY_PASS} \
+               -Partifactory_deploy_repo_key=${ARTIFACTORY_REPO} \
+               -Partifactory_url=${ARTIFACTORY_URL} \
+               -Partifactory_resolve_repo=${ARTIFACTORY_RESOLVE_REPO}"
+  cache:
+    paths:
+      - 'build/*'
+docker_publish:
+  stage: publish
   script:
     - "export VERSION=\"${MAJOR_VERSION}.${MINOR_VERSION}.${MAINTENANCE_VERSION}.${CI_PIPELINE_IID}$(if [ $CI_COMMIT_BRANCH != 'master' ]; then echo \"-$CI_COMMIT_BRANCH\"; fi)\" && \
         echo \"Version = $VERSION\""
     - "export FULL_DOCKER_IMAGE_NAME=\"${TH2_REGISTRY_URL}/${DOCKER_IMAGE_NAME}:${VERSION}\""
-    - "docker build -f ./ci/Dockerfile -t pipeline:${CI_PIPELINE_IID} --build-arg CI_JOB_TOKEN \
-        --build-arg CI_PIPELINE_IID --build-arg MAJOR_VERSION --build-arg MINOR_VERSION \
-        --build-arg ARTIFACTORY_USER --build-arg ARTIFACTORY_PASS --build-arg ARTIFACTORY_REPO \
-        --build-arg DOCKER_IMAGE_NAME=${FULL_DOCKER_IMAGE_NAME} \
-        --build-arg ARTIFACTORY_URL --build-arg ARTIFACTORY_RESOLVE_REPO ."
-    - "docker create -v $(pwd)/build:/home/build/libs -v $(pwd)/build:/home/build/distributions \
-         pipeline:${CI_PIPELINE_IID}"
-    - "docker tag pipeline:${CI_PIPELINE_IID} ${FULL_DOCKER_IMAGE_NAME}"
+    - "docker build -f ./ci/Dockerfile -t ${FULL_DOCKER_IMAGE_NAME} ."
     - "docker login -u $TH2_REGISTRY_USR -p $TH2_REGISTRY_PSW $TH2_REGISTRY_URL"
     - "docker push ${FULL_DOCKER_IMAGE_NAME}"
-  artifacts:
+  cache:
     paths:
-      - 'build/*.jar'
-      - 'build/*.tar'
-      - 'build/*.zip'
+      - 'build/*'
 inspection:
   stage: build
   script:
