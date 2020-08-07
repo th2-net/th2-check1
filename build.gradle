@@ -106,7 +106,7 @@ ext {
     dockerImageVersion  = "${version_major}.${version_minor}.${version_maintenance}.${version_build}"
 }
 
-archivesBaseName = 'verifier-service-153'
+archivesBaseName = 'verifier-service'
 
 dependencies {
     compile project(':grpc-verifier')
