@@ -106,7 +106,7 @@ ext {
     dockerImageVersion  = "${version_major}.${version_minor}.${version_maintenance}.${version_build}"
 }
 
-archivesBaseName = 'verifier-service'
+archivesBaseName = 'verifier-service-153'
 
 dependencies {
     compile project(':grpc-verifier')
@@ -131,7 +131,7 @@ dependencies {
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            artifactId = 'th2-verifier'
+            artifactId = 'th2-verifier-153'
         }
     }
 }
