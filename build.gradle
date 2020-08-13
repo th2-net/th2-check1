@@ -99,7 +99,7 @@ ext {
     cassandraVersion   = '3.6.0' //FIXME: Migrate to another library for UUID
 }
 
-archivesBaseName = 'verifier-service'
+archivesBaseName = 'service'
 
 dependencies {
     compile project(':grpc-verifier')
