@@ -7,4 +7,4 @@ ENV RABBITMQ_HOST=rabbitmq \
     GRPC_PORT=8080
 WORKDIR /home
 COPY ./ .
-ENTRYPOINT ["/home/verifier-service/bin/verifier-service", "/home/verifier-service/etc/config.yml"]
+ENTRYPOINT ["/home/service/bin/service", "/home/service/etc/config.yml"]
