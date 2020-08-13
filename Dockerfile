@@ -1,10 +1,6 @@
 FROM gradle:6.4-jdk11 AS build
 COPY ./ .
-RUN gradle dockerPrepare \
-    -Pversion_major=${MAJOR_VERSION} \
-    -Pversion_minor=${MINOR_VERSION} \
-    -Pversion_maintenance=${MAINTENANCE_VERSION} \
-    -Pversion_build=${CI_PIPELINE_IID}
+RUN gradle dockerPrepare
 
 FROM openjdk:12-alpine
 ENV RABBITMQ_HOST=rabbitmq \
