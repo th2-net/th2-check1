@@ -1,6 +1,6 @@
 include:
   - project: 'vivarium/th2/pipelines'
-    ref: java-template
+    ref: master
     file: '/.gitlab-ci-java-template.yml'
 
 variables:
