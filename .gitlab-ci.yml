@@ -1,6 +1,5 @@
 variables:
   APP_NAME: "th2-verifier"
-  COMPONENT_TYPE: "core"
   MAJOR_VERSION: "0"
   MINOR_VERSION: "5"
   INSPECTION_ENABLED: 'true'
