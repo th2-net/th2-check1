@@ -1,8 +1,3 @@
-include:
-  - project: 'vivarium/th2/pipelines'
-    ref: master
-    file: '/.gitlab-ci-java-template.yml'
-
 variables:
   APP_NAME: "th2-verifier"
   COMPONENT_TYPE: "core"
@@ -11,3 +6,8 @@ variables:
   INSPECTION_ENABLED: 'true'
   TEST_ENABLED: 'false'
   ARTIFACTORY_PUBLISH: 'true'
+  
+include:
+  - project: 'vivarium/th2/pipelines'
+    ref: master
+    file: '/.gitlab-ci-java-template.yml'
