@@ -1,12 +1,9 @@
 /*
  * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -40,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.exactpro.th2.configuration.Th2Configuration.QueueNames;
 
+import org.apache.commons.lang3.ObjectUtils;
 import com.exactpro.th2.verifier.configuration.Configuration;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -124,8 +122,13 @@ public class CollectorService {
         Event rootEvent = Event.from(startTime)
                 .description(checkRuleRequest.getDescription());
         try {
+            Direction direction = ObjectUtils.defaultIfNull(checkRuleRequest.getDirection(), Direction.FIRST);
+            if (direction == Direction.UNRECOGNIZED) {
+                direction = Direction.FIRST;
+            }
+
             Checkpoint checkpoint = Checkpoint.convert(checkRuleRequest.getCheckpoint());
-            VerifyIterator<MessageWrapper> iterator = messageCollector.createIterator(checkRuleRequest.getConnectivityId().getSessionAlias(), Direction.FIRST, checkpoint);
+            VerifyIterator<MessageWrapper> iterator = messageCollector.createIterator(checkRuleRequest.getConnectivityId().getSessionAlias(), direction, checkpoint);
             try {
                 ComparatorSettings settings = createComparatorSettings(checkRuleRequest.getFilter());
                 List<Pair<IMessage, ComparisonResult>> comparisonResults = waitMessage(checkRuleRequest.getFilter(),
@@ -143,7 +146,7 @@ public class CollectorService {
                 Pair<IMessage, ComparisonResult> comparisonResultPair = comparisonResults.get(0);
                 appendEventWithVerification(rootEvent, (MessageWrapper)comparisonResultPair.getFirst(), checkRuleRequest.getFilter(), comparisonResultPair.getSecond());
             } finally {
-                messageCollector.removeIterator(checkRuleRequest.getConnectivityId().getSessionAlias(), Direction.FIRST, iterator);
+                messageCollector.removeIterator(checkRuleRequest.getConnectivityId().getSessionAlias(), direction, iterator);
             }
         } catch (InterruptedException | RuntimeException e) {
             rootEvent
@@ -171,6 +174,11 @@ public class CollectorService {
 
         try {
 
+            Direction direction = ObjectUtils.defaultIfNull(checkSequenceRuleRequest.getDirection(), Direction.FIRST);
+            if (direction == Direction.UNRECOGNIZED) {
+                direction = Direction.FIRST;
+            }
+
             MessageFilter preMessageFilter = MessageFilter.newBuilder()
                     .setMessageType("PreFilter")
                     .putAllFields(checkSequenceRuleRequest.getPreFilter().getFieldsMap())
@@ -181,7 +189,7 @@ public class CollectorService {
 
             String connectivityId = checkSequenceRuleRequest.getConnectivityId().getSessionAlias();
             Checkpoint checkpoint = Checkpoint.convert(checkSequenceRuleRequest.getCheckpoint());
-            VerifyIterator<MessageWrapper> iterator = messageCollector.createIterator(checkSequenceRuleRequest.getConnectivityId().getSessionAlias(), Direction.FIRST, checkpoint);
+            VerifyIterator<MessageWrapper> iterator = messageCollector.createIterator(checkSequenceRuleRequest.getConnectivityId().getSessionAlias(), direction, checkpoint);
             try {
                 //region create events for pre-filtering
                 Event preFilterEvent = rootEvent.addSubEvent(Event.from(verifyStartTime))
@@ -272,7 +280,7 @@ public class CollectorService {
                         .endTimestamp();
                 //endregion
             } finally {
-                messageCollector.removeIterator(checkSequenceRuleRequest.getConnectivityId().getSessionAlias(), Direction.FIRST, iterator);
+                messageCollector.removeIterator(checkSequenceRuleRequest.getConnectivityId().getSessionAlias(), direction, iterator);
             }
         } catch (InterruptedException | RuntimeException e) {
             rootEvent.status(Status.FAILED)

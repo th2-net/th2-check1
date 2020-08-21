@@ -32,6 +32,7 @@ message CheckRuleRequest {
     reserved 5; // ReportId reportId = 5; reserved now
     EventID parent_event_id = 6;
     string description = 7;
+    Direction direction = 8;
 }
 
 message CheckRuleResponse {
@@ -48,6 +49,7 @@ message CheckSequenceRuleRequest {
     EventID parent_event_id = 7;
     bool check_order = 8;
     string description = 9;
+    Direction direction = 10;
 }
 
 message CheckSequenceRuleResponse {
