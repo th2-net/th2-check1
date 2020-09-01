@@ -139,16 +139,11 @@ class SequenceCheckRuleTask(
         }
 
         if (messageFilters.isEmpty()) {
-            fillEvent()
             checkComplete()
         }
     }
 
-    override fun onTimeout() {
-        fillEvent()
-    }
-
-    private fun fillEvent() {
+    override fun completeEvent() {
         preFilterEvent.name("Pre-filtering (filtered ${preFilteringResults.size} / processed $handledMessageCounter) messages")
 
         fillSequenceEvent()

@@ -127,24 +127,25 @@ abstract class AbstractCheckTask(
     /**
      * It is called when timeout is over and task in not complete yet
      */
-    protected abstract fun onTimeout()
+    protected open fun onTimeout() {}
 
     /**
      * Emit last sequence to the single for to the next task. It should be called after completed of base check.
      * This method can call {@link #onCompleteTask} if the next task already subscribed
      */
     protected fun checkComplete() {
-        try {
-            LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
-            if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
+
+        LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
+        if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
+            try {
                 dispose()
                 endFuture.dispose()
                 sequenceSubject.onSuccess(lastSequence)
-            } else {
-                LOGGER.warn("Task for session alias '{}' is already completed. Skip calling 'checkComplete'", sessionAlias)
+            } finally {
+                publishEvent()
             }
-        } finally {
-            publishEvent()
+        } else {
+            LOGGER.debug("Task for session alias '{}' is already completed. Skip calling 'checkComplete'", sessionAlias)
         }
     }
 
@@ -188,23 +189,29 @@ abstract class AbstractCheckTask(
      * Disposes task when timeout is over. Task unsubscribe from message stream.
      */
     private fun end() {
-        try {
-            LOGGER.info("Timeout is over for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
-            if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
+        LOGGER.info("Timeout is over for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
+        if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
+            try {
                 dispose()
                 sequenceSubject.onSuccess(lastSequence)
                 onTimeout()
-            } else {
-                LOGGER.warn("Task for session alias '{}' is already completed. Skip calling 'onTimeout'", sessionAlias)
+            } finally {
+                publishEvent()
             }
-        } finally {
-            publishEvent()
+        } else {
+            LOGGER.debug("Task for session alias '{}' is already completed. Skip calling 'onTimeout'", sessionAlias)
         }
     }
 
+    /**
+     * Prepare the root event or children events for publication.
+     * This method is invoked in [State.PUBLISHED] state.
+     */
+    protected open fun completeEvent() {}
+
     private fun publishEvent() {
-        val currentState = taskState.compareAndExchange(State.DONE, State.PUBLISHED)
-        if (currentState != State.PUBLISHED) {
+        if (taskState.compareAndSet(State.DONE, State.PUBLISHED)) {
+            completeEvent();
             _endTime = Instant.now()
             LOGGER.debug("Sending event thee id '{}' parent id '{}'", rootEvent.id, parentEventID)
             val storeRequest = StoreEventBatchRequest.newBuilder()
@@ -223,11 +230,8 @@ abstract class AbstractCheckTask(
                 },
                 RESPONSE_EXECUTOR
             )
-            if (currentState != State.DONE) {
-                LOGGER.error("Event tree id '{}' parent id '{}' is published in unexpected state '{}'", rootEvent.id, parentEventID, currentState)
-            }
         } else {
-            LOGGER.warn("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
+            LOGGER.debug("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
         }
     }
 
