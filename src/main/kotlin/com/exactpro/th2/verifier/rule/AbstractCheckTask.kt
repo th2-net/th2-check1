@@ -34,7 +34,6 @@ import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.Message
 import com.exactpro.th2.infra.grpc.MessageFilter
 import com.exactpro.th2.verifier.AbstractSessionObserver
-import com.exactpro.th2.verifier.CollectorServiceA
 import com.exactpro.th2.verifier.DefaultMessageFactoryProxy
 import com.exactpro.th2.verifier.StreamContainer
 import com.exactpro.th2.verifier.event.bean.builder.VerificationBuilder
@@ -42,16 +41,24 @@ import com.exactpro.th2.verifier.rule.sequence.ComparisonContainer
 import com.exactpro.th2.verifier.util.VerificationUtil
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
+import io.reactivex.Scheduler
 import io.reactivex.Single
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.SingleSubject
 import java.time.Instant
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
+/**
+ * Implements common logic for check task.
+ *
+ * **Class in not thread-safe**
+ */
 abstract class AbstractCheckTask(
     val description: String?,
     private val timeout: Long,
@@ -70,6 +77,13 @@ abstract class AbstractCheckTask(
     private val sequenceSubject = SingleSubject.create<Long>()
     private val hasNextTask = AtomicBoolean(false)
     private val taskState = AtomicReference(State.CREATED)
+    /**
+     * Used for observe messages in one thread.
+     * It provides feature to write no thread-safe code in children classes.
+     *
+     * Executor is shared between connected tasks.
+     */
+    private lateinit var executorService: ExecutorService
     private var _endTime: Instant? = null
     val endTime: Instant?
         get() = _endTime
@@ -100,14 +114,35 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * Registers a task as the next task in continuous verification chain. Its {@link #begin} method will be called
+     * Shutdowns the executor that is used to perform this task.
+     *
+     * @throws IllegalStateException if this task has connected task
+     */
+    fun shutdownExecutor() {
+        if (hasNextTask.get()) {
+            throw IllegalStateException("Cannot shutdown executor for task '$description' that has connected task")
+        }
+        executorService.shutdown()
+    }
+
+    /**
+     * Registers a task as the next task in continuous verification chain. Its [begin] method will be called
      * when current task completes check or timeout is over for it.
+     * The scheduler for current task will be passed to the next task.
+     *
      * This method should be called only once otherwise it throws IllegalStateException.
      * @throws IllegalStateException when method is called more than once.
      */
     fun subscribeNextTask(checkTask: AbstractCheckTask) {
         if (hasNextTask.compareAndSet(false, true)) {
-            sequenceSubject.subscribe { sequence -> checkTask.begin(sequence) }
+            val executor =
+                if (executorService.isShutdown) {
+                    LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
+                    createExecutorService()
+                } else {
+                    executorService
+                }
+            sequenceSubject.subscribe { sequence -> checkTask.begin(sequence, executor) }
         } else {
             throw IllegalStateException("Subscription to last sequence for task $description is already executed")
         }
@@ -159,15 +194,18 @@ abstract class AbstractCheckTask(
      * Task subscribe to messages stream with sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param sequence message sequence from previous task.
+     * @param executorService executor to schedule pipeline execution.
      * @throws IllegalStateException when method is called more than once.
      */
-    private fun begin(sequence: Long = DEFAULT_SEQUENCE) {
+    private fun begin(sequence: Long = DEFAULT_SEQUENCE, executorService: ExecutorService = createExecutorService()) {
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionAlias, sequence, timeout)
+        this.executorService = executorService
+        val scheduler = Schedulers.from(executorService)
 
-        messageStream.observeOn(TASK_SCHEDULER) // Defined scheduler to execution in one thread
+        messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread
             .continueObserve(sessionAlias, sequence)
             .doOnNext {
                 handledMessageCounter++
@@ -181,9 +219,11 @@ abstract class AbstractCheckTask(
             .taskPipeline()
             .subscribe(this)
 
-        endFuture = Single.timer(timeout, MILLISECONDS, TASK_SCHEDULER)
+        endFuture = Single.timer(timeout, MILLISECONDS, scheduler)
             .subscribe { _ -> end() }
     }
+
+    private fun createExecutorService(): ExecutorService = Executors.newSingleThreadExecutor()
 
     /**
      * Disposes task when timeout is over. Task unsubscribe from message stream.
@@ -213,7 +253,7 @@ abstract class AbstractCheckTask(
         if (taskState.compareAndSet(State.DONE, State.PUBLISHED)) {
             completeEvent();
             _endTime = Instant.now()
-            LOGGER.debug("Sending event thee id '{}' parent id '{}'", rootEvent.id, parentEventID)
+            LOGGER.debug("Sending event tree id '{}' parent id '{}'", rootEvent.id, parentEventID)
             val storeRequest = StoreEventBatchRequest.newBuilder()
                 .setEventBatch(EventBatch.newBuilder()
                     .setParentEventId(parentEventID)
@@ -236,11 +276,6 @@ abstract class AbstractCheckTask(
     }
 
     companion object {
-        /**
-         * Used for observe messages in one thread.
-         * It provides feature to write no thread-safe code in children classes
-         */
-        val TASK_SCHEDULER = Schedulers.newThread()
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
 
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()

@@ -92,7 +92,7 @@ class CollectorServiceA(
     @Throws(InterruptedException::class)
     fun verifyCheckRule(request: CheckRuleRequest): ChainID {
         val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
-        val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias cant't be null")
+        val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias can't be null")
         val filter: MessageFilter = requireNonNull(request.filter, "Message filter can't be null")
 
         val chainID = request.getChainIdOrGenerate()
@@ -111,7 +111,7 @@ class CollectorServiceA(
     @Throws(InterruptedException::class)
     fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): ChainID {
         val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
-        val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias cant't be null")
+        val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias can't be null")
 
         val chainID = request.getChainIdOrGenerate()
 
@@ -151,13 +151,20 @@ class CollectorServiceA(
 
     private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
         val now = Instant.now()
-        eventIdToLastCheckTask.values.removeIf {
-            val endTime = it.endTime
-            val remove = endTime != null && unit.between(endTime, now) > delta
-            if (remove) { logger.debug("Remove task ${it.description} ($endTime) from tasks map") }
-            remove
+        for ((key, task) in eventIdToLastCheckTask.entries) {
+            val endTime = task.endTime
+            if (olderThan(now, delta, unit, endTime)) {
+                logger.debug("Remove task ${task.description} ($endTime) from tasks map")
+                if (eventIdToLastCheckTask.remove(key, task)) {
+                    runCatching { task.shutdownExecutor() }
+                        .onFailure { logger.error("Cannot shutdown scheduler for task '${task.description}'", it) }
+                }
+            }
         }
     }
+
+    private fun olderThan(now: Instant?, delta: Long, unit: ChronoUnit, endTime: Instant?) =
+        endTime != null && unit.between(endTime, now) > delta
 
     @Throws(JsonProcessingException::class)
     private fun sendEvents(parentEventID: EventID, event: Event) {
