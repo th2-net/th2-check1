@@ -26,8 +26,12 @@ class StreamContainer(val sessionAlias : String,
     private val currentMessage : Observable<Message>
 
     init {
-        currentMessage = messageObservable.replay(1).apply { connect() }
+        val replay = messageObservable.replay(1)
+        currentMessage = replay
         bufferedMessages = currentMessage.replay(limitSize).apply { connect() }
+
+        // if we connect it before [bufferedMessages] stream is constructed we might lose some data
+        replay.connect()
     }
 
     val lastMessage : Message
