@@ -25,6 +25,10 @@ allprojects {
         kotlinOptions.jvmTarget = "11"
     }
 
+    compileTestKotlin {
+        kotlinOptions.jvmTarget = "11"
+    }
+
     sourceCompatibility = 1.11
     targetCompatibility = 1.11
 
@@ -125,7 +129,12 @@ dependencies {
 
     compile "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
 
-    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 publishing {
