@@ -18,7 +18,6 @@ package com.exactpro.th2.verifier.rule.sequence
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
-import com.exactpro.sf.comparison.ComparisonUtil.getStatusType
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.ProtoToIMessageConverter
@@ -127,14 +126,17 @@ class SequenceCheckRuleTask(
             )
 
             if (comparisonResult != null) {
-                reordered = reordered || index != 0
+                val comparisonStatus = comparisonResult.getStatusType()
+                reordered = reordered || index != 0 || comparisonStatus != StatusType.PASSED
                 messageFilteringResults[messageContainer.protoMessage.metadata.id] = ComparisonContainer(
                     messageContainer,
                     messageFilter.protoMessageFilter,
                     comparisonResult
                 )
-                messageFilters.removeAt(index)
-                break
+                if (checkOrder || comparisonStatus == StatusType.PASSED) {
+                    messageFilters.removeAt(index)
+                    break
+                }
             }
         }
 
