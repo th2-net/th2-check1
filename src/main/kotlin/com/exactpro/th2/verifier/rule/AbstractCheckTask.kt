@@ -77,6 +77,13 @@ abstract class AbstractCheckTask(
     private val sequenceSubject = SingleSubject.create<Long>()
     private val hasNextTask = AtomicBoolean(false)
     private val taskState = AtomicReference(State.CREATED)
+
+    /**
+     * This flag will be set if timeout is exited before task is finished.
+     */
+    @Volatile
+    private var canceled = false
+
     /**
      * Used for observe messages in one thread.
      * It provides feature to write no thread-safe code in children classes.
@@ -172,13 +179,8 @@ abstract class AbstractCheckTask(
 
         LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
         if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
-            try {
-                dispose()
-                endFuture.dispose()
-                sequenceSubject.onSuccess(lastSequence)
-            } finally {
-                publishEvent()
-            }
+            dispose()
+            endFuture.dispose()
         } else {
             LOGGER.debug("Task for session alias '{}' is already completed. Skip calling 'checkComplete'", sessionAlias)
         }
@@ -205,7 +207,18 @@ abstract class AbstractCheckTask(
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
 
-        messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread
+        messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
+            .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
+
+            // All sources above will be disposed on this scheduler.
+            //
+            // This method should be called as closer as possible
+            // to the actual dispose you want to execute on this scheduler
+            // because other operations are executed on the same single-thread scheduler.
+            //
+            // If we move [Observable#unsubscribeOn] after them they won't be disposed until scheduler is free.
+            // In the worst-case scenario, it might never happen.
+            .unsubscribeOn(scheduler)
             .continueObserve(sessionAlias, sequence)
             .doOnNext {
                 handledMessageCounter++
@@ -219,8 +232,31 @@ abstract class AbstractCheckTask(
             .taskPipeline()
             .subscribe(this)
 
-        endFuture = Single.timer(timeout, MILLISECONDS, scheduler)
+        endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end() }
+    }
+
+    private fun taskFinished() {
+        try {
+            LOGGER.info("Finishes task '$description'")
+            if (canceled) {
+                callOnTimeoutCallback()
+            }
+            publishEvent()
+            LOGGER.info("Task '$description' has been finished")
+        } catch (ex: Exception) {
+            LOGGER.error("Cannot finish task '$description'", ex)
+        } finally {
+            sequenceSubject.onSuccess(lastSequence)
+        }
+    }
+
+    private fun callOnTimeoutCallback() {
+        try {
+            onTimeout()
+        } catch (ex: Exception) {
+            LOGGER.error("Cannot execute 'onTimeout' method", ex)
+        }
     }
 
     private fun createExecutorService(): ExecutorService = Executors.newSingleThreadExecutor()
@@ -231,13 +267,8 @@ abstract class AbstractCheckTask(
     private fun end() {
         LOGGER.info("Timeout is over for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
         if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
-            try {
-                dispose()
-                sequenceSubject.onSuccess(lastSequence)
-                onTimeout()
-            } finally {
-                publishEvent()
-            }
+            canceled = true
+            dispose()
         } else {
             LOGGER.debug("Task for session alias '{}' is already completed. Skip calling 'onTimeout'", sessionAlias)
         }
