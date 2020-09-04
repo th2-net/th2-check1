@@ -274,6 +274,11 @@ abstract class AbstractCheckTask(
         }
     }
 
+    override fun onComplete() {
+        super.onComplete()
+        end()
+    }
+
     /**
      * Prepare the root event or children events for publication.
      * This method is invoked in [State.PUBLISHED] state.
@@ -282,7 +287,7 @@ abstract class AbstractCheckTask(
 
     private fun publishEvent() {
         if (taskState.compareAndSet(State.DONE, State.PUBLISHED)) {
-            completeEvent();
+            completeEvent()
             _endTime = Instant.now()
             LOGGER.debug("Sending event tree id '{}' parent id '{}'", rootEvent.id, parentEventID)
             val storeRequest = StoreEventBatchRequest.newBuilder()
