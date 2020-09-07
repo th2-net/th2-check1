@@ -145,7 +145,7 @@ class SequenceCheckRuleTask(
         }
     }
 
-    override fun completeEvent() {
+    override fun completeEvent(canceled: Boolean) {
         preFilterEvent.name("Pre-filtering (filtered ${preFilteringResults.size} / processed $handledMessageCounter) messages")
 
         fillSequenceEvent()

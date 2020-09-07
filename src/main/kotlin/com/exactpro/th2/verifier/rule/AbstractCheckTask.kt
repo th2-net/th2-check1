@@ -41,7 +41,6 @@ import com.exactpro.th2.verifier.rule.sequence.ComparisonContainer
 import com.exactpro.th2.verifier.util.VerificationUtil
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
-import io.reactivex.Scheduler
 import io.reactivex.Single
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
@@ -79,12 +78,6 @@ abstract class AbstractCheckTask(
     private val taskState = AtomicReference(State.CREATED)
 
     /**
-     * This flag will be set if timeout is exited before task is finished.
-     */
-    @Volatile
-    private var canceled = false
-
-    /**
      * Used for observe messages in one thread.
      * It provides feature to write no thread-safe code in children classes.
      *
@@ -98,7 +91,8 @@ abstract class AbstractCheckTask(
     protected enum class State {
         CREATED,
         BEGIN,
-        DONE,
+        TIMEOUT,
+        COMPLETED,
         PUBLISHED
     }
 
@@ -118,6 +112,7 @@ abstract class AbstractCheckTask(
 
         rootEvent.status(FAILED)
             .bodyData(EventUtils.createMessageBean(e.message))
+        end("Error ${e.message} received in message stream")
     }
 
     /**
@@ -172,17 +167,20 @@ abstract class AbstractCheckTask(
     protected open fun onTimeout() {}
 
     /**
-     * Emit last sequence to the single for to the next task. It should be called after completed of base check.
-     * This method can call {@link #onCompleteTask} if the next task already subscribed
+     * Marks the task as successfully completed. If task timeout had been exited and then the task was marked as successfully completed
+     * the task will be considered as successfully completed because it had actually found that it should
      */
     protected fun checkComplete() {
 
         LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
-        if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
-            dispose()
-            endFuture.dispose()
+        val prevValue = taskState.getAndSet(State.COMPLETED)
+        dispose()
+        endFuture.dispose()
+
+        if (prevValue == State.TIMEOUT) {
+            LOGGER.info("Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed", description, sessionAlias)
         } else {
-            LOGGER.debug("Task for session alias '{}' is already completed. Skip calling 'checkComplete'", sessionAlias)
+            LOGGER.debug("Task '{}' for session alias '{}' is completed normally", description, sessionAlias)
         }
     }
 
@@ -233,13 +231,14 @@ abstract class AbstractCheckTask(
             .subscribe(this)
 
         endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
-            .subscribe { _ -> end() }
+            .subscribe { _ -> end("Timeout is exited") }
     }
 
     private fun taskFinished() {
         try {
-            LOGGER.info("Finishes task '$description'")
-            if (canceled) {
+            val currentState = taskState.get()
+            LOGGER.info("Finishes task '$description' in state $currentState")
+            if (currentState == State.TIMEOUT) {
                 callOnTimeoutCallback()
             }
             publishEvent()
@@ -262,32 +261,39 @@ abstract class AbstractCheckTask(
     private fun createExecutorService(): ExecutorService = Executors.newSingleThreadExecutor()
 
     /**
-     * Disposes task when timeout is over. Task unsubscribe from message stream.
+     * Disposes task when timeout is over or message stream is completed normally or with an exception.
+     * Task unsubscribe from message stream.
+     *
+     * @param reason the cause why task must be stopped
      */
-    private fun end() {
-        LOGGER.info("Timeout is over for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
-        if (taskState.compareAndSet(State.BEGIN, State.DONE)) {
-            canceled = true
+    private fun end(reason: String) {
+        if (taskState.compareAndSet(State.BEGIN, State.TIMEOUT)) {
+            LOGGER.info("Stop task for session alias '{}' with sequence '{}' because: {}", sessionAlias, lastSequence, reason)
             dispose()
+            endFuture.dispose()
         } else {
-            LOGGER.debug("Task for session alias '{}' is already completed. Skip calling 'onTimeout'", sessionAlias)
+            LOGGER.debug("Task for session alias '{}' is already completed. Ignore 'end' method call with reason: {}", sessionAlias, reason)
         }
     }
 
     override fun onComplete() {
         super.onComplete()
-        end()
+        end("Message stream is completed")
     }
 
     /**
      * Prepare the root event or children events for publication.
      * This method is invoked in [State.PUBLISHED] state.
      */
-    protected open fun completeEvent() {}
+    protected open fun completeEvent(canceled: Boolean) {}
 
+    /**
+     * Publishes event to the [eventStoreStub].
+     */
     private fun publishEvent() {
-        if (taskState.compareAndSet(State.DONE, State.PUBLISHED)) {
-            completeEvent()
+        val prevState = taskState.getAndSet(State.PUBLISHED)
+        if (prevState != State.PUBLISHED) {
+            completeEvent(prevState == State.TIMEOUT)
             _endTime = Instant.now()
             LOGGER.debug("Sending event tree id '{}' parent id '{}'", rootEvent.id, parentEventID)
             val storeRequest = StoreEventBatchRequest.newBuilder()
