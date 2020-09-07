@@ -41,7 +41,7 @@ public class VerifierHandler extends VerifierImplBase {
 
     private final CollectorService collectorService;
 
-    public VerifierHandler(CollectorService collectorService, ExecutorService executorService) {
+    public VerifierHandler(CollectorService collectorService) {
         this.collectorService = collectorService;
     }
 

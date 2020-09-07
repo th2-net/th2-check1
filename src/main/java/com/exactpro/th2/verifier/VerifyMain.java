@@ -46,10 +46,8 @@ public class VerifyMain {
             Configuration microserviceConfiguration = readConfiguration(args);
             CollectorServiceConfiguration configuration = new CollectorServiceConfiguration(microserviceConfiguration);
             CollectorService collectorService = new CollectorService(configuration);
-            ExecutorService executorService = Executors.newFixedThreadPool(10);//TODO config in future
             Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
-            Runtime.getRuntime().addShutdownHook(new Thread(executorService::shutdown));//TODO fix
-            VerifierHandler verifierHandler = new VerifierHandler(collectorService, executorService);
+            VerifierHandler verifierHandler = new VerifierHandler(collectorService);
             VerifierServer verifierServer = new VerifierServer(microserviceConfiguration.getPort(), verifierHandler);
             verifierServer.start();
             LOGGER.info("verify started on {} port", microserviceConfiguration.getPort());
