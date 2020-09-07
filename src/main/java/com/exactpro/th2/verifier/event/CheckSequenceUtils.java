@@ -47,10 +47,6 @@ public class CheckSequenceUtils {
         return row;
     }
 
-    public static CheckSequenceRow createBothSide(Result result, String sessionAlias) {
-        return createBothSide(result.getActual(), result.getMessageFilter(), sessionAlias);
-    }
-
     /**
      * In the case when no MessageFilter was found for the actual message.
      */

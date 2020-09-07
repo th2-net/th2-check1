@@ -52,7 +52,8 @@ message CheckRuleRequest {
     reserved 5; // ReportId reportId = 5; reserved now
     EventID parent_event_id = 6;
     string description = 7;
-    ChainID chain_id = 8; // The chain id to continue checking.
+    Direction direction = 8;
+    ChainID chain_id = 9; // The chain id to continue checking.
                           // If it's not set the check will be started from the specified checkpoint
 }
 
@@ -71,7 +72,8 @@ message CheckSequenceRuleRequest {
     EventID parent_event_id = 7;
     bool check_order = 8;
     string description = 9;
-    ChainID chain_id = 10; // The chain id to continue checking.
+    Direction direction = 10;
+    ChainID chain_id = 11; // The chain id to continue checking.
                            // If it's not set the check will be started from the specified checkpoint
 }
 
