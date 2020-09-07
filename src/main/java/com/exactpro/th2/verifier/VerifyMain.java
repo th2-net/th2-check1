@@ -43,7 +43,7 @@ public class VerifyMain {
      */
     public static void main(String[] args) {
         try {
-            MicroserviceConfiguration microserviceConfiguration = readConfiguration(args);
+            Configuration microserviceConfiguration = readConfiguration(args);
             CollectorServiceConfiguration configuration = new CollectorServiceConfiguration(microserviceConfiguration);
             CollectorService collectorService = new CollectorService(configuration);
             ExecutorService executorService = Executors.newFixedThreadPool(10);//TODO config in future

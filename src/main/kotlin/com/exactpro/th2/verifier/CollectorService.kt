@@ -75,7 +75,7 @@ class CollectorService(
         val limitSize = configuration.messageBufferLimit
         mqSubject = PublishSubject.create()
 
-        subscribers = subscribe(configuration.microserviceConfiguration, DeliverCallback { _: String, delivery: Delivery -> mqSubject.onNext(delivery.body) })
+        subscribers = subscribe(configuration.configuration, DeliverCallback { _: String, delivery: Delivery -> mqSubject.onNext(delivery.body) })
         streamObservable = mqSubject.map(MessageBatch::parseFrom)
             .flatMapIterable(MessageBatch::getMessagesList)
             .groupBy { message -> message.metadata.id.run { SessionKey(connectionId.sessionAlias, direction) } }
@@ -84,7 +84,7 @@ class CollectorService(
 
         checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
 
-        val th2Configuration = configuration.microserviceConfiguration.th2
+        val th2Configuration = configuration.configuration.th2
         eventStoreStub = EventStoreServiceGrpc.newFutureStub(ManagedChannelBuilder.forAddress(
             th2Configuration.th2EventStorageGRPCHost, th2Configuration.th2EventStorageGRPCPort)
             .usePlaintext().build())

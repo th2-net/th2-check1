@@ -15,7 +15,7 @@
  */
 package com.exactpro.th2.verifier.cfg
 
-import com.exactpro.th2.configuration.MicroserviceConfiguration
+import com.exactpro.th2.verifier.configuration.Configuration
 import java.lang.System.getenv
 import java.time.temporal.ChronoUnit
 
@@ -27,21 +27,15 @@ import java.time.temporal.ChronoUnit
  */
 const val DEFAULT_DELTA = 60L
 
-/**
- * Default size of the message buffer for each session alias
- */
-const val DEFAULT_MESSAGE_BUFFER = 1000
-
 const val VERIFIER_CLEANUP_OLDER_THAN = "TH2_VERIFIER_CLEANUP_OLDER_THAN"
 const val VERIFIER_CLEANUP_TIME_UNIT = "TH2_VERIFIER_CLEANUP_TIME_UNIT"
-const val VERIFIER_MESSAGE_BUFFER_LIMIT = "TH2_VERIFIER_MESSAGE_BUFFER_LIMIT"
 
 class CollectorServiceConfiguration(
-    val microserviceConfiguration: MicroserviceConfiguration
+    val configuration: Configuration
 ) {
     val cleanupOlderThan: Long = getenv(VERIFIER_CLEANUP_OLDER_THAN)?.toLong() ?: DEFAULT_DELTA
     val cleanupTimeUnit: ChronoUnit =
         getenv(VERIFIER_CLEANUP_TIME_UNIT)?.run { ChronoUnit.valueOf(toUpperCase()) } ?: ChronoUnit.SECONDS
 
-    val messageBufferLimit: Int = getenv(VERIFIER_MESSAGE_BUFFER_LIMIT)?.toInt() ?: DEFAULT_MESSAGE_BUFFER
+    val messageBufferLimit: Int = configuration.messageCacheSize
 }
