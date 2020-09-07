@@ -35,6 +35,7 @@ import com.exactpro.th2.infra.grpc.Message
 import com.exactpro.th2.infra.grpc.MessageFilter
 import com.exactpro.th2.verifier.AbstractSessionObserver
 import com.exactpro.th2.verifier.DefaultMessageFactoryProxy
+import com.exactpro.th2.verifier.SessionKey
 import com.exactpro.th2.verifier.StreamContainer
 import com.exactpro.th2.verifier.event.bean.builder.VerificationBuilder
 import com.exactpro.th2.verifier.rule.sequence.ComparisonContainer
@@ -62,7 +63,7 @@ abstract class AbstractCheckTask(
     val description: String?,
     private val timeout: Long,
     submitTime: Instant,
-    protected val sessionAlias: String,
+    protected val sessionKey: SessionKey,
     private val parentEventID: EventID,
     private val messageStream: Observable<StreamContainer>,
     private val eventStoreStub: EventStoreServiceFutureStub
@@ -158,7 +159,7 @@ abstract class AbstractCheckTask(
      * @throws IllegalStateException when method is called more than once.
      */
     fun begin(checkpoint: Checkpoint? = null) {
-        begin(checkpoint?.getSequence(sessionAlias) ?: DEFAULT_SEQUENCE)
+        begin(checkpoint?.getSequence(sessionKey) ?: DEFAULT_SEQUENCE)
     }
 
     /**
@@ -172,15 +173,15 @@ abstract class AbstractCheckTask(
      */
     protected fun checkComplete() {
 
-        LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionAlias, lastSequence)
+        LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionKey, lastSequence)
         val prevValue = taskState.getAndSet(State.COMPLETED)
         dispose()
         endFuture.dispose()
 
         if (prevValue == State.TIMEOUT) {
-            LOGGER.info("Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed", description, sessionAlias)
+            LOGGER.info("Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed", description, sessionKey)
         } else {
-            LOGGER.debug("Task '{}' for session alias '{}' is completed normally", description, sessionAlias)
+            LOGGER.debug("Task '{}' for session alias '{}' is completed normally", description, sessionKey)
         }
     }
 
@@ -201,7 +202,7 @@ abstract class AbstractCheckTask(
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
-        LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionAlias, sequence, timeout)
+        LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
 
@@ -217,7 +218,7 @@ abstract class AbstractCheckTask(
             // If we move [Observable#unsubscribeOn] after them they won't be disposed until scheduler is free.
             // In the worst-case scenario, it might never happen.
             .unsubscribeOn(scheduler)
-            .continueObserve(sessionAlias, sequence)
+            .continueObserve(sessionKey, sequence)
             .doOnNext {
                 handledMessageCounter++
 
@@ -268,11 +269,11 @@ abstract class AbstractCheckTask(
      */
     private fun end(reason: String) {
         if (taskState.compareAndSet(State.BEGIN, State.TIMEOUT)) {
-            LOGGER.info("Stop task for session alias '{}' with sequence '{}' because: {}", sessionAlias, lastSequence, reason)
+            LOGGER.info("Stop task for session alias '{}' with sequence '{}' because: {}", sessionKey, lastSequence, reason)
             dispose()
             endFuture.dispose()
         } else {
-            LOGGER.debug("Task for session alias '{}' is already completed. Ignore 'end' method call with reason: {}", sessionAlias, reason)
+            LOGGER.debug("Task for session alias '{}' is already completed. Ignore 'end' method call with reason: {}", sessionKey, reason)
         }
     }
 
@@ -359,21 +360,21 @@ abstract class AbstractCheckTask(
      * Filters incoming {@link StreamContainer} via session alias and then
      * filters message which sequence grete than passed
      */
-    private fun Observable<StreamContainer>.continueObserve(sessionAlias: String, sequence: Long): Observable<Message> =
-        filter { streamContainer -> streamContainer.sessionAlias == sessionAlias }
+    private fun Observable<StreamContainer>.continueObserve(sessionKey: SessionKey, sequence: Long): Observable<Message> =
+        filter { streamContainer -> streamContainer.sessionKey == sessionKey }
             .flatMap(StreamContainer::bufferedMessages)
             .filter { message -> message.metadata.id.sequence > sequence }
 
-    private fun Checkpoint.getSequence(sessionAlias: String): Long {
-        val sequence = sessionAliasToDirectionCheckpointMap[sessionAlias]
-            ?.directionToSequenceMap?.get(Direction.FIRST.number)
+    private fun Checkpoint.getSequence(sessionKey: SessionKey): Long {
+        val sequence = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
+            ?.directionToSequenceMap?.get(sessionKey.direction.number)
 
         if (sequence == null) {
             if (LOGGER.isWarnEnabled) {
-                LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionAlias)
+                LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionKey)
             }
         } else {
-            LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionAlias)
+            LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionKey)
         }
 
         return sequence ?: DEFAULT_SEQUENCE

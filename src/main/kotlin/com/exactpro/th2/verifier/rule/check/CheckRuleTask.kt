@@ -26,6 +26,7 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageFilter
+import com.exactpro.th2.verifier.SessionKey
 import com.exactpro.th2.verifier.rule.MessageContainer
 import com.exactpro.th2.verifier.StreamContainer
 import com.exactpro.th2.verifier.rule.AbstractCheckTask
@@ -38,20 +39,20 @@ import java.time.Instant
 class CheckRuleTask(
     description: String?,
     startTime: Instant,
-    sessionAlias: String,
+    sessionKey: SessionKey,
     timeout: Long,
     private val protoMessageFilter: MessageFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventStoreStub: EventStoreServiceFutureStub
-) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, eventStoreStub) {
+) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventStoreStub) {
 
     private val filter: IMessage = converter.fromProtoFilter(protoMessageFilter, protoMessageFilter.messageType)
     private val settings: ComparatorSettings = protoMessageFilter.toCompareSettings()
 
     init {
         rootEvent
-            .name("Check rule $sessionAlias")
+            .name("Check rule $sessionKey")
             .type("Check rule")
     }
 

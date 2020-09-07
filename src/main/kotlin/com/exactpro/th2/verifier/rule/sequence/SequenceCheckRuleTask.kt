@@ -31,6 +31,7 @@ import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceF
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageFilter
 import com.exactpro.th2.infra.grpc.MessageID
+import com.exactpro.th2.verifier.SessionKey
 import com.exactpro.th2.verifier.StreamContainer
 import com.exactpro.th2.verifier.event.CheckSequenceUtils
 import com.exactpro.th2.verifier.event.bean.CheckSequenceRow
@@ -52,7 +53,7 @@ import java.util.LinkedHashMap
 class SequenceCheckRuleTask(
     description: String?,
     startTime: Instant,
-    sessionAlias: String,
+    sessionKey: SessionKey,
     timeout: Long,
     protoPreFilter: PreFilter,
     private val protoMessageFilters: List<MessageFilter>,
@@ -60,7 +61,7 @@ class SequenceCheckRuleTask(
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventStoreStub: EventStoreServiceFutureStub
-) : AbstractCheckTask(description, timeout, startTime, sessionAlias, parentEventID, messageStream, eventStoreStub) {
+) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventStoreStub) {
 
     private val protoPreMessageFilter: MessageFilter = protoPreFilter.toMessageFilter()
     private val preFilter: IMessage = converter.fromProtoPreFilter(protoPreMessageFilter)
@@ -76,7 +77,7 @@ class SequenceCheckRuleTask(
 
     init {
         rootEvent
-            .name("Check sequence rule $sessionAlias")
+            .name("Check sequence rule $sessionKey")
             .type("checkSequenceRule")
     }
 
@@ -176,12 +177,12 @@ class SequenceCheckRuleTask(
         preFilteringResults.forEach { (messageID: MessageID, comparisonContainer: ComparisonContainer) ->
             sequenceTable.row(
                 messageFilteringResults[messageID]?.let {
-                    CheckSequenceUtils.createBothSide(it.sailfishActual, it.protoFilter, sessionAlias)
-                } ?: CheckSequenceUtils.createOnlyActualSide(comparisonContainer.sailfishActual, sessionAlias)
+                    CheckSequenceUtils.createBothSide(it.sailfishActual, it.protoFilter, sessionKey.sessionAlias)
+                } ?: CheckSequenceUtils.createOnlyActualSide(comparisonContainer.sailfishActual, sessionKey.sessionAlias)
             )
         }
         messageFilters.forEach { messageFilter: MessageFilterContainer ->
-            sequenceTable.row(CheckSequenceUtils.createOnlyExpectedSide(messageFilter.protoMessageFilter, sessionAlias))
+            sequenceTable.row(CheckSequenceUtils.createOnlyExpectedSide(messageFilter.protoMessageFilter, sessionKey.sessionAlias))
         }
 
         rootEvent.addSubEventWithSamePeriod()

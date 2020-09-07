@@ -24,6 +24,7 @@ import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest
 import com.exactpro.th2.infra.grpc.ConnectionID
+import com.exactpro.th2.infra.grpc.Direction
 import com.exactpro.th2.infra.grpc.EventBatch
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageBatch
@@ -77,7 +78,7 @@ class CollectorService(
         subscribers = subscribe(configuration.microserviceConfiguration, DeliverCallback { _: String, delivery: Delivery -> mqSubject.onNext(delivery.body) })
         streamObservable = mqSubject.map(MessageBatch::parseFrom)
             .flatMapIterable(MessageBatch::getMessagesList)
-            .groupBy { message -> message.metadata.id.connectionId.sessionAlias }
+            .groupBy { message -> message.metadata.id.run { SessionKey(connectionId.sessionAlias, direction) } }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
             .replay().apply { connect() }
 
@@ -94,10 +95,11 @@ class CollectorService(
         val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
         val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias can't be null")
         val filter: MessageFilter = requireNonNull(request.filter, "Message filter can't be null")
+        val direction = directionOrDefault(request.direction)
 
         val chainID = request.getChainIdOrGenerate()
 
-        val task = CheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout, filter,
+        val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, filter,
             parentEventID, streamObservable, eventStoreStub)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
@@ -112,10 +114,11 @@ class CollectorService(
     fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): ChainID {
         val parentEventID: EventID = requireNonNull(request.parentEventId, "Parent event id can't be null")
         val sessionAlias: String = requireNonNull(request.connectivityId.sessionAlias, "Session alias can't be null")
+        val direction = directionOrDefault(request.direction)
 
         val chainID = request.getChainIdOrGenerate()
 
-        val task = SequenceCheckRuleTask(request.description, Instant.now(), sessionAlias, request.timeout, request.preFilter,
+        val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, request.preFilter,
             request.messageFiltersList, request.checkOrder, parentEventID, streamObservable, eventStoreStub)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
@@ -125,6 +128,9 @@ class CollectorService(
         }
         return chainID
     }
+
+    private fun directionOrDefault(direction: Direction) =
+        if (direction == Direction.UNRECOGNIZED) Direction.FIRST else direction
 
     private fun AbstractCheckTask.addToChainOrBegin(
         value: AbstractCheckTask?,

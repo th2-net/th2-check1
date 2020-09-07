@@ -19,7 +19,7 @@ package com.exactpro.th2.verifier
 import com.exactpro.th2.infra.grpc.Message
 import io.reactivex.Observable
 
-class StreamContainer(val sessionAlias : String,
+class StreamContainer(val sessionKey : SessionKey,
                       limitSize : Int,
                       messageObservable : Observable<Message>) {
     val bufferedMessages : Observable<Message>
@@ -39,8 +39,8 @@ class StreamContainer(val sessionAlias : String,
 
     override fun equals(other: Any?): Boolean =
         if (other is StreamContainer) {
-            sessionAlias == other.sessionAlias
+            sessionKey == other.sessionKey
         } else false
 
-    override fun hashCode(): Int = sessionAlias.hashCode()
+    override fun hashCode(): Int = sessionKey.hashCode()
 }

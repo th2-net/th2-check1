@@ -16,7 +16,6 @@
 
 package com.exactpro.th2.verifier
 
-import com.exactpro.th2.infra.grpc.Direction.FIRST
 import io.vertx.core.impl.ConcurrentHashSet
 
 class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
@@ -27,6 +26,6 @@ class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
     }
 
     fun createCheckpoint() : Checkpoint = Checkpoint(sessionSet.associateBy(
-        { session -> SessionKey(session.sessionAlias, FIRST) },
+        { session -> session.sessionKey },
         { session -> session.lastMessage.metadata.id.sequence }))
 }

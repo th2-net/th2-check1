@@ -17,6 +17,7 @@ package com.exactpro.th2.verifier.rule.sequence
 
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.infra.grpc.ConnectionID
+import com.exactpro.th2.infra.grpc.Direction
 import com.exactpro.th2.infra.grpc.Event
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.EventStatus
@@ -26,6 +27,7 @@ import com.exactpro.th2.infra.grpc.MessageID
 import com.exactpro.th2.infra.grpc.MessageMetadata
 import com.exactpro.th2.infra.grpc.Value
 import com.exactpro.th2.infra.grpc.ValueFilter
+import com.exactpro.th2.verifier.SessionKey
 import com.exactpro.th2.verifier.StreamContainer
 import com.exactpro.th2.verifier.grpc.PreFilter
 import com.exactpro.th2.verifier.rule.AbstractCheckTaskTest
@@ -95,7 +97,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `messages in right order passes`(checkOrder: Boolean) {
         val messages = Observable.fromIterable(messagesInCorrectOrder)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer("test_session", 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey("test_session", Direction.FIRST), 10, messages))
         val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
 
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin()
@@ -124,7 +126,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val switchedMessagesId = listOf(messagesUnordered[indexesToSwitch.first].metadata.id, messagesUnordered[indexesToSwitch.second].metadata.id)
         val messages = Observable.fromIterable(messagesUnordered)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer("test_session", 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey("test_session", Direction.FIRST), 10, messages))
         val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
 
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
@@ -156,7 +158,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         }
         val messages = Observable.fromIterable(messagesUnordered)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer("test_session", 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey("test_session", Direction.FIRST), 10, messages))
         val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
 
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
@@ -183,7 +185,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         return SequenceCheckRuleTask(
             description = "Test",
             startTime = Instant.now(),
-            sessionAlias = "test_session",
+            sessionKey = SessionKey("test_session", Direction.FIRST),
             timeout = 5000L,
             protoPreFilter = preFilter,
             protoMessageFilters = protoMessageFilters,
