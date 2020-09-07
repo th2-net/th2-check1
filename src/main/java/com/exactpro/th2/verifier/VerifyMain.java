@@ -45,7 +45,7 @@ public class VerifyMain {
         try {
             MicroserviceConfiguration microserviceConfiguration = readConfiguration(args);
             CollectorServiceConfiguration configuration = new CollectorServiceConfiguration(microserviceConfiguration);
-            CollectorServiceA collectorService = new CollectorServiceA(configuration);
+            CollectorService collectorService = new CollectorService(configuration);
             ExecutorService executorService = Executors.newFixedThreadPool(10);//TODO config in future
             Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
             Runtime.getRuntime().addShutdownHook(new Thread(executorService::shutdown));//TODO fix

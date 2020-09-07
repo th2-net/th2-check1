@@ -1,5 +1,5 @@
-/******************************************************************************
- * Copyright 2009-2020 Exactpro (Exactpro Systems Limited)
+/*
+ * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,15 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- ******************************************************************************/
+ */
 package com.exactpro.th2.verifier.event;
 
 import java.util.List;
 
-import com.exactpro.th2.infra.grpc.Message;
 import com.exactpro.th2.infra.grpc.MessageFilter;
 import com.exactpro.th2.infra.grpc.ValueFilter;
-import com.exactpro.th2.verifier.CollectorService.Result;
 import com.exactpro.sf.common.messages.IMessage;
 import com.exactpro.th2.verifier.event.bean.CheckSequenceRow;
 

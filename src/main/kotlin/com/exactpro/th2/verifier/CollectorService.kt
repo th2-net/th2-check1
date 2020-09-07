@@ -52,7 +52,7 @@ import java.util.Objects.requireNonNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
 
-class CollectorServiceA(
+class CollectorService(
     configuration: CollectorServiceConfiguration
 ) {
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())

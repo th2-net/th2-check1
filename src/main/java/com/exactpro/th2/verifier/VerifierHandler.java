@@ -39,9 +39,9 @@ import io.grpc.stub.StreamObserver;
 public class VerifierHandler extends VerifierImplBase {
     private final Logger logger = LoggerFactory.getLogger(getClass().getName() + "@" + hashCode());
 
-    private final CollectorServiceA collectorService;
+    private final CollectorService collectorService;
 
-    public VerifierHandler(CollectorServiceA collectorService, ExecutorService executorService) {
+    public VerifierHandler(CollectorService collectorService, ExecutorService executorService) {
         this.collectorService = collectorService;
     }
 
