@@ -72,7 +72,7 @@ public class VerifierHandler extends VerifierImplBase {
     public void submitCheckRule(CheckRuleRequest request, StreamObserver<CheckRuleResponse> responseObserver) {
         try {
             if (logger.isInfoEnabled()) {
-                logger.info("SubmitCheckRule request: " + shortDebugString(request));
+                logger.info("Submit CheckRule request: " + shortDebugString(request));
             }
 
             CheckRuleResponse.Builder response = CheckRuleResponse.newBuilder();
