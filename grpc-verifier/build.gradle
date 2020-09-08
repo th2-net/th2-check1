@@ -70,7 +70,7 @@ task zipProtobuf (type: Zip) {
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            artifactId = 'th2-grpc-verifier-153'
+            artifactId = 'th2-grpc-verifier'
             artifact source: zipProtobuf, extension: 'zip'
         }
     }

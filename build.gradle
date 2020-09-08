@@ -140,7 +140,7 @@ test {
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            artifactId = 'th2-verifier-153'
+            artifactId = 'th2-verifier'
         }
     }
 }
