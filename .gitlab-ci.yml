@@ -1,6 +1,5 @@
 variables:
   APP_NAME: "th2-verifier"
-<<<<<<< HEAD
   MAJOR_VERSION: "1"
   MINOR_VERSION: "1"
   INSPECTION_ENABLED: 'true'
@@ -10,15 +9,4 @@ variables:
 include:
   - project: 'vivarium/th2/pipelines'
     ref: th2-269
-=======
-  MAJOR_VERSION: "0"
-  MINOR_VERSION: "5"
-  INSPECTION_ENABLED: 'true'
-  TEST_ENABLED: 'false'
-  ARTIFACTORY_PUBLISH: 'true'
-  
-include:
-  - project: 'vivarium/th2/pipelines'
-    ref: master
->>>>>>> ff4571044d5b83bfea963cf6b2edcdce0e2c2fb6
     file: '/.gitlab-ci-java.yml'
