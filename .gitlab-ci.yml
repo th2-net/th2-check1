@@ -8,5 +8,5 @@ variables:
 
 include:
   - project: 'vivarium/th2/pipelines'
-    ref: th2-269
+    ref: master
     file: '/.gitlab-ci-java.yml'
