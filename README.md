@@ -30,5 +30,5 @@ Available requests described in [proto file](grpc-verifier/src/main/proto/th2/ve
 - TH2_EVENT_STORAGE_GRPC_HOST=event-store-host-name-or-ip; (***required***)
 - TH2_EVENT_STORAGE_GRPC_PORT=9999; (***required***)
 - MESSAGE_CACHE_SIZE=1000; (***optional***)
-- TH2_VERIFIER_CLEANUP_OLDER_THAN=60; (***optional***) - time that must pass before a task can be removed and no more chain with that task can be crteated
+- TH2_VERIFIER_CLEANUP_OLDER_THAN=60; (***optional***) - time that must pass before a task can be removed and no more chain with that task can be created. Default time unit is SECONDS.
 - TH2_VERIFIER_CLEANUP_TIME_UNIT=SECONDS; (***optional***) - time unit for TH2_VERIFIER_CLEANUP_OLDER_THAN variable. Possible values: MILLIS, SECONDS, MINUTES, HOURS and DAYS

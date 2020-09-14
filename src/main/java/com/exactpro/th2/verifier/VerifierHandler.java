@@ -109,17 +109,17 @@ public class VerifierHandler extends VerifierImplBase {
             CheckSequenceRuleResponse.Builder response = CheckSequenceRuleResponse.newBuilder();
             try {
                 if (logger.isInfoEnabled()) {
-                    logger.info("Sequence rule for request '" + shortDebugString(request) + "' started");
+                    logger.info("Submitting sequence rule for request '" + shortDebugString(request) + "' started");
                 }
                 ChainID chainID = collectorService.verifyCheckSequenceRule(request);
                 if (logger.isInfoEnabled()) {
-                    logger.info("Sequence rule for request '" + shortDebugString(request) + "' finished");
+                    logger.info("Submitting sequence rule for request '" + request.getDescription() + "' finished");
                 }
                 response.setChainId(chainID)
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
-                    logger.error("Sequence rule for request '" + shortDebugString(request) + "' failed", e);
+                    logger.error("Submitting sequence rule for request '" + shortDebugString(request) + "' failed", e);
                 }
                 RequestStatus status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
