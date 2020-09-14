@@ -91,7 +91,6 @@ class SequenceCheckRuleTask(
         messageFilters = protoMessageFilters.map {
             MessageFilterContainer(it, converter.fromProtoFilter(it, it.messageType), it.toCompareSettings())
         }.toMutableList()
-        reordered = false
 
         preFilterEvent = Event.start()
             .type("preFiltering")
