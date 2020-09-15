@@ -18,7 +18,7 @@ allprojects {
     }
 
     group = 'com.exactpro.th2'
-    version = "${version_major}.${version_minor}-SNAPSHOT"
+    version = release_version
 
     sourceCompatibility = 1.11
     targetCompatibility = 1.11
@@ -147,4 +147,3 @@ docker {
 
     copySpec.from(tarTree("$buildDir/distributions/${archivesBaseName}.tar"))
 }
-
