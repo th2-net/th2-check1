@@ -45,6 +45,19 @@ allprojects {
         }
     }
 
+    jar {
+		    manifest {
+            attributes('Created-By': System.getProperty('java.version') + ' (' + System.getProperty('java.vendor') + ')')
+            attributes('Specification-Title': '')
+            attributes('Specification-Vendor': 'Exactpro Systems LLC')
+            attributes('Implementation-Title': "${project.name}")
+            attributes('Implementation-Vendor': 'Exactpro Systems LLC')
+            attributes('Implementation-Vendor-Id': 'com.exactpro')
+      			attributes('Implementation-Version': "${version}")
+      			attributes('Implementation-Version-Date': getDate())
+		    }
+    }
+
     publishing {
         publications {
             mavenJava(MavenPublication) {
@@ -88,6 +101,8 @@ allprojects {
             }
         }
     }
+
+
 }
 
 apply plugin: 'application'
