@@ -11,10 +11,10 @@ allprojects {
     apply plugin: 'com.jfrog.artifactory'
 
     ext {
-        sharedDir           = file("${project.rootDir}/shared")
+        sharedDir = file("${project.rootDir}/shared")
 
-        sailfishVersion     = '3.2-SNAPSHOT'
-        th2CommonVersion    = '1.3.0'
+        sailfishVersion = '3.2-SNAPSHOT'
+        th2CommonVersion = '1.3.0'
     }
 
     group = 'com.exactpro.th2'
@@ -46,16 +46,16 @@ allprojects {
     }
 
     jar {
-		    manifest {
+        manifest {
             attributes('Created-By': System.getProperty('java.version') + ' (' + System.getProperty('java.vendor') + ')')
             attributes('Specification-Title': '')
             attributes('Specification-Vendor': 'Exactpro Systems LLC')
             attributes('Implementation-Title': "${project.name}")
             attributes('Implementation-Vendor': 'Exactpro Systems LLC')
             attributes('Implementation-Vendor-Id': 'com.exactpro')
-      			attributes('Implementation-Version': "${version}")
-      			attributes('Implementation-Version-Date': getDate())
-		    }
+            attributes('Implementation-Version': "${version}")
+            attributes('Implementation-Version-Date': getDate())
+        }
     }
 
     publishing {
@@ -109,13 +109,13 @@ apply plugin: 'application'
 apply plugin: 'com.palantir.docker'
 
 ext {
-    slf4jVersion        = '1.7.30'
-    sailfishVersion     = '3.2-SNAPSHOT'
+    slf4jVersion = '1.7.30'
+    sailfishVersion = '3.2-SNAPSHOT'
 
-    th2EventStoreVersion   = '1.1-SNAPSHOT'
+    th2EventStoreVersion = '1.1-SNAPSHOT'
     th2ConnectivityVersion = '1.1-SNAPSHOT'
 
-    cassandraVersion   = '3.6.0' //FIXME: Migrate to another library for UUID
+    cassandraVersion = '3.6.0' //FIXME: Migrate to another library for UUID
 }
 
 archivesBaseName = 'service'
@@ -127,7 +127,8 @@ dependencies {
     compile "com.exactpro.sf:sailfish-core:${sailfishVersion}"
 
     compile "com.rabbitmq:amqp-client:5.8.0"
-    compile "com.datastax.cassandra:cassandra-driver-core:${cassandraVersion}"//FIXME: Migrate to another library for UUID
+    compile "com.datastax.cassandra:cassandra-driver-core:${cassandraVersion}"
+//FIXME: Migrate to another library for UUID
 
     compile "com.exactpro.th2:th2-grpc-event-store:${th2EventStoreVersion}"
     compile "com.exactpro.th2:th2-grpc-connectivity:${th2ConnectivityVersion}"
@@ -165,4 +166,10 @@ docker {
     tag 'local-version', docker_image_name
 
     copySpec.from(tarTree("$buildDir/distributions/${archivesBaseName}.tar"))
+}
+
+static def getDate() {
+    def date = new Date()
+    def formattedDate = date.format('yyyyMMdd-HH:mm:ss.SSS')
+    return formattedDate
 }
