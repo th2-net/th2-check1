@@ -122,11 +122,13 @@ archivesBaseName = 'service'
 dependencies {
     compile project(':grpc-verifier')
     compile "com.exactpro.th2:th2-common:${th2CommonVersion}"
+    compile "com.exactpro.th2:th2-sailfish-utils:${th2SailfishUtils}"
 
     compile "com.exactpro.sf:sailfish-core:${sailfishVersion}"
 
     compile "com.rabbitmq:amqp-client:5.8.0"
-    compile "com.datastax.cassandra:cassandra-driver-core:${cassandraVersion}"//FIXME: Migrate to another library for UUID
+    compile "com.datastax.cassandra:cassandra-driver-core:${cassandraVersion}"
+//FIXME: Migrate to another library for UUID
 
     compile "com.exactpro.th2:th2-grpc-event-store:${th2EventStoreVersion}"
     compile "com.exactpro.th2:th2-grpc-connectivity:${th2ConnectivityVersion}"
