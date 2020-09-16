@@ -112,6 +112,7 @@ ext {
     slf4jVersion = '1.7.30'
     sailfishVersion = '3.2-SNAPSHOT'
 
+    th2SailfishUtils = '1.2-SNAPSHOT'
     th2EventStoreVersion = '1.3.0'
     th2ConnectivityVersion = '1.1-SNAPSHOT'
 
@@ -123,6 +124,7 @@ archivesBaseName = 'service'
 dependencies {
     compile project(':grpc-verifier')
     compile "com.exactpro.th2:th2-common:${th2CommonVersion}"
+    compile "com.exactpro.th2:th2-sailfish-utils:${th2SailfishUtils}"
 
     compile "com.exactpro.sf:sailfish-core:${sailfishVersion}"
 
