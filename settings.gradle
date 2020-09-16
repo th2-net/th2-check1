@@ -1,1 +1,4 @@
+rootProject.name = 'th2-verifier'
+
 include "grpc-verifier"
+project(':grpc-verifier').name = 'th2-grpc-verifier'
