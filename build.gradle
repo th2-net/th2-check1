@@ -14,14 +14,14 @@ allprojects {
         sharedDir           = file("${project.rootDir}/shared")
 
         sailfishVersion     = '3.2-SNAPSHOT'
-        th2CommonVersion    = '1.3.0'
+        th2CommonVersion    = '1.4.1'
     }
 
     group = 'com.exactpro.th2'
     version = release_version
 
-    sourceCompatibility = 1.11
-    targetCompatibility = 1.11
+    sourceCompatibility = 11
+    targetCompatibility = 11
 
     repositories {
         maven {
@@ -47,14 +47,15 @@ allprojects {
 
     jar {
         manifest {
-            attributes('Created-By': System.getProperty('java.version') + ' (' + System.getProperty('java.vendor') + ')')
-            attributes('Specification-Title': '')
-            attributes('Specification-Vendor': 'Exactpro Systems LLC')
-            attributes('Implementation-Title': "${project.name}")
-            attributes('Implementation-Vendor': 'Exactpro Systems LLC')
-            attributes('Implementation-Vendor-Id': 'com.exactpro')
-            attributes('Implementation-Version': "${version}")
-            attributes('Implementation-Version-Date': getDate())
+            attributes(
+                    'Created-By':               "${System.getProperty('java.version')} (${System.getProperty('java.vendor')})",
+                    'Specification-Title':      '',
+                    'Specification-Vendor':     'Exactpro Systems LLC',
+                    'Implementation-Title':     project.archivesBaseName,
+                    'Implementation-Vendor':    'Exactpro Systems LLC',
+                    'Implementation-Vendor-Id': 'com.exactpro',
+                    'Implementation-Version':   project.version
+            )
         }
     }
 
@@ -92,14 +93,6 @@ allprojects {
                 publishPom = true
             }
         }
-        resolve {
-            contextUrl = "${artifactory_url}"
-            repository {
-                repoKey = "${artifactory_resolve_repo_key}" // The Artifactory repository key to publish to
-                username = "${artifactory_user}" // The publisher user name
-                password = "${artifactory_password}" // The publisher password
-            }
-        }
     }
 }
 
@@ -112,17 +105,14 @@ ext {
 
     th2SailfishUtils = '1.2-SNAPSHOT'
     th2EventStoreVersion = '1.3.0'
-    th2ConnectivityVersion = '1.1-SNAPSHOT'
 
     cassandraVersion = '3.6.0' //FIXME: Migrate to another library for UUID
 }
 
-archivesBaseName = 'service'
-
 dependencies {
-    compile project(':grpc-verifier')
+    compile project(':th2-grpc-verifier')
     compile "com.exactpro.th2:th2-common:${th2CommonVersion}"
-    compile "com.exactpro.th2:th2-sailfish-utils:${th2SailfishUtils}"
+    compile 'com.exactpro.th2:th2-sailfish-utils:1.3.0'
 
     compile "com.exactpro.sf:sailfish-core:${sailfishVersion}"
 
@@ -131,7 +121,6 @@ dependencies {
 //FIXME: Migrate to another library for UUID
 
     compile "com.exactpro.th2:th2-grpc-event-store:${th2EventStoreVersion}"
-    compile "com.exactpro.th2:th2-grpc-connectivity:${th2ConnectivityVersion}"
 
     compile "org.slf4j:slf4j-log4j12:${slf4jVersion}"
     compile "org.slf4j:slf4j-api:${slf4jVersion}"
@@ -139,22 +128,14 @@ dependencies {
     testImplementation 'junit:junit:4.12'
 }
 
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            artifactId = 'th2-verifier'
-        }
-    }
-}
-
 application {
     mainClassName 'com.exactpro.th2.verifier.VerifyMain'
 }
 
-applicationName = archivesBaseName
+applicationName = 'service'
 
 distTar {
-    archiveName "${archivesBaseName}.tar"
+    archiveName "${applicationName}.tar"
 }
 
 dockerPrepare {
@@ -162,14 +143,5 @@ dockerPrepare {
 }
 
 docker {
-    name docker_image_name
-    tag 'local-version', docker_image_name
-
-    copySpec.from(tarTree("$buildDir/distributions/${archivesBaseName}.tar"))
-}
-
-static def getDate() {
-    def date = new Date()
-    def formattedDate = date.format('yyyyMMdd-HH:mm:ss.SSS')
-    return formattedDate
+    copySpec.from(tarTree("$buildDir/distributions/${applicationName}.tar"))
 }
