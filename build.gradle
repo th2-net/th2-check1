@@ -15,11 +15,11 @@ allprojects {
         sharedDir           = file("${project.rootDir}/shared")
 
         sailfishVersion     = '3.2-SNAPSHOT'
-        th2CommonVersion    = '1.1-SNAPSHOT'
+        th2CommonVersion    = '1.4.1'
     }
 
     group = 'com.exactpro.th2'
-    version = "${version_major}.${version_minor}-SNAPSHOT"
+    version = release_version
 
     compileKotlin {
         kotlinOptions.jvmTarget = "11"
@@ -29,8 +29,8 @@ allprojects {
         kotlinOptions.jvmTarget = "11"
     }
 
-    sourceCompatibility = 1.11
-    targetCompatibility = 1.11
+    sourceCompatibility = 11
+    targetCompatibility = 11
 
     repositories {
         maven {
@@ -42,11 +42,29 @@ allprojects {
             name 'Artifactory snapshot'
             url 'http://artifactory5.exp.exactpro.com/artifactory/libs-snapshot'
         }
+        maven {
+            name 'Artifactory release'
+            url 'http://artifactory5.exp.exactpro.com/artifactory/libs-release'
+        }
         mavenLocal()
 
         configurations.all {
             resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
             resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+        }
+    }
+
+    jar {
+        manifest {
+            attributes(
+                    'Created-By':               "${System.getProperty('java.version')} (${System.getProperty('java.vendor')})",
+                    'Specification-Title':      '',
+                    'Specification-Vendor':     'Exactpro Systems LLC',
+                    'Implementation-Title':     project.archivesBaseName,
+                    'Implementation-Vendor':    'Exactpro Systems LLC',
+                    'Implementation-Vendor-Id': 'com.exactpro',
+                    'Implementation-Version':   project.version
+            )
         }
     }
 
@@ -84,14 +102,6 @@ allprojects {
                 publishPom = true
             }
         }
-        resolve {
-            contextUrl = "${artifactory_url}"
-            repository {
-                repoKey = "${artifactory_resolve_repo_key}" // The Artifactory repository key to publish to
-                username = "${artifactory_user}" // The publisher user name
-                password = "${artifactory_password}" // The publisher password
-            }
-        }
     }
 }
 
@@ -102,27 +112,24 @@ ext {
     slf4jVersion        = '1.7.30'
     sailfishVersion     = '3.2-SNAPSHOT'
 
-    th2EventStoreVersion   = '1.1-SNAPSHOT'
-    th2ConnectivityVersion = '1.1-SNAPSHOT'
+    th2SailfishUtils = '1.3.0'
+    th2EventStoreVersion = '1.3.0'
 
     cassandraVersion   = '3.6.0' //FIXME: Migrate to another library for UUID
-
-    dockerImageVersion  = "${version_major}.${version_minor}.${version_maintenance}.${version_build}"
 }
 
-archivesBaseName = 'verifier-service'
-
 dependencies {
-    compile project(':grpc-verifier')
+    compile project(':th2-grpc-verifier')
     compile "com.exactpro.th2:th2-common:${th2CommonVersion}"
+    compile 'com.exactpro.th2:th2-sailfish-utils:1.3.0'
 
     compile "com.exactpro.sf:sailfish-core:${sailfishVersion}"
 
     compile "com.rabbitmq:amqp-client:5.8.0"
-    compile "com.datastax.cassandra:cassandra-driver-core:${cassandraVersion}"//FIXME: Migrate to another library for UUID
+    compile "com.datastax.cassandra:cassandra-driver-core:${cassandraVersion}"
+//FIXME: Migrate to another library for UUID
 
     compile "com.exactpro.th2:th2-grpc-event-store:${th2EventStoreVersion}"
-    compile "com.exactpro.th2:th2-grpc-connectivity:${th2ConnectivityVersion}"
 
     compile "org.slf4j:slf4j-log4j12:${slf4jVersion}"
     compile "org.slf4j:slf4j-api:${slf4jVersion}"
@@ -137,22 +144,14 @@ test {
     useJUnitPlatform()
 }
 
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            artifactId = 'th2-verifier'
-        }
-    }
-}
-
 application {
     mainClassName 'com.exactpro.th2.verifier.VerifyMain'
 }
 
-applicationName = archivesBaseName
+applicationName = 'service'
 
 distTar {
-    archiveName "${archivesBaseName}.tar"
+    archiveName "${applicationName}.tar"
 }
 
 dockerPrepare {
@@ -160,21 +159,5 @@ dockerPrepare {
 }
 
 docker {
-    name "${target_docker_repository}/${docke_image_name}:${dockerImageVersion}"
-    tag 'local-version', "${docke_image_name}:${dockerImageVersion}"
-
-    copySpec.from(tarTree("$buildDir/distributions/${archivesBaseName}.tar"))
+    copySpec.from(tarTree("$buildDir/distributions/${applicationName}.tar"))
 }
-
-tasks.register("getImageVersion") {
-    doLast {
-        println("$dockerImageVersion")
-    }
-}
-
-tasks.register("getImageName") {
-    doLast {
-        println(docker.name)
-    }
-}
-
