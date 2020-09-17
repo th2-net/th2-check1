@@ -1,4 +1,4 @@
-/******************************************************************************
+/*
  * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- ******************************************************************************/
+ */
 package com.exactpro.th2.verifier.event;
 
 import java.util.List;
 
 import com.exactpro.th2.infra.grpc.MessageFilter;
 import com.exactpro.th2.infra.grpc.ValueFilter;
-import com.exactpro.th2.verifier.CollectorService.Result;
 import com.exactpro.sf.common.messages.IMessage;
 import com.exactpro.th2.verifier.event.bean.CheckSequenceRow;
 
@@ -39,12 +38,12 @@ public class CheckSequenceUtils {
     }
 
     /**
-     * In the case when actual message was found for the MessageFitler.
+     * In the case when actual message was found for the MessageFilter.
      */
-    public static CheckSequenceRow createBothSide(Result result, String connectivityId) {
+    public static CheckSequenceRow createBothSide(IMessage actual, MessageFilter filter, String sessionAlias) {
         CheckSequenceRow row = new CheckSequenceRow();
-        row.setActualMessage(result.getActual().getName() + ", " + connectivityId + getKeyFields(result.getActual(), result.getMessageFilter()));
-        row.setExpectedMessage(result.getMessageFilter().getMessageType() + ", " + connectivityId + getKeyFields(result.getMessageFilter()));
+        row.setActualMessage(actual.getName() + ", " + sessionAlias + getKeyFields(actual, filter));
+        row.setExpectedMessage(filter.getMessageType() + ", " + sessionAlias + getKeyFields(filter));
         return row;
     }
 
