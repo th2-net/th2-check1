@@ -53,7 +53,7 @@ dependencies {
     implementation "io.grpc:grpc-core:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
 
-    implementation "com.exactpro.th2:th2-grpc-event-store"
+
 }
 
 sourceSets {
