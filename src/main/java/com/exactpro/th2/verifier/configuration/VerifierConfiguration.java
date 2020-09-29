@@ -20,14 +20,14 @@ public class VerifierConfiguration {
     @JsonProperty(value = "count-executor-thread", defaultValue = "10")
     private int countExecutorThreads = 10;
 
-    @JsonProperty(value = "collector-max-size", defaultValue = "1000")
-    private int collectorMaxSize = 1000;
+    @JsonProperty(value="message-cache-size", defaultValue = "1000")
+    private int messageCacheSize = 1000;
 
     public int getCountExecutorThreads() {
         return countExecutorThreads;
     }
 
-    public int getCollectorMaxSize() {
-        return collectorMaxSize;
+    public int getMessageCacheSize() {
+        return messageCacheSize;
     }
 }

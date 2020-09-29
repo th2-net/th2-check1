@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 syntax = "proto3";
 package th2;
 
@@ -24,34 +40,46 @@ message CheckpointResponse {
     RequestStatus status = 2;
 }
 
+message ChainID {
+    string id = 1;
+}
+
 message CheckRuleRequest {
     ConnectionID connectivity_id = 1;
     MessageFilter filter = 2;
-    Checkpoint checkpoint = 3; // Registered Checkpoint
+    Checkpoint checkpoint = 3; // Registered Checkpoint. If the chain_id is also set in the request the checkpoint will be ignored
     int64 timeout = 4; // Timeout for rule execution
     reserved 5; // ReportId reportId = 5; reserved now
     EventID parent_event_id = 6;
     string description = 7;
+    Direction direction = 8;
+    ChainID chain_id = 9; // The chain id to continue checking.
+                          // If it's not set the check will be started from the specified checkpoint otherwise checkpoint will be ignored
 }
 
 message CheckRuleResponse {
     RequestStatus status = 1;
+    ChainID chain_id = 2; // You can use it to unite the next rule to the chain with currently submitted one
 }
 
 message CheckSequenceRuleRequest {
     PreFilter pre_filter = 1;
     repeated MessageFilter message_filters = 2;
-    Checkpoint checkpoint = 3; // Registered Checkpoint
+    Checkpoint checkpoint = 3; // Registered Checkpoint. If the chain_id is also set in the request the checkpoint will be ignored
     int64 timeout = 4; // Timeout for rule execution
     ConnectionID connectivity_id = 5;
     reserved 6; // ReportId reportId = 5; reserved now
     EventID parent_event_id = 7;
     bool check_order = 8;
     string description = 9;
+    Direction direction = 10;
+    ChainID chain_id = 11; // The chain id to continue checking.
+                           // If it's not set the check will be started from the specified checkpoint otherwise checkpoint will be ignored
 }
 
 message CheckSequenceRuleResponse {
     RequestStatus status = 1;
+    ChainID chain_id = 2; // You can use it to unite the next rule to the chain with currently submitted one
 }
 
 message PreFilter {

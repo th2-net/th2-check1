@@ -12,28 +12,25 @@
  */
 package com.exactpro.th2.verifier;
 
-import com.exactpro.th2.configuration.RabbitMQConfiguration;
-import com.exactpro.th2.configuration.MicroserviceConfiguration;
-import com.exactpro.th2.infra.grpc.MessageBatch;
-import com.exactpro.th2.schema.factory.CommonFactory;
-import com.exactpro.th2.schema.grpc.router.GrpcRouter;
-import com.exactpro.th2.schema.message.MessageRouter;
-import com.exactpro.th2.verifier.configuration.VerifierConfiguration;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.exactpro.th2.ConfigurationUtils.safeLoad;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import com.exactpro.th2.configuration.RabbitMQConfiguration;
+import com.exactpro.th2.infra.grpc.MessageBatch;
+import com.exactpro.th2.schema.factory.CommonFactory;
+import com.exactpro.th2.schema.grpc.router.GrpcRouter;
+import com.exactpro.th2.schema.message.MessageRouter;
+import com.exactpro.th2.verifier.cfg.CollectorServiceConfiguration;
+import com.exactpro.th2.verifier.configuration.VerifierConfiguration;
 
 public class VerifyMain {
     private final static Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);
 
     /**
      * Environment variables:
-     *  {@link com.exactpro.th2.configuration.Configuration#ENV_GRPC_PORT}
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_HOST}
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_PORT}
      *  {@link RabbitMQConfiguration#ENV_RABBITMQ_USER}
@@ -47,11 +44,11 @@ public class VerifyMain {
             GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
             VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
 
-            CollectorService collectorService = new CollectorService(messageRouter, grpcRouter, configuration);
+            CollectorService collectorService = new CollectorService(messageRouter, grpcRouter, new CollectorServiceConfiguration(configuration));
             ExecutorService executorService = Executors.newFixedThreadPool(configuration.getCountExecutorThreads());
             Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
             Runtime.getRuntime().addShutdownHook(new Thread(executorService::shutdown));//TODO fix
-            VerifierHandler verifierHandler = new VerifierHandler(collectorService, executorService);
+            VerifierHandler verifierHandler = new VerifierHandler(collectorService);
 
             VerifierServer verifierServer = new VerifierServer(grpcRouter.startServer(verifierHandler));
             verifierServer.start();

@@ -10,8 +10,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.exactpro.th2.verifier.rule
 
-rootProject.name = 'th2-verifier'
+import com.exactpro.sf.common.messages.IMessage
+import com.exactpro.th2.infra.grpc.Message
 
-include "grpc-verifier"
-project(':grpc-verifier').name = 'th2-grpc-verifier'
+class MessageContainer(val protoMessage: Message, val sailfishMessage: IMessage)

@@ -10,8 +10,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.exactpro.th2.verifier
 
-rootProject.name = 'th2-verifier'
+import com.exactpro.th2.infra.grpc.ConnectionID
+import com.exactpro.th2.verifier.grpc.ChainID
 
-include "grpc-verifier"
-project(':grpc-verifier').name = 'th2-grpc-verifier'
+data class CheckTaskKey(val parentEventID: ChainID, val connectionID: ConnectionID)

@@ -10,28 +10,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier.event.bean;
+package com.exactpro.th2.verifier
 
-import com.exactpro.th2.common.event.bean.IRow;
+import io.reactivex.observers.DisposableObserver
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
-public class CheckSequenceRow implements IRow {
-
-    private String expectedMessage;
-    private String actualMessage;
-
-    public String getExpectedMessage() {
-        return expectedMessage;
+abstract class AbstractSessionObserver<T> : DisposableObserver<T>() {
+    override fun onComplete() {
+        LOGGER.info("Observing completed for ${this::class.java.simpleName}")
     }
 
-    public void setExpectedMessage(String expectedMessage) {
-        this.expectedMessage = expectedMessage;
+    override fun onError(e: Throwable) {
+        LOGGER.error("Error threw for ${this::class.java.simpleName}", e)
     }
 
-    public String getActualMessage() {
-        return actualMessage;
-    }
-
-    public void setActualMessage(String actualMessage) {
-        this.actualMessage = actualMessage;
+    companion object {
+        @Suppress("JAVA_CLASS_ON_COMPANION")
+        @JvmField
+        val LOGGER: Logger = LoggerFactory.getLogger(javaClass.enclosingClass)
     }
 }

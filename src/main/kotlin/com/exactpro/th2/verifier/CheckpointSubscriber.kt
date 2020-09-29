@@ -11,7 +11,18 @@
  * limitations under the License.
  */
 
-rootProject.name = 'th2-verifier'
+package com.exactpro.th2.verifier
 
-include "grpc-verifier"
-project(':grpc-verifier').name = 'th2-grpc-verifier'
+import io.vertx.core.impl.ConcurrentHashSet
+
+class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
+    private val sessionSet : MutableSet<StreamContainer> = ConcurrentHashSet()
+
+    override fun onNext(item: StreamContainer) {
+        sessionSet += item
+    }
+
+    fun createCheckpoint() : Checkpoint = Checkpoint(sessionSet.associateBy(
+        { session -> session.sessionKey },
+        { session -> session.lastMessage.metadata.id.sequence }))
+}

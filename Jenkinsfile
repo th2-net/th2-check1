@@ -179,7 +179,8 @@ pipeline {
                     useWrapper: true,
                     rootDir: "./",
                     buildFile: 'build.gradle',
-                    tasks: "clean build artifactoryPublish ${GRADLE_SWITCHES}",
+                    tasks: "clean build artifactoryPublish",
+                    switches: "${GRADLE_SWITCHES} ${env.USER_GRADLE_SWITCHES == null ? '' : env.USER_GRADLE_SWITCHES}",
                     deployerId: "GRADLE_DEPLOYER",
                     resolverId: "GRADLE_RESOLVER",
                 )

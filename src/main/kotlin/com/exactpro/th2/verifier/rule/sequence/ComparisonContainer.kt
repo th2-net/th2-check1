@@ -10,8 +10,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.exactpro.th2.verifier.rule.sequence
 
-rootProject.name = 'th2-verifier'
+import com.exactpro.sf.common.messages.IMessage
+import com.exactpro.sf.comparison.ComparisonResult
+import com.exactpro.th2.infra.grpc.Message
+import com.exactpro.th2.infra.grpc.MessageFilter
+import com.exactpro.th2.verifier.rule.MessageContainer
 
-include "grpc-verifier"
-project(':grpc-verifier').name = 'th2-grpc-verifier'
+class ComparisonContainer(val messageContainer: MessageContainer, val protoFilter: MessageFilter, val comparisonResult: ComparisonResult?) {
+    val sailfishActual: IMessage
+        get() = messageContainer.sailfishMessage
+
+    val protoActual: Message
+        get() = messageContainer.protoMessage
+}
