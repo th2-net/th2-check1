@@ -20,14 +20,12 @@ plugins {
 
 allprojects {
     apply plugin: 'java'
+    apply plugin: 'java-library'
     apply plugin: 'maven-publish'
     apply plugin: 'com.jfrog.artifactory'
 
     ext {
         sharedDir           = file("${project.rootDir}/shared")
-
-        sailfishVersion     = '3.2-SNAPSHOT'
-        th2CommonVersion    = '1.1-SNAPSHOT'
     }
 
     group = 'com.exactpro.th2'
@@ -35,6 +33,13 @@ allprojects {
 
     sourceCompatibility = 1.11
     targetCompatibility = 1.11
+
+    dependencies {
+        api platform('com.exactpro.th2:th2-bom:1.0.0-schema-ci.+')
+        implementation "com.exactpro.th2:th2-grpc-event-store"
+        implementation "com.exactpro.th2:th2-grpc-infra"
+    }
+
 
     repositories {
         maven {
@@ -49,6 +54,10 @@ allprojects {
         maven {
             name 'Artifactory snapshot'
             url 'http://artifactory5.exp.exactpro.com/artifactory/libs-snapshot'
+        }
+        maven {
+            name 'Artifactory release'
+            url 'http://artifactory5.exp.exactpro.com/artifactory/libs-release'
         }
         mavenLocal()
 
@@ -94,7 +103,6 @@ apply plugin: 'com.palantir.docker'
 
 ext {
     slf4jVersion        = '1.7.30'
-    sailfishVersion     = '3.2-SNAPSHOT'
 
     th2EventStoreVersion   = '1.1-SNAPSHOT'
     th2ConnectivityVersion = '1.1-SNAPSHOT'
@@ -107,19 +115,19 @@ ext {
 archivesBaseName = 'verifier-service'
 
 dependencies {
-    compile project(':grpc-verifier')
-    compile "com.exactpro.th2:th2-common:${th2CommonVersion}"
+    implementation project(':grpc-verifier')
+    implementation "com.exactpro.th2:th2-common"
 
-    compile "com.exactpro.sf:sailfish-core:${sailfishVersion}"
+    implementation "com.exactpro.sf:sailfish-core:3.2-SNAPSHOT"
 
-    compile "com.rabbitmq:amqp-client:5.8.0"
-    compile "com.datastax.cassandra:cassandra-driver-core:${cassandraVersion}"//FIXME: Migrate to another library for UUID
+    implementation "com.rabbitmq:amqp-client:5.8.0"
+    implementation "com.datastax.cassandra:cassandra-driver-core:${cassandraVersion}"//FIXME: Migrate to another library for UUID
 
-    compile "com.exactpro.th2:th2-grpc-event-store:${th2EventStoreVersion}"
-    compile "com.exactpro.th2:th2-grpc-connectivity:${th2ConnectivityVersion}"
+    implementation 'com.exactpro.th2:th2-sailfish-utils'
+    implementation "com.exactpro.th2:th2-grpc-connectivity"
 
-    compile "org.slf4j:slf4j-log4j12:${slf4jVersion}"
-    compile "org.slf4j:slf4j-api:${slf4jVersion}"
+    implementation "org.slf4j:slf4j-log4j12:${slf4jVersion}"
+    implementation "org.slf4j:slf4j-api:${slf4jVersion}"
 
     testImplementation 'junit:junit:4.12'
 }

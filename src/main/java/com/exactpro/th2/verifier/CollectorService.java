@@ -19,18 +19,13 @@ import static com.exactpro.th2.verifier.event.CheckSequenceUtils.createBothSide;
 import static com.exactpro.th2.verifier.event.CheckSequenceUtils.createOnlyActualSide;
 import static com.exactpro.th2.verifier.event.CheckSequenceUtils.createOnlyExpectedSide;
 import static com.exactpro.th2.verifier.util.VerificationUtil.toMetaContainer;
-import static java.lang.String.format;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.TimeoutException;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -45,14 +40,10 @@ import com.exactpro.sf.comparison.MessageComparator;
 import com.exactpro.sf.services.ICSHIterator;
 import com.exactpro.th2.MessageWrapper;
 import com.exactpro.th2.ProtoToIMessageConverter;
-import com.exactpro.th2.RabbitMqSubscriber;
 import com.exactpro.th2.common.event.Event;
 import com.exactpro.th2.common.event.Event.Status;
 import com.exactpro.th2.common.event.bean.builder.MessageBuilder;
 import com.exactpro.th2.common.event.bean.builder.TableBuilder;
-import com.exactpro.th2.configuration.MicroserviceConfiguration;
-import com.exactpro.th2.configuration.RabbitMQConfiguration;
-import com.exactpro.th2.configuration.Th2Configuration.QueueNames;
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceService;
 import com.exactpro.th2.eventstore.grpc.Response;
 import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest;
@@ -74,7 +65,6 @@ import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest;
 import com.exactpro.th2.verifier.grpc.CheckpointRequestOrBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.protobuf.TextFormat;
-import com.rabbitmq.client.DeliverCallback;
 
 public class CollectorService {
     private final Logger logger = LoggerFactory.getLogger(getClass().getName() + '@' + hashCode());
@@ -408,40 +398,5 @@ public class CollectorService {
         public ComparisonResult getComparisonResult() {
             return comparisonResult;
         }
-    }
-
-    private Map<String, RabbitMqSubscriber> subscribe(MicroserviceConfiguration configuration, DeliverCallback deliverCallback) throws InterruptedException {
-        RabbitMQConfiguration rabbitMQConfiguration = configuration.getRabbitMQ();
-        Map<String, RabbitMqSubscriber> subscribers = new HashMap<>();
-        for (Entry<String, QueueNames> connectivityQueueNames
-                : configuration.getTh2().getConnectivityQueueNames().entrySet()) {
-            String connectivityAlias = connectivityQueueNames.getKey();
-            QueueNames queueNames = connectivityQueueNames.getValue();
-            try {
-                subscribers.computeIfAbsent(queueNames.getInQueueName(), queueName -> {
-                    try {
-                        var subscriber = new RabbitMqSubscriber(queueNames.getExchangeName(), deliverCallback, null,
-                                queueNames.getInQueueName());
-                        subscriber.startListening(
-                                rabbitMQConfiguration.getHost(),
-                                rabbitMQConfiguration.getVirtualHost(),
-                                rabbitMQConfiguration.getPort(),
-                                rabbitMQConfiguration.getUsername(),
-                                rabbitMQConfiguration.getPassword(),
-                                "Verify:" + connectivityAlias);
-                        logger.info("Subscribed to queue '{}', from connectivity '{}'", queueName, connectivityAlias);
-                        return subscriber;
-                    } catch (IOException | TimeoutException e) {
-                        throw new RuntimeException(format("Subscription to queue '%s' failure, from connectivity '%'",
-                                queueName, connectivityAlias), e);
-                    }
-                });
-            } catch (RuntimeException e) {
-                logger.error("Subscribing to message queue failure. queue '{}', connectivity '{}'",
-                        queueNames.getInQueueName(), connectivityAlias, e);
-                throw e;
-            }
-        }
-        return subscribers;
     }
 }
