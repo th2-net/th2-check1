@@ -8,13 +8,12 @@ plugins {
 
 allprojects {
     apply plugin: 'kotlin'
+    apply plugin: 'java-library'
     apply plugin: 'maven-publish'
     apply plugin: 'com.jfrog.artifactory'
 
     ext {
         sharedDir           = file("${project.rootDir}/shared")
-
-        th2CommonVersion    = '1.4.1'
     }
 
     group = 'com.exactpro.th2'
@@ -52,6 +51,11 @@ allprojects {
             resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
         }
     }
+
+    dependencies {
+        api platform('com.exactpro.th2:th2-bom:1.0.8')
+    }
+
 
     jar {
         manifest {
@@ -107,26 +111,22 @@ allprojects {
 apply plugin: 'application'
 apply plugin: 'com.palantir.docker'
 
-ext {
-    slf4jVersion        = '1.7.30'
-}
-
 dependencies {
-    compile project(':th2-grpc-verifier')
-    compile "com.exactpro.th2:th2-common:${th2CommonVersion}"
-    compile 'com.exactpro.th2:th2-sailfish-utils:1.3.0'
+    implementation project(':th2-grpc-verifier')
+    implementation "com.exactpro.th2:th2-common"
+    implementation 'com.exactpro.th2:th2-sailfish-utils'
+    implementation "com.exactpro.th2:th2-grpc-event-store"
+    implementation "org.slf4j:slf4j-log4j12"
+    implementation "org.slf4j:slf4j-api"
 
-    compile "com.exactpro.sf:sailfish-core:3.2-SNAPSHOT"
+    implementation "com.exactpro.sf:sailfish-core:3.2-SNAPSHOT"
 
-    compile "com.rabbitmq:amqp-client:5.8.0"
-    compile "com.datastax.cassandra:cassandra-driver-core:3.6.0" //FIXME: Migrate to another library for UUID
+    implementation "com.rabbitmq:amqp-client:5.8.0"
+    implementation "com.datastax.cassandra:cassandra-driver-core:3.6.0" //FIXME: Migrate to another library for UUID
 
-    compile "com.exactpro.th2:th2-grpc-event-store:1.3.0"
 
-    compile "org.slf4j:slf4j-log4j12:${slf4jVersion}"
-    compile "org.slf4j:slf4j-api:${slf4jVersion}"
 
-    compile "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
+    implementation "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'
