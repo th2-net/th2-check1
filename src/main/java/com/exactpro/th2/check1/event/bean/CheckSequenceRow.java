@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package com.exactpro.th2.verifier.event.bean;
+package com.exactpro.th2.check1.event.bean;
 
 import com.exactpro.th2.common.event.bean.IRow;
 

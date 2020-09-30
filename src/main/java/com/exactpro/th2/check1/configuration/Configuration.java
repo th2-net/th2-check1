@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package com.exactpro.th2.verifier.configuration;
+package com.exactpro.th2.check1.configuration;
 
 import com.exactpro.th2.configuration.MicroserviceConfiguration;
 

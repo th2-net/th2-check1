@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier.event;
+package com.exactpro.th2.check1.event;
 
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;

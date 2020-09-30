@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.verifier.rule
+package com.exactpro.th2.check1.rule
 
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
@@ -28,18 +28,17 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest
 import com.exactpro.th2.infra.grpc.Checkpoint
-import com.exactpro.th2.infra.grpc.Direction
 import com.exactpro.th2.infra.grpc.EventBatch
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.Message
 import com.exactpro.th2.infra.grpc.MessageFilter
-import com.exactpro.th2.verifier.AbstractSessionObserver
-import com.exactpro.th2.verifier.DefaultMessageFactoryProxy
-import com.exactpro.th2.verifier.SessionKey
-import com.exactpro.th2.verifier.StreamContainer
-import com.exactpro.th2.verifier.event.bean.builder.VerificationBuilder
-import com.exactpro.th2.verifier.rule.sequence.ComparisonContainer
-import com.exactpro.th2.verifier.util.VerificationUtil
+import com.exactpro.th2.check1.AbstractSessionObserver
+import com.exactpro.th2.check1.DefaultMessageFactoryProxy
+import com.exactpro.th2.check1.SessionKey
+import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
+import com.exactpro.th2.check1.rule.sequence.ComparisonContainer
+import com.exactpro.th2.check1.util.VerificationUtil
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import io.reactivex.Single
@@ -60,13 +59,13 @@ import java.util.concurrent.atomic.AtomicReference
  * **Class in not thread-safe**
  */
 abstract class AbstractCheckTask(
-    val description: String?,
-    private val timeout: Long,
-    submitTime: Instant,
-    protected val sessionKey: SessionKey,
-    private val parentEventID: EventID,
-    private val messageStream: Observable<StreamContainer>,
-    private val eventStoreStub: EventStoreServiceFutureStub
+        val description: String?,
+        private val timeout: Long,
+        submitTime: Instant,
+        protected val sessionKey: SessionKey,
+        private val parentEventID: EventID,
+        private val messageStream: Observable<StreamContainer>,
+        private val eventStoreStub: EventStoreServiceFutureStub
 ) : AbstractSessionObserver<MessageContainer>() {
     protected var handledMessageCounter: Long = 0
 

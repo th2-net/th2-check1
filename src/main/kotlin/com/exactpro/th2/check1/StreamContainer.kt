@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.verifier
+package com.exactpro.th2.check1
 
+import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.infra.grpc.Message
 import io.reactivex.Observable
 

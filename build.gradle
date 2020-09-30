@@ -53,7 +53,7 @@ allprojects {
     }
 
     dependencies {
-        api platform('com.exactpro.th2:th2-bom:1.0.8')
+        api platform('com.exactpro.th2:bom:2.0.+')
     }
 
 
@@ -112,10 +112,10 @@ apply plugin: 'application'
 apply plugin: 'com.palantir.docker'
 
 dependencies {
-    implementation project(':th2-grpc-verifier')
-    implementation "com.exactpro.th2:th2-common"
-    implementation 'com.exactpro.th2:th2-sailfish-utils'
-    implementation "com.exactpro.th2:th2-grpc-event-store"
+    implementation project(':grpc-check1')
+    implementation "com.exactpro.th2:common"
+    implementation 'com.exactpro.th2:sailfish-utils'
+    implementation "com.exactpro.th2:grpc-estore"
     implementation "org.slf4j:slf4j-log4j12"
     implementation "org.slf4j:slf4j-api"
 
@@ -137,7 +137,7 @@ test {
 }
 
 application {
-    mainClassName 'com.exactpro.th2.verifier.VerifyMain'
+    mainClassName 'com.exactpro.th2.check1.VerifyMain'
 }
 
 applicationName = 'service'

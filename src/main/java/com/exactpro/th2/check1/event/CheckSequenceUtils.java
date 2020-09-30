@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier.event;
+package com.exactpro.th2.check1.event;
 
 import java.util.List;
 
+import com.exactpro.th2.check1.event.bean.CheckSequenceRow;
 import com.exactpro.th2.infra.grpc.MessageFilter;
 import com.exactpro.th2.infra.grpc.ValueFilter;
 import com.exactpro.sf.common.messages.IMessage;
-import com.exactpro.th2.verifier.event.bean.CheckSequenceRow;
 
 public class CheckSequenceUtils {
 

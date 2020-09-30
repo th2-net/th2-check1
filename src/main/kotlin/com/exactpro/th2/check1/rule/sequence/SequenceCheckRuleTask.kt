@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.verifier.rule.sequence
+package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
@@ -31,13 +31,13 @@ import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceF
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageFilter
 import com.exactpro.th2.infra.grpc.MessageID
-import com.exactpro.th2.verifier.SessionKey
-import com.exactpro.th2.verifier.StreamContainer
-import com.exactpro.th2.verifier.event.CheckSequenceUtils
-import com.exactpro.th2.verifier.event.bean.CheckSequenceRow
+import com.exactpro.th2.check1.SessionKey
+import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.event.CheckSequenceUtils
+import com.exactpro.th2.check1.event.bean.CheckSequenceRow
 import com.exactpro.th2.verifier.grpc.PreFilter
-import com.exactpro.th2.verifier.rule.AbstractCheckTask
-import com.exactpro.th2.verifier.rule.MessageContainer
+import com.exactpro.th2.check1.rule.AbstractCheckTask
+import com.exactpro.th2.check1.rule.MessageContainer
 import io.reactivex.Observable
 import java.time.Instant
 import java.util.LinkedHashMap
@@ -51,16 +51,16 @@ import java.util.LinkedHashMap
  * If this parameter is `false` the order won't be checked.
  */
 class SequenceCheckRuleTask(
-    description: String?,
-    startTime: Instant,
-    sessionKey: SessionKey,
-    timeout: Long,
-    protoPreFilter: PreFilter,
-    private val protoMessageFilters: List<MessageFilter>,
-    private val checkOrder: Boolean,
-    parentEventID: EventID,
-    messageStream: Observable<StreamContainer>,
-    eventStoreStub: EventStoreServiceFutureStub
+        description: String?,
+        startTime: Instant,
+        sessionKey: SessionKey,
+        timeout: Long,
+        protoPreFilter: PreFilter,
+        private val protoMessageFilters: List<MessageFilter>,
+        private val checkOrder: Boolean,
+        parentEventID: EventID,
+        messageStream: Observable<StreamContainer>,
+        eventStoreStub: EventStoreServiceFutureStub
 ) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventStoreStub) {
 
     private val protoPreMessageFilter: MessageFilter = protoPreFilter.toMessageFilter()

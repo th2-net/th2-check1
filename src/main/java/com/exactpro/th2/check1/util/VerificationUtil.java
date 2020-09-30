@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier.util;
+package com.exactpro.th2.check1.util;
 
 import com.exactpro.sf.aml.script.MetaContainer;
 import com.exactpro.th2.infra.grpc.ListValueFilter;

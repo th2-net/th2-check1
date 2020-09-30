@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.verifier
+package com.exactpro.th2.check1
 
+import com.exactpro.th2.check1.Checkpoint
 import io.vertx.core.impl.ConcurrentHashSet
 
 class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
@@ -26,6 +27,6 @@ class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
     }
 
     fun createCheckpoint() : Checkpoint = Checkpoint(sessionSet.associateBy(
-        { session -> session.sessionKey },
-        { session -> session.lastMessage.metadata.id.sequence }))
+            { session -> session.sessionKey },
+            { session -> session.lastMessage.metadata.id.sequence }))
 }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.verifier.rule.check
+package com.exactpro.th2.check1.rule.check
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
@@ -26,10 +26,10 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageFilter
-import com.exactpro.th2.verifier.SessionKey
-import com.exactpro.th2.verifier.rule.MessageContainer
-import com.exactpro.th2.verifier.StreamContainer
-import com.exactpro.th2.verifier.rule.AbstractCheckTask
+import com.exactpro.th2.check1.SessionKey
+import com.exactpro.th2.check1.rule.MessageContainer
+import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.rule.AbstractCheckTask
 import io.reactivex.Observable
 import java.time.Instant
 
@@ -37,14 +37,14 @@ import java.time.Instant
  * This rule checks the presents of the single message in the messages stream.
  */
 class CheckRuleTask(
-    description: String?,
-    startTime: Instant,
-    sessionKey: SessionKey,
-    timeout: Long,
-    private val protoMessageFilter: MessageFilter,
-    parentEventID: EventID,
-    messageStream: Observable<StreamContainer>,
-    eventStoreStub: EventStoreServiceFutureStub
+        description: String?,
+        startTime: Instant,
+        sessionKey: SessionKey,
+        timeout: Long,
+        private val protoMessageFilter: MessageFilter,
+        parentEventID: EventID,
+        messageStream: Observable<StreamContainer>,
+        eventStoreStub: EventStoreServiceFutureStub
 ) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventStoreStub) {
 
     private val filter: IMessage = converter.fromProtoFilter(protoMessageFilter, protoMessageFilter.messageType)

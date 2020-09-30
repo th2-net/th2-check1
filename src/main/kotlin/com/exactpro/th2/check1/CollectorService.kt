@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier
+package com.exactpro.th2.check1
 
 import com.exactpro.th2.RabbitMqSubscriber
+import com.exactpro.th2.check1.Checkpoint
+import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.configuration.MicroserviceConfiguration
@@ -30,14 +32,14 @@ import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageBatch
 import com.exactpro.th2.infra.grpc.MessageFilter
 import com.exactpro.th2.infra.grpc.MessageID
-import com.exactpro.th2.verifier.cfg.CollectorServiceConfiguration
+import com.exactpro.th2.check1.cfg.CollectorServiceConfiguration
 import com.exactpro.th2.verifier.grpc.ChainID
 import com.exactpro.th2.verifier.grpc.CheckRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.verifier.grpc.CheckpointRequestOrBuilder
-import com.exactpro.th2.verifier.rule.AbstractCheckTask
-import com.exactpro.th2.verifier.rule.check.CheckRuleTask
-import com.exactpro.th2.verifier.rule.sequence.SequenceCheckRuleTask
+import com.exactpro.th2.check1.rule.AbstractCheckTask
+import com.exactpro.th2.check1.rule.check.CheckRuleTask
+import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.TextFormat.shortDebugString
 import com.rabbitmq.client.DeliverCallback
@@ -133,8 +135,8 @@ class CollectorService(
         if (direction == Direction.UNRECOGNIZED) Direction.FIRST else direction
 
     private fun AbstractCheckTask.addToChainOrBegin(
-        value: AbstractCheckTask?,
-        checkpoint: com.exactpro.th2.infra.grpc.Checkpoint
+            value: AbstractCheckTask?,
+            checkpoint: com.exactpro.th2.infra.grpc.Checkpoint
     ): Unit = value?.subscribeNextTask(this) ?: begin(checkpoint)
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {

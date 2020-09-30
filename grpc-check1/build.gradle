@@ -28,8 +28,8 @@ dependencies {
     implementation "io.grpc:grpc-core:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
 
-    implementation "com.exactpro.th2:th2-grpc-infra"
-    implementation "com.exactpro.th2:th2-grpc-event-store"
+    implementation "com.exactpro.th2:grpc-common"
+    implementation "com.exactpro.th2:grpc-estore"
 }
 
 sourceSets {
@@ -70,7 +70,7 @@ task zipProtobuf (type: Zip) {
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            artifactId = 'th2-grpc-verifier'
+            artifactId = 'grpc-check1'
             artifact source: zipProtobuf, extension: 'zip'
         }
     }

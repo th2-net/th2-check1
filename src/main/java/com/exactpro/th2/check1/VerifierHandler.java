@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier;
+package com.exactpro.th2.check1;
 
 import static com.exactpro.th2.infra.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.infra.grpc.RequestStatus.Status.SUCCESS;
@@ -21,6 +21,7 @@ import static com.google.protobuf.TextFormat.shortDebugString;
 
 import java.util.concurrent.ExecutorService;
 
+import com.exactpro.th2.check1.CollectorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

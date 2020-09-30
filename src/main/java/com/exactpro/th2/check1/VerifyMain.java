@@ -13,20 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier;
+package com.exactpro.th2.check1;
 
 import com.exactpro.th2.configuration.RabbitMQConfiguration;
-import com.exactpro.th2.verifier.cfg.CollectorServiceConfiguration;
-import com.exactpro.th2.verifier.configuration.Configuration;
+import com.exactpro.th2.check1.CollectorService;
+import com.exactpro.th2.check1.cfg.CollectorServiceConfiguration;
+import com.exactpro.th2.check1.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.exactpro.th2.ConfigurationUtils.safeLoad;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import com.exactpro.th2.configuration.MicroserviceConfiguration;
 
 public class VerifyMain {
     private final static Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);

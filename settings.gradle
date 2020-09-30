@@ -1,4 +1,4 @@
-rootProject.name = 'th2-verifier'
+rootProject.name = 'check1'
 
-include "grpc-verifier"
-project(':grpc-verifier').name = 'th2-grpc-verifier'
+include "grpc-check1"
+project(':grpc-check1').name = 'grpc-check1'

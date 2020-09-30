@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier.event.bean.builder;
+package com.exactpro.th2.check1.event.bean.builder;
 
-import static com.exactpro.th2.verifier.util.VerificationUtil.toMetaContainer;
+import static com.exactpro.th2.check1.util.VerificationUtil.toMetaContainer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,7 +25,7 @@ import com.exactpro.th2.common.event.IBodyData;
 import com.exactpro.th2.common.event.bean.Verification;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.infra.grpc.MessageFilter;
-import com.exactpro.th2.verifier.event.VerificationEntryUtils;
+import com.exactpro.th2.check1.event.VerificationEntryUtils;
 
 public class VerificationBuilder {
 

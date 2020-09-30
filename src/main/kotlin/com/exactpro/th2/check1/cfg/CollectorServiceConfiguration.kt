@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier.cfg
+package com.exactpro.th2.check1.cfg
 
-import com.exactpro.th2.verifier.configuration.Configuration
+import com.exactpro.th2.check1.configuration.Configuration
 import java.lang.System.getenv
 import java.time.temporal.ChronoUnit
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.verifier.sequence
+package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.infra.grpc.ConnectionID
@@ -31,7 +31,7 @@ import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.verifier.grpc.PreFilter
-import com.exactpro.th2.verifier.AbstractCheckTaskTest
+import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import io.reactivex.Observable
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.params.ParameterizedTest
