@@ -17,6 +17,8 @@ package com.exactpro.th2.verifier;
 
 import java.util.Map;
 
+import com.exactpro.th2.check1.Checkpoint;
+import com.exactpro.th2.check1.SessionKey;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
