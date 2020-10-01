@@ -232,7 +232,7 @@ class CollectorService(
     }
 
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
-        return messageRouter.subscribeAll(listener, "in", "parsed") ?: throw IllegalStateException("Can not subscribe to queues")
+        return messageRouter.subscribeAll(listener, "subscribe", "first", "parsed") ?: throw IllegalStateException("Can not subscribe to queues")
     }
 
     private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
