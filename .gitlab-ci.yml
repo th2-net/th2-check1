@@ -2,7 +2,7 @@ variables:
   APP_NAME: "th2-verifier"
   MAJOR_VERSION: "1"
   MINOR_VERSION: "3"
-  MAINTENANCE_VERSION: '3'
+  MAINTENANCE_VERSION: '4'
   ARTIFACTORY_PUBLISH_ENABLED: 'true'
 
 include:
