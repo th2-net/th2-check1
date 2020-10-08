@@ -22,8 +22,10 @@ import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.eventstore.grpc.AsyncEventStoreServiceService
 import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
+import com.exactpro.th2.infra.grpc.EventBatch
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.MessageFilter
+import com.exactpro.th2.schema.message.MessageRouter
 import com.exactpro.th2.verifier.SessionKey
 import com.exactpro.th2.verifier.rule.MessageContainer
 import com.exactpro.th2.verifier.StreamContainer
@@ -42,8 +44,8 @@ class CheckRuleTask(
     private val protoMessageFilter: MessageFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
-    eventStoreStub: AsyncEventStoreServiceService
-) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventStoreStub) {
+    eventBatchRouter: MessageRouter<EventBatch>
+) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val filter: IMessage = converter.fromProtoFilter(protoMessageFilter, protoMessageFilter.messageType)
     private val settings: ComparatorSettings = protoMessageFilter.toCompareSettings()

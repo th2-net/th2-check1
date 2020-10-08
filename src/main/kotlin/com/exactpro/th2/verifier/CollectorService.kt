@@ -14,11 +14,7 @@ package com.exactpro.th2.verifier
 
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.configuration.MicroserviceConfiguration
 import com.exactpro.th2.eventstore.grpc.AsyncEventStoreServiceService
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceService
 import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest
 import com.exactpro.th2.infra.grpc.ConnectionID
 import com.exactpro.th2.infra.grpc.Direction
@@ -41,7 +37,6 @@ import com.exactpro.th2.verifier.rule.check.CheckRuleTask
 import com.exactpro.th2.verifier.rule.sequence.SequenceCheckRuleTask
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.TextFormat.shortDebugString
-import io.grpc.ManagedChannelBuilder
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
 import org.slf4j.LoggerFactory
@@ -54,7 +49,7 @@ import java.util.concurrent.ForkJoinPool
 import java.util.function.Consumer
 
 class CollectorService(
-    private val messageRouter: MessageRouter<MessageBatch>, grpcRouter: GrpcRouter, configuration: CollectorServiceConfiguration
+    private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: CollectorServiceConfiguration
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
@@ -63,7 +58,6 @@ class CollectorService(
      * Queue name to subscriber. Messages with different connectivity can be transferred with one queue.
      */
     private val subscriberMonitor: SubscriberMonitor
-    private val eventStoreStub: AsyncEventStoreServiceService
     private val streamObservable: Observable<StreamContainer>
     private val checkpointSubscriber: CheckpointSubscriber
     private val mqSubject: PublishSubject<MessageBatch>
@@ -83,8 +77,6 @@ class CollectorService(
             .replay().apply { connect() }
 
         checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
-
-        eventStoreStub = grpcRouter.getService(AsyncEventStoreServiceService::class.java)
     }
 
     @Throws(InterruptedException::class)
@@ -97,7 +89,7 @@ class CollectorService(
         val chainID = request.getChainIdOrGenerate()
 
         val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, filter,
-            parentEventID, streamObservable, eventStoreStub)
+            parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -116,7 +108,7 @@ class CollectorService(
         val chainID = request.getChainIdOrGenerate()
 
         val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, request.preFilter,
-            request.messageFiltersList, request.checkOrder, parentEventID, streamObservable, eventStoreStub)
+            request.messageFiltersList, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -172,22 +164,22 @@ class CollectorService(
     @Throws(JsonProcessingException::class)
     private fun sendEvents(parentEventID: EventID, event: Event) {
         logger.debug("Sending event thee id '{}' parent id '{}'", event.id, parentEventID)
-        val storeRequest = StoreEventBatchRequest.newBuilder()
-            .setEventBatch(EventBatch.newBuilder()
-                .setParentEventId(parentEventID)
-                .addAllEvents(event.toProtoEvents(parentEventID.id))
-                .build())
+
+        val batch = EventBatch.newBuilder()
+            .setParentEventId(parentEventID)
+            .addAllEvents(event.toProtoEvents(parentEventID.id))
             .build()
 
-        eventStoreStub.storeEventBatch(storeRequest, ListenableStreamObserver(
-            Consumer {
+        ForkJoinPool.commonPool().execute {
+            try {
+                eventBatchRouter.send(batch, "publish", "event")
                 if (logger.isDebugEnabled) {
-                    logger.debug("Sent event batch '{}' with result {}", shortDebugString(storeRequest), parentEventID, it)
+                    logger.debug("Sent event batch '{}'", shortDebugString(batch))
                 }
-            },
-            null, //FIXME: add error handler
-            ForkJoinPool.commonPool()
-        ))
+            } catch (e: Exception) {
+                logger.error("Can not send event batch '{}'", shortDebugString(batch), e)
+            }
+        }
     }
 
     fun createCheckpoint(request: CheckpointRequestOrBuilder): Checkpoint {

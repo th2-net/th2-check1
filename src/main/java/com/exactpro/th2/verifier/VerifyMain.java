@@ -44,7 +44,7 @@ public class VerifyMain {
             GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
             VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
 
-            CollectorService collectorService = new CollectorService(messageRouter, grpcRouter, new CollectorServiceConfiguration(configuration));
+            CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), new CollectorServiceConfiguration(configuration));
             ExecutorService executorService = Executors.newFixedThreadPool(configuration.getCountExecutorThreads());
             Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
             Runtime.getRuntime().addShutdownHook(new Thread(executorService::shutdown));//TODO fix

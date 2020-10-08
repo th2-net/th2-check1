@@ -31,6 +31,7 @@ import com.exactpro.th2.infra.grpc.EventBatch
 import com.exactpro.th2.infra.grpc.EventID
 import com.exactpro.th2.infra.grpc.Message
 import com.exactpro.th2.infra.grpc.MessageFilter
+import com.exactpro.th2.schema.message.MessageRouter
 import com.exactpro.th2.verifier.AbstractSessionObserver
 import com.exactpro.th2.verifier.DefaultMessageFactoryProxy
 import com.exactpro.th2.verifier.ListenableStreamObserver
@@ -66,7 +67,7 @@ abstract class AbstractCheckTask(
     protected val sessionKey: SessionKey,
     private val parentEventID: EventID,
     private val messageStream: Observable<StreamContainer>,
-    private val eventStoreStub: AsyncEventStoreServiceService
+    private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
     protected var handledMessageCounter: Long = 0
 
@@ -297,22 +298,21 @@ abstract class AbstractCheckTask(
             completeEvent(prevState == State.TIMEOUT)
             _endTime = Instant.now()
             LOGGER.debug("Sending event tree id '{}' parent id '{}'", rootEvent.id, parentEventID)
-            val storeRequest = StoreEventBatchRequest.newBuilder()
-                .setEventBatch(EventBatch.newBuilder()
-                    .setParentEventId(parentEventID)
-                    .addAllEvents(rootEvent.toProtoEvents(parentEventID.id))
-                    .build())
-                .build()
+           val batch = EventBatch.newBuilder()
+               .setParentEventId(parentEventID)
+               .addAllEvents(rootEvent.toProtoEvents(parentEventID.id))
+               .build()
 
-            eventStoreStub.storeEventBatch(storeRequest, ListenableStreamObserver(
-                Consumer {
+            RESPONSE_EXECUTOR.execute {
+                try {
+                    eventBatchRouter.send(batch, "publish", "event")
                     if (LOGGER.isDebugEnabled) {
-                        LOGGER.debug("Sent event batch '{}' with result {}", shortDebugString(storeRequest), shortDebugString(it))
+                        LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
                     }
-                },
-                null,  //FIXME: add error handler
-                RESPONSE_EXECUTOR
-            ))
+                } catch (e: Exception) {
+                    LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
+                }
+            }
         } else {
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
         }
