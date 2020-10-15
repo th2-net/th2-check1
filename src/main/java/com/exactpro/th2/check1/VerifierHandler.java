@@ -15,8 +15,8 @@
  */
 package com.exactpro.th2.check1;
 
-import static com.exactpro.th2.infra.grpc.RequestStatus.Status.ERROR;
-import static com.exactpro.th2.infra.grpc.RequestStatus.Status.SUCCESS;
+import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
+import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
 import static com.google.protobuf.TextFormat.shortDebugString;
 
 import java.util.concurrent.ExecutorService;
@@ -25,15 +25,15 @@ import com.exactpro.th2.check1.CollectorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.exactpro.th2.infra.grpc.RequestStatus;
-import com.exactpro.th2.verifier.grpc.ChainID;
-import com.exactpro.th2.verifier.grpc.CheckRuleRequest;
-import com.exactpro.th2.verifier.grpc.CheckRuleResponse;
-import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest;
-import com.exactpro.th2.verifier.grpc.CheckSequenceRuleResponse;
-import com.exactpro.th2.verifier.grpc.CheckpointRequest;
-import com.exactpro.th2.verifier.grpc.CheckpointResponse;
-import com.exactpro.th2.verifier.grpc.VerifierGrpc.VerifierImplBase;
+import com.exactpro.th2.common.grpc.RequestStatus;
+import com.exactpro.th2.check1.grpc.ChainID;
+import com.exactpro.th2.check1.grpc.CheckRuleRequest;
+import com.exactpro.th2.check1.grpc.CheckRuleResponse;
+import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest;
+import com.exactpro.th2.check1.grpc.CheckSequenceRuleResponse;
+import com.exactpro.th2.check1.grpc.CheckpointRequest;
+import com.exactpro.th2.check1.grpc.CheckpointResponse;
+import com.exactpro.th2.check1.grpc.VerifierGrpc.VerifierImplBase;
 
 import io.grpc.stub.StreamObserver;
 

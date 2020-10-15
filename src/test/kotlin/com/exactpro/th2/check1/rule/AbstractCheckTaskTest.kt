@@ -15,22 +15,26 @@
  */
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
-import com.exactpro.th2.eventstore.grpc.Response
-import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest
+import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc
+import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
+import com.exactpro.th2.estore.grpc.Response
+import com.exactpro.th2.estore.grpc.StoreEventBatchRequest
 import com.google.protobuf.StringValue
 import io.grpc.ManagedChannel
 import io.grpc.Server
 import io.grpc.inprocess.InProcessChannelBuilder
 import io.grpc.inprocess.InProcessServerBuilder
 import io.grpc.stub.StreamObserver
-import org.junit.jupiter.api.AfterEach
+import io.grpc.testing.GrpcCleanupRule
+import org.junit.Rule
 import org.junit.jupiter.api.BeforeEach
 import org.slf4j.LoggerFactory
 import kotlin.test.assertNotNull
 
 abstract class AbstractCheckTaskTest {
+    @Rule
+    var grpcCleanup: GrpcCleanupRule = GrpcCleanupRule()
+
     private lateinit var server: Server
     private lateinit var channel: ManagedChannel
 
@@ -42,25 +46,10 @@ abstract class AbstractCheckTaskTest {
         val serverName = InProcessServerBuilder.generateName()
         serverStub = TestEventStorageImpl()
 
-        server = InProcessServerBuilder.forName(serverName).directExecutor().addService(serverStub).build().start()
+        server = grpcCleanup.register(InProcessServerBuilder.forName(serverName).directExecutor().addService(serverStub).build().start())
 
-        channel = InProcessChannelBuilder.forName(serverName).directExecutor().build()
+        channel = grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().maxInboundMessageSize(1024).build())
         clientStub = EventStoreServiceGrpc.newFutureStub(channel)
-    }
-
-    @AfterEach
-    internal fun tearDown() {
-        try {
-            channel.shutdownNow()
-        } catch (ex: Exception) {
-            LOGGER.error("Cannot shutdown channel", ex)
-        }
-
-        try {
-            server.shutdownNow()
-        } catch (ex: Exception) {
-            LOGGER.error("Cannot shutdown server", ex)
-        }
     }
 
     fun awaitEventBatchRequest(timeout: Long = 1000L): StoreEventBatchRequest {

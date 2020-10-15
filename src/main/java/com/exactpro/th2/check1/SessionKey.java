@@ -17,7 +17,7 @@ package com.exactpro.th2.check1;
 
 import java.util.Objects;
 
-import com.exactpro.th2.infra.grpc.Direction;
+import com.exactpro.th2.common.grpc.Direction;
 
 public class SessionKey {
     private final String sessionAlias;

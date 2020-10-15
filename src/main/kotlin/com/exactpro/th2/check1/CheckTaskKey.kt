@@ -15,7 +15,7 @@
  */
 package com.exactpro.th2.check1
 
-import com.exactpro.th2.infra.grpc.ConnectionID
-import com.exactpro.th2.verifier.grpc.ChainID
+import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.check1.grpc.ChainID
 
 data class CheckTaskKey(val parentEventID: ChainID, val connectionID: ConnectionID)

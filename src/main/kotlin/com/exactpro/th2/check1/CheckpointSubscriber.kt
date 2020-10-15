@@ -16,11 +16,10 @@
 
 package com.exactpro.th2.check1
 
-import com.exactpro.th2.check1.Checkpoint
-import io.vertx.core.impl.ConcurrentHashSet
+import java.util.concurrent.ConcurrentHashMap
 
 class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
-    private val sessionSet : MutableSet<StreamContainer> = ConcurrentHashSet()
+    private val sessionSet : MutableSet<StreamContainer> = ConcurrentHashMap.newKeySet()
 
     override fun onNext(item: StreamContainer) {
         sessionSet += item

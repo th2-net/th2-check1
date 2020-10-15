@@ -1,4 +1,1 @@
 rootProject.name = 'check1'
-
-include "grpc-check1"
-project(':grpc-check1').name = 'grpc-check1'

@@ -17,8 +17,8 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparisonResult
-import com.exactpro.th2.infra.grpc.Message
-import com.exactpro.th2.infra.grpc.MessageFilter
+import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.check1.rule.MessageContainer
 
 class ComparisonContainer(val messageContainer: MessageContainer, val protoFilter: MessageFilter, val comparisonResult: ComparisonResult?) {

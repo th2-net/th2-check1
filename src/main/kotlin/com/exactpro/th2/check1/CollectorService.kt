@@ -22,21 +22,21 @@ import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.configuration.MicroserviceConfiguration
 import com.exactpro.th2.configuration.Th2Configuration.QueueNames
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
-import com.exactpro.th2.eventstore.grpc.StoreEventBatchRequest
-import com.exactpro.th2.infra.grpc.ConnectionID
-import com.exactpro.th2.infra.grpc.Direction
-import com.exactpro.th2.infra.grpc.EventBatch
-import com.exactpro.th2.infra.grpc.EventID
-import com.exactpro.th2.infra.grpc.MessageBatch
-import com.exactpro.th2.infra.grpc.MessageFilter
-import com.exactpro.th2.infra.grpc.MessageID
+import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc
+import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
+import com.exactpro.th2.estore.grpc.StoreEventBatchRequest
+import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.MessageBatch
+import com.exactpro.th2.common.grpc.MessageFilter
+import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.check1.cfg.CollectorServiceConfiguration
-import com.exactpro.th2.verifier.grpc.ChainID
-import com.exactpro.th2.verifier.grpc.CheckRuleRequest
-import com.exactpro.th2.verifier.grpc.CheckSequenceRuleRequest
-import com.exactpro.th2.verifier.grpc.CheckpointRequestOrBuilder
+import com.exactpro.th2.check1.grpc.ChainID
+import com.exactpro.th2.check1.grpc.CheckRuleRequest
+import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
+import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
@@ -136,7 +136,7 @@ class CollectorService(
 
     private fun AbstractCheckTask.addToChainOrBegin(
             value: AbstractCheckTask?,
-            checkpoint: com.exactpro.th2.infra.grpc.Checkpoint
+            checkpoint: com.exactpro.th2.common.grpc.Checkpoint
     ): Unit = value?.subscribeNextTask(this) ?: begin(checkpoint)
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {

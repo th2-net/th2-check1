@@ -23,9 +23,9 @@ import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.eventstore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
-import com.exactpro.th2.infra.grpc.EventID
-import com.exactpro.th2.infra.grpc.MessageFilter
+import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.StreamContainer

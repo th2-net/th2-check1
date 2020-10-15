@@ -18,8 +18,8 @@ package com.exactpro.th2.check1.event;
 import java.util.List;
 
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow;
-import com.exactpro.th2.infra.grpc.MessageFilter;
-import com.exactpro.th2.infra.grpc.ValueFilter;
+import com.exactpro.th2.common.grpc.MessageFilter;
+import com.exactpro.th2.common.grpc.ValueFilter;
 import com.exactpro.sf.common.messages.IMessage;
 
 public class CheckSequenceUtils {

@@ -29,7 +29,7 @@ import com.exactpro.sf.comparison.Formatter;
 import com.exactpro.sf.scriptrunner.StatusType;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
-import com.exactpro.th2.infra.grpc.FilterOperation;
+import com.exactpro.th2.common.grpc.FilterOperation;
 
 import static com.exactpro.sf.comparison.ComparisonUtil.getStatusType;
 import static java.lang.String.format;

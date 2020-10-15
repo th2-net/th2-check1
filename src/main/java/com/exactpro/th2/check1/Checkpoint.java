@@ -15,8 +15,8 @@
  */
 package com.exactpro.th2.check1;
 
-import com.exactpro.th2.infra.grpc.Checkpoint.DirectionCheckpoint;
-import com.exactpro.th2.infra.grpc.Direction;
+import com.exactpro.th2.common.grpc.Checkpoint.DirectionCheckpoint;
+import com.exactpro.th2.common.grpc.Direction;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,7 +53,7 @@ public class Checkpoint {
         return sessionKeyToSequence.get(sessionKey);
     }
 
-    public com.exactpro.th2.infra.grpc.Checkpoint convert() {
+    public com.exactpro.th2.common.grpc.Checkpoint convert() {
         Map<String, DirectionCheckpoint.Builder> intermediateMap = new HashMap<>();
 
         for (Map.Entry<SessionKey, Long> entry : sessionKeyToSequence.entrySet()) {
@@ -62,7 +62,7 @@ public class Checkpoint {
                     .putDirectionToSequence(sessionKey.getDirection().getNumber(), entry.getValue());
         }
 
-        var checkpointBuilder = com.exactpro.th2.infra.grpc.Checkpoint.newBuilder()
+        var checkpointBuilder = com.exactpro.th2.common.grpc.Checkpoint.newBuilder()
                 .setId(id);
         for (Map.Entry<String, DirectionCheckpoint.Builder> entry : intermediateMap.entrySet()) {
             checkpointBuilder.putSessionAliasToDirectionCheckpoint(entry.getKey(),
@@ -109,7 +109,7 @@ public class Checkpoint {
                 .toHashCode();
     }
 
-    public static Checkpoint convert(com.exactpro.th2.infra.grpc.Checkpoint protoCheckpoint) {
+    public static Checkpoint convert(com.exactpro.th2.common.grpc.Checkpoint protoCheckpoint) {
         Map<SessionKey, Long> sessionKeyToSequence = new HashMap<>();
         for (Map.Entry<String, DirectionCheckpoint> sessionAliasDirectionCheckpointEntry : protoCheckpoint.getSessionAliasToDirectionCheckpointMap().entrySet()) {
             String sessionAlias = sessionAliasDirectionCheckpointEntry.getKey();

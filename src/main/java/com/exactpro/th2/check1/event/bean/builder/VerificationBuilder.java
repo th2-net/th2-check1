@@ -24,7 +24,7 @@ import com.exactpro.sf.comparison.ComparisonResult;
 import com.exactpro.th2.common.event.IBodyData;
 import com.exactpro.th2.common.event.bean.Verification;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
-import com.exactpro.th2.infra.grpc.MessageFilter;
+import com.exactpro.th2.common.grpc.MessageFilter;
 import com.exactpro.th2.check1.event.VerificationEntryUtils;
 
 public class VerificationBuilder {

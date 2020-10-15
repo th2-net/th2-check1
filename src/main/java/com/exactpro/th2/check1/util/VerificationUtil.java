@@ -16,9 +16,9 @@
 package com.exactpro.th2.check1.util;
 
 import com.exactpro.sf.aml.script.MetaContainer;
-import com.exactpro.th2.infra.grpc.ListValueFilter;
-import com.exactpro.th2.infra.grpc.MessageFilter;
-import com.exactpro.th2.infra.grpc.ValueFilter;
+import com.exactpro.th2.common.grpc.ListValueFilter;
+import com.exactpro.th2.common.grpc.MessageFilter;
+import com.exactpro.th2.common.grpc.ValueFilter;
 
 import java.util.ArrayList;
 import java.util.HashSet;

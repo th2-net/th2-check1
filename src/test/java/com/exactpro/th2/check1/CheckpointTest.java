@@ -17,12 +17,10 @@ package com.exactpro.th2.check1;
 
 import java.util.Map;
 
-import com.exactpro.th2.check1.Checkpoint;
-import com.exactpro.th2.check1.SessionKey;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import com.exactpro.th2.infra.grpc.Direction;
+import com.exactpro.th2.common.grpc.Direction;
 
 public class CheckpointTest {
 
