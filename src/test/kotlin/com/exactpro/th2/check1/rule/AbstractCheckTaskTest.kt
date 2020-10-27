@@ -1,0 +1,81 @@
+/*
+ * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.exactpro.th2.check1.rule
+
+import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc
+import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
+import com.exactpro.th2.estore.grpc.Response
+import com.exactpro.th2.estore.grpc.StoreEventBatchRequest
+import com.google.protobuf.StringValue
+import io.grpc.ManagedChannel
+import io.grpc.Server
+import io.grpc.inprocess.InProcessChannelBuilder
+import io.grpc.inprocess.InProcessServerBuilder
+import io.grpc.stub.StreamObserver
+import io.grpc.testing.GrpcCleanupRule
+import org.junit.Rule
+import org.junit.jupiter.api.BeforeEach
+import org.slf4j.LoggerFactory
+import kotlin.test.assertNotNull
+
+abstract class AbstractCheckTaskTest {
+    @Rule
+    var grpcCleanup: GrpcCleanupRule = GrpcCleanupRule()
+
+    private lateinit var server: Server
+    private lateinit var channel: ManagedChannel
+
+    private lateinit var serverStub: TestEventStorageImpl
+    protected lateinit var clientStub: EventStoreServiceFutureStub
+
+    @BeforeEach
+    internal fun setUp() {
+        val serverName = InProcessServerBuilder.generateName()
+        serverStub = TestEventStorageImpl()
+
+        server = grpcCleanup.register(InProcessServerBuilder.forName(serverName).directExecutor().addService(serverStub).build().start())
+
+        channel = grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().maxInboundMessageSize(1024).build())
+        clientStub = EventStoreServiceGrpc.newFutureStub(channel)
+    }
+
+    fun awaitEventBatchRequest(timeout: Long = 1000L): StoreEventBatchRequest {
+        val currentTime = System.currentTimeMillis()
+        while (System.currentTimeMillis() < currentTime + timeout) {
+            if (serverStub.eventBatchRequest != null) {
+                break
+            }
+            Thread.sleep(100L)
+        }
+        return assertNotNull(serverStub.eventBatchRequest, "Request was not received during $timeout millis")
+    }
+
+    protected class TestEventStorageImpl : EventStoreServiceGrpc.EventStoreServiceImplBase() {
+        private var _eventBatchRequest: StoreEventBatchRequest? = null
+        val eventBatchRequest: StoreEventBatchRequest?
+            get() = _eventBatchRequest
+
+        override fun storeEventBatch(request: StoreEventBatchRequest, responseObserver: StreamObserver<Response>) {
+            _eventBatchRequest = request
+            responseObserver.onNext(Response.newBuilder().setId(StringValue.of("id")).build())
+            responseObserver.onCompleted()
+        }
+    }
+
+    companion object {
+        protected val LOGGER = LoggerFactory.getLogger(AbstractCheckTaskTest::class.java)
+    }
+}
