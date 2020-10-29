@@ -132,9 +132,9 @@ dependencies {
 
     implementation "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
 
-    testImplementation "io.grpc:grpc-testing:1.32.1"
     testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'
+    testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
 }
 
 test {

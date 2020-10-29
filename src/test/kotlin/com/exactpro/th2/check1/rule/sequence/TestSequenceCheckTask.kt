@@ -102,7 +102,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L)
-        val eventsList: List<Event> = batchRequest.eventBatch.eventsList
+        val eventsList: List<Event> = batchRequest.eventsList
 
         assertAll({
             val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
@@ -131,7 +131,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L)
-        val eventsList: List<Event> = batchRequest.eventBatch.eventsList
+        val eventsList: List<Event> = batchRequest.eventsList
 
         assertAll({
             val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
@@ -163,7 +163,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L)
-        val eventsList: List<Event> = batchRequest.eventBatch.eventsList
+        val eventsList: List<Event> = batchRequest.eventsList
 
         assertAll({
             val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
@@ -191,7 +191,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             checkOrder = checkOrder,
             parentEventID = parentEventID,
             messageStream = messageStream,
-            eventStoreStub = clientStub
+            eventBatchRouter = clientStub
         )
     }
 

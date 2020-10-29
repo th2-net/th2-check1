@@ -15,6 +15,9 @@
  */
 package com.exactpro.th2.check1;
 
+import java.io.Closeable;
+import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,23 +25,20 @@ import com.exactpro.th2.common.grpc.MessageBatch;
 import com.exactpro.th2.common.schema.factory.CommonFactory;
 import com.exactpro.th2.common.schema.grpc.router.GrpcRouter;
 import com.exactpro.th2.common.schema.message.MessageRouter;
-import com.exactpro.th2.check1.CollectorService;
-import com.exactpro.th2.check1.cfg.CollectorServiceConfiguration;
 import com.exactpro.th2.check1.configuration.VerifierConfiguration;
-import com.exactpro.th2.check1.configuration.Configuration;
 
 public class VerifyMain {
-    private final static Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);
 
     public static void main(String[] args) {
         try {
             CommonFactory commonFactory = CommonFactory.createFromArguments(args);
-            MessageRouter<MessageBatch> messageRouter = (MessageRouter<MessageBatch>) commonFactory.getMessageRouterParsedBatch();
+            MessageRouter<MessageBatch> messageRouter = commonFactory.getMessageRouterParsedBatch();
             GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
             VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
 
-            CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), new CollectorServiceConfiguration(configuration));
-            Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
+            CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), configuration);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> closeResources(commonFactory, collectorService::close)));
             VerifierHandler verifierHandler = new VerifierHandler(collectorService);
 
             VerifierServer verifierServer = new VerifierServer(grpcRouter.startServer(verifierHandler));
@@ -48,6 +48,16 @@ public class VerifyMain {
         } catch (Throwable e) {
             LOGGER.error("Fatal error: {}", e.getMessage(), e);
             System.exit(-1);
+        }
+    }
+
+    private static void closeResources(AutoCloseable... resources) {
+        for (AutoCloseable resource : resources) {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                LOGGER.error("Cannot close resource", e);
+            }
         }
     }
 }

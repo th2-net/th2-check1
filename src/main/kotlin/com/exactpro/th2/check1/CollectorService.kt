@@ -12,8 +12,6 @@
  */
 package com.exactpro.th2.check1
 
-import com.exactpro.th2.check1.Checkpoint
-import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.ConnectionID
@@ -26,7 +24,7 @@ import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
-import com.exactpro.th2.check1.cfg.CollectorServiceConfiguration
+import com.exactpro.th2.check1.configuration.VerifierConfiguration
 import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
@@ -45,10 +43,9 @@ import java.time.temporal.ChronoUnit
 import java.util.Objects.requireNonNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
-import java.util.function.Consumer
 
 class CollectorService(
-    private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: CollectorServiceConfiguration
+    private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: VerifierConfiguration
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
@@ -66,7 +63,7 @@ class CollectorService(
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
 
     init {
-        val limitSize = configuration.messageBufferLimit
+        val limitSize = configuration.messageCacheSize
         mqSubject = PublishSubject.create()
 
         subscriberMonitor = subscribe(MessageListener { _: String, batch: MessageBatch -> mqSubject.onNext(batch) })
@@ -223,7 +220,7 @@ class CollectorService(
     }
 
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
-        return messageRouter.subscribeAll(listener, "subscribe", "first", "parsed") ?: throw IllegalStateException("Can not subscribe to queues")
+        return messageRouter.subscribeAll(listener, "subscribe", "first", "second", "parsed") ?: throw IllegalStateException("Can not subscribe to queues")
     }
 
     private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()

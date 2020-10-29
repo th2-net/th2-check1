@@ -12,79 +12,23 @@
  */
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.eventstore.grpc.AsyncEventStoreServiceService
-import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc
-import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
-import com.exactpro.th2.estore.grpc.Response
-import com.exactpro.th2.estore.grpc.StoreEventBatchRequest
-import com.exactpro.th2.eventstore.grpc.StoreEventRequest
-import com.exactpro.th2.proto.service.generator.core.antlr.ServiceClassGenerator
-import com.google.protobuf.StringValue
-import io.grpc.ManagedChannel
-import io.grpc.Server
-import io.grpc.inprocess.InProcessChannelBuilder
-import io.grpc.inprocess.InProcessServerBuilder
-import io.grpc.stub.StreamObserver
-import io.grpc.testing.GrpcCleanupRule
-import org.junit.Rule
-import org.junit.jupiter.api.BeforeEach
+import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.schema.message.MessageRouter
+import com.nhaarman.mockitokotlin2.any
+import com.nhaarman.mockitokotlin2.argumentCaptor
+import com.nhaarman.mockitokotlin2.spy
+import com.nhaarman.mockitokotlin2.timeout
+import com.nhaarman.mockitokotlin2.verify
 import org.slf4j.LoggerFactory
 import kotlin.test.assertNotNull
 
 abstract class AbstractCheckTaskTest {
-    @Rule
-    var grpcCleanup: GrpcCleanupRule = GrpcCleanupRule()
+    protected val clientStub: MessageRouter<EventBatch> = spy { }
 
-    private lateinit var server: Server
-    private lateinit var channel: ManagedChannel
-
-    private lateinit var serverStub: TestEventStorageImpl
-    protected lateinit var clientStub: AsyncEventStoreServiceService
-
-    @BeforeEach
-    internal fun setUp() {
-        val serverName = InProcessServerBuilder.generateName()
-        serverStub = TestEventStorageImpl()
-
-        server = grpcCleanup.register(InProcessServerBuilder.forName(serverName).directExecutor().addService(serverStub).build().start())
-
-        channel = grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().maxInboundMessageSize(1024).build())
-        clientStub = object : AsyncEventStoreServiceService {
-
-            private val stub = EventStoreServiceGrpc.newStub(channel)
-
-            override fun storeEvent(p0: StoreEventRequest?, p1: StreamObserver<Response>?) {
-                stub.storeEvent(p0, p1)
-            }
-
-            override fun storeEventBatch(p0: StoreEventBatchRequest?, p1: StreamObserver<Response>?) {
-                stub.storeEventBatch(p0, p1)
-            }
-
-        }
-    }
-
-    fun awaitEventBatchRequest(timeout: Long = 1000L): StoreEventBatchRequest {
-        val currentTime = System.currentTimeMillis()
-        while (System.currentTimeMillis() < currentTime + timeout) {
-            if (serverStub.eventBatchRequest != null) {
-                break
-            }
-            Thread.sleep(100L)
-        }
-        return assertNotNull(serverStub.eventBatchRequest, "Request was not received during $timeout millis")
-    }
-
-    protected class TestEventStorageImpl : EventStoreServiceGrpc.EventStoreServiceImplBase() {
-        private var _eventBatchRequest: StoreEventBatchRequest? = null
-        val eventBatchRequest: StoreEventBatchRequest?
-            get() = _eventBatchRequest
-
-        override fun storeEventBatch(request: StoreEventBatchRequest, responseObserver: StreamObserver<Response>) {
-            _eventBatchRequest = request
-            responseObserver.onNext(Response.newBuilder().setId(StringValue.of("id")).build())
-            responseObserver.onCompleted()
-        }
+    fun awaitEventBatchRequest(timeoutValue: Long = 1000L): EventBatch {
+        val argumentCaptor = argumentCaptor<EventBatch>()
+        verify(clientStub, timeout(timeoutValue).times(1)).send(argumentCaptor.capture(), any())
+        return assertNotNull(argumentCaptor.lastValue, "Request was not received during $timeoutValue millis")
     }
 
     companion object {

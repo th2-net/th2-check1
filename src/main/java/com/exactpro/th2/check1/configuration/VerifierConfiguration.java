@@ -11,23 +11,32 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.verifier.configuration;
+package com.exactpro.th2.check1.configuration;
+
+import java.time.temporal.ChronoUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class VerifierConfiguration {
 
-    @JsonProperty(value = "count-executor-thread", defaultValue = "10")
-    private int countExecutorThreads = 10;
-
     @JsonProperty(value="message-cache-size", defaultValue = "1000")
     private int messageCacheSize = 1000;
 
-    public int getCountExecutorThreads() {
-        return countExecutorThreads;
-    }
+    @JsonProperty(value="cleanup-older-than", defaultValue = "60")
+    private long cleanupOlderThan = 60L;
+
+    @JsonProperty(value="cleanup-time-unit", defaultValue = "SECONDS")
+    private ChronoUnit cleanupTimeUnit = ChronoUnit.SECONDS;
 
     public int getMessageCacheSize() {
         return messageCacheSize;
+    }
+
+    public long getCleanupOlderThan() {
+        return cleanupOlderThan;
+    }
+
+    public ChronoUnit getCleanupTimeUnit() {
+        return cleanupTimeUnit;
     }
 }
