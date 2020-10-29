@@ -10,24 +10,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.check1
 
-import io.reactivex.observers.DisposableObserver
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+package com.exactpro.th2.verifier.configuration;
 
-abstract class AbstractSessionObserver<T> : DisposableObserver<T>() {
-    override fun onComplete() {
-        LOGGER.info("Observing completed for ${this::class.java.simpleName}")
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+public class VerifierConfiguration {
+
+    @JsonProperty(value = "count-executor-thread", defaultValue = "10")
+    private int countExecutorThreads = 10;
+
+    @JsonProperty(value="message-cache-size", defaultValue = "1000")
+    private int messageCacheSize = 1000;
+
+    public int getCountExecutorThreads() {
+        return countExecutorThreads;
     }
 
-    override fun onError(e: Throwable) {
-        LOGGER.error("Error threw for ${this::class.java.simpleName}", e)
-    }
-
-    companion object {
-        @Suppress("JAVA_CLASS_ON_COMPANION")
-        @JvmField
-        val LOGGER: Logger = LoggerFactory.getLogger(javaClass.enclosingClass)
+    public int getMessageCacheSize() {
+        return messageCacheSize;
     }
 }

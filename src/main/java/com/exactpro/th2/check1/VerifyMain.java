@@ -15,50 +15,39 @@
  */
 package com.exactpro.th2.check1;
 
-import com.exactpro.th2.configuration.RabbitMQConfiguration;
-import com.exactpro.th2.check1.CollectorService;
-import com.exactpro.th2.check1.cfg.CollectorServiceConfiguration;
-import com.exactpro.th2.check1.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.exactpro.th2.ConfigurationUtils.safeLoad;
+import com.exactpro.th2.common.grpc.MessageBatch;
+import com.exactpro.th2.common.schema.factory.CommonFactory;
+import com.exactpro.th2.common.schema.grpc.router.GrpcRouter;
+import com.exactpro.th2.common.schema.message.MessageRouter;
+import com.exactpro.th2.check1.CollectorService;
+import com.exactpro.th2.check1.cfg.CollectorServiceConfiguration;
+import com.exactpro.th2.check1.configuration.VerifierConfiguration;
+import com.exactpro.th2.check1.configuration.Configuration;
 
 public class VerifyMain {
     private final static Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);
 
-    /**
-     * Environment variables:
-     *  {@link Configuration#ENV_GRPC_PORT}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_HOST}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_PORT}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_USER}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_PASS}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_VHOST}
-     *  {@link Configuration#MESSAGE_CACHE_SIZE}
-     */
     public static void main(String[] args) {
         try {
-            Configuration microserviceConfiguration = readConfiguration(args);
-            CollectorServiceConfiguration configuration = new CollectorServiceConfiguration(microserviceConfiguration);
-            CollectorService collectorService = new CollectorService(configuration);
+            CommonFactory commonFactory = CommonFactory.createFromArguments(args);
+            MessageRouter<MessageBatch> messageRouter = (MessageRouter<MessageBatch>) commonFactory.getMessageRouterParsedBatch();
+            GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
+            VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
+
+            CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), new CollectorServiceConfiguration(configuration));
             Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
             VerifierHandler verifierHandler = new VerifierHandler(collectorService);
-            VerifierServer verifierServer = new VerifierServer(microserviceConfiguration.getPort(), verifierHandler);
+
+            VerifierServer verifierServer = new VerifierServer(grpcRouter.startServer(verifierHandler));
             verifierServer.start();
-            LOGGER.info("verify started on {} port", microserviceConfiguration.getPort());
+            LOGGER.info("verify started");
             verifierServer.blockUntilShutdown();
         } catch (Throwable e) {
             LOGGER.error("Fatal error: {}", e.getMessage(), e);
             System.exit(-1);
         }
-    }
-
-    private static Configuration readConfiguration(String[] args) {
-        Configuration configuration = args.length > 0
-                ? safeLoad(Configuration::load, Configuration::new, args[0])
-                : new Configuration();
-        LOGGER.info("Loading verify with configuration: {}", configuration);
-        return configuration;
     }
 }

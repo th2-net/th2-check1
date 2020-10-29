@@ -1,12 +1,9 @@
 /*
  * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,9 +20,10 @@ import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
+import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageFilter
+import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.StreamContainer
@@ -44,8 +42,8 @@ class CheckRuleTask(
         private val protoMessageFilter: MessageFilter,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
-        eventStoreStub: EventStoreServiceFutureStub
-) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventStoreStub) {
+        eventBatchRouter: MessageRouter<EventBatch>
+) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val filter: IMessage = converter.fromProtoFilter(protoMessageFilter, protoMessageFilter.messageType)
     private val settings: ComparatorSettings = protoMessageFilter.toCompareSettings()

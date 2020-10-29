@@ -1,12 +1,9 @@
 /*
  * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,10 +12,13 @@
  */
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.th2.eventstore.grpc.AsyncEventStoreServiceService
 import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc
 import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
 import com.exactpro.th2.estore.grpc.Response
 import com.exactpro.th2.estore.grpc.StoreEventBatchRequest
+import com.exactpro.th2.eventstore.grpc.StoreEventRequest
+import com.exactpro.th2.proto.service.generator.core.antlr.ServiceClassGenerator
 import com.google.protobuf.StringValue
 import io.grpc.ManagedChannel
 import io.grpc.Server
@@ -39,7 +39,7 @@ abstract class AbstractCheckTaskTest {
     private lateinit var channel: ManagedChannel
 
     private lateinit var serverStub: TestEventStorageImpl
-    protected lateinit var clientStub: EventStoreServiceFutureStub
+    protected lateinit var clientStub: AsyncEventStoreServiceService
 
     @BeforeEach
     internal fun setUp() {
@@ -49,7 +49,19 @@ abstract class AbstractCheckTaskTest {
         server = grpcCleanup.register(InProcessServerBuilder.forName(serverName).directExecutor().addService(serverStub).build().start())
 
         channel = grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().maxInboundMessageSize(1024).build())
-        clientStub = EventStoreServiceGrpc.newFutureStub(channel)
+        clientStub = object : AsyncEventStoreServiceService {
+
+            private val stub = EventStoreServiceGrpc.newStub(channel)
+
+            override fun storeEvent(p0: StoreEventRequest?, p1: StreamObserver<Response>?) {
+                stub.storeEvent(p0, p1)
+            }
+
+            override fun storeEventBatch(p0: StoreEventBatchRequest?, p1: StreamObserver<Response>?) {
+                stub.storeEventBatch(p0, p1)
+            }
+
+        }
     }
 
     fun awaitEventBatchRequest(timeout: Long = 1000L): StoreEventBatchRequest {

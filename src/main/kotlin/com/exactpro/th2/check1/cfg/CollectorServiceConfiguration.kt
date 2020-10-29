@@ -15,7 +15,7 @@
  */
 package com.exactpro.th2.check1.cfg
 
-import com.exactpro.th2.check1.configuration.Configuration
+import com.exactpro.th2.check1.configuration.VerifierConfiguration
 import java.lang.System.getenv
 import java.time.temporal.ChronoUnit
 
@@ -31,7 +31,7 @@ const val VERIFIER_CLEANUP_OLDER_THAN = "TH2_VERIFIER_CLEANUP_OLDER_THAN"
 const val VERIFIER_CLEANUP_TIME_UNIT = "TH2_VERIFIER_CLEANUP_TIME_UNIT"
 
 class CollectorServiceConfiguration(
-    val configuration: Configuration
+    val configuration: VerifierConfiguration
 ) {
     val cleanupOlderThan: Long = getenv(VERIFIER_CLEANUP_OLDER_THAN)?.toLong() ?: DEFAULT_DELTA
     val cleanupTimeUnit: ChronoUnit =

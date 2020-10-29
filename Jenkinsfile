@@ -1,3 +1,16 @@
+/*
+ * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 pipeline {
     agent { label "sailfish" }
     options { timestamps () }
@@ -9,11 +22,9 @@ pipeline {
                             returnStdout: true,
                             script: 'git rev-list --count VERSION-1.1..HEAD'
                             ).trim()}""" //TODO: Calculate revision from a specific tag instead of a root commit
-        TH2_REGISTRY = credentials('TH2_REGISTRY_USER')
-        TH2_REGISTRY_URL = credentials('TH2_REGISTRY')
+        TH2_SCHEMA_REGISTRY = credentials('TH2_SCHEMA_REGISTRY_USER')
+        TH2_SCHEMA_REGISTRY_URL = credentials('TH2_SCHEMA_REGISTRY')
         GRADLE_SWITCHES = " -Pversion_build=${BUILD_NUMBER} -Pversion_maintenance=${VERSION_MAINTENANCE}"
-        GCHAT_WEB_HOOK = credentials('th2-dev-environment-web-hook')
-        GCHAT_THREAD_NAME = credentials('th2-dev-environment-release-docker-images-thread')
         IDEA_PROPERTIES="idea.ci.properties"
         IDEA_VM_OPTIONS="idea64.ci.vmoptions"
     }
@@ -143,13 +154,13 @@ pipeline {
                 rtGradleDeployer (
                     id: "GRADLE_DEPLOYER",
                     serverId: "artifatory5",
-                    repo: "libs-snapshot-local",
+                    repo: "th2-schema-snapshot-local",
                 )
 
                 rtGradleResolver (
                     id: "GRADLE_RESOLVER",
                     serverId: "artifatory5",
-                    repo: "libs-snapshot"
+                    repo: "th2-schema-snapshot-local"
                 )
             }
         }
@@ -182,12 +193,12 @@ pipeline {
                 )
             }
         }
-        stage('Docker publish') {
+        stage('Publish docker') {
             steps {
                 sh """
-                    docker login -u ${TH2_REGISTRY_USR} -p ${TH2_REGISTRY_PSW} ${TH2_REGISTRY_URL}
+                    docker login -u ${TH2_SCHEMA_REGISTRY_USR} -p ${TH2_SCHEMA_REGISTRY_PSW} ${TH2_SCHEMA_REGISTRY_URL}
                     ./gradlew dockerPush ${GRADLE_SWITCHES} \
-                    -Ptarget_docker_repository=${TH2_REGISTRY_URL}
+                    -Ptarget_docker_repository=${TH2_SCHEMA_REGISTRY_URL}
                 """
             }
         }
@@ -207,18 +218,6 @@ pipeline {
                                 changeLogs += "\n${entry.msg}"
                             }
                         }
-                    } catch(e) {
-                        println "Exception occurred: ${e}"
-                    }
-
-                    def fields = [
-                        "*Job:* <${BUILD_URL}|${JOB_NAME}>",
-                        "*Docker image version:* ${dockerImageVersion}",
-                        "*Changes:*${changeLogs}"
-                    ]
-                    writeJSON file: 'result.json', json: [text: fields.join('\n'), thread: [name: GCHAT_THREAD_NAME]]
-                    try {
-                        sh "curl -s -H 'Content-Type: application/json' -d @result.json '${GCHAT_WEB_HOOK}'"
                     } catch(e) {
                         println "Exception occurred: ${e}"
                     }
