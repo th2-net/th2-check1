@@ -22,4 +22,4 @@ ENV RABBITMQ_HOST=rabbitmq \
     GRPC_PORT=8080
 WORKDIR /home
 COPY --from=build /home/gradle/build/docker ./
-ENTRYPOINT ["/home/service/bin/service", "/home/service/etc/config.yml"]
+ENTRYPOINT ["/home/service/bin/service"]
