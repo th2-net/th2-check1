@@ -38,7 +38,7 @@ public class VerifyMain {
             VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
 
             CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), configuration);
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> closeResources(commonFactory, collectorService::close)));
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> closeResources(collectorService::close, commonFactory)));
             VerifierHandler verifierHandler = new VerifierHandler(collectorService);
 
             VerifierServer verifierServer = new VerifierServer(grpcRouter.startServer(verifierHandler));
