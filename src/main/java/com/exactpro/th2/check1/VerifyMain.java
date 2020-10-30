@@ -17,6 +17,8 @@ package com.exactpro.th2.check1;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Deque;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,15 +34,20 @@ public class VerifyMain {
 
     public static void main(String[] args) {
         try {
+            Deque<AutoCloseable> toDispose = new ArrayDeque<>();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> closeResources(toDispose)));
+
             CommonFactory commonFactory = CommonFactory.createFromArguments(args);
+            toDispose.add(commonFactory);
+
             MessageRouter<MessageBatch> messageRouter = commonFactory.getMessageRouterParsedBatch();
             GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
             VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
 
             CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), configuration);
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> closeResources(collectorService::close, commonFactory)));
-            VerifierHandler verifierHandler = new VerifierHandler(collectorService);
+            toDispose.add(collectorService::close);
 
+            VerifierHandler verifierHandler = new VerifierHandler(collectorService);
             VerifierServer verifierServer = new VerifierServer(grpcRouter.startServer(verifierHandler));
             verifierServer.start();
             LOGGER.info("verify started");
@@ -51,13 +58,17 @@ public class VerifyMain {
         }
     }
 
-    private static void closeResources(AutoCloseable... resources) {
-        for (AutoCloseable resource : resources) {
+    /**
+     * Close resources in LIFO order
+     * @param resources
+     */
+    private static void closeResources(Deque<AutoCloseable> resources) {
+        resources.descendingIterator().forEachRemaining(resource -> {
             try {
                 resource.close();
             } catch (Exception e) {
                 LOGGER.error("Cannot close resource", e);
             }
-        }
+        });
     }
 }
