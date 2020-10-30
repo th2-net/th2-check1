@@ -12,7 +12,7 @@ When the component starts, the grpc server starts and then the component waits f
 
 # Verification requests
 
-Available requests described in [proto file](../th2-grpc-check1/src/main/proto/grpc_check1/check1.proto)
+Available requests described in [this repository](https://gitlab.exactpro.com/vivarium/th2/th2-core-open-source/th2-grpc-check1)
 
 - CheckSequenceRuleRequest - prefilters messages and verify all of them by filter. Order checking configured from request.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
