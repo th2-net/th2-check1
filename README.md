@@ -12,23 +12,32 @@ When the component starts, the grpc server starts and then the component waits f
 
 # Verification requests
 
-Available requests described in [proto file](grpc-verifier/src/main/proto/th2/verifier.proto)
+Available requests described in [proto file](../th2-grpc-check1/src/main/proto/grpc_check1/check1.proto)
 
 - CheckSequenceRuleRequest - prefilters messages and verify all of them by filter. Order checking configured from request.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
 
 # Configuration
 
-## Environment variables
-- RABBITMQ_PASS=some_pass (***required***)
-- RABBITMQ_HOST=some-host-name-or-ip (***required***)
-- RABBITMQ_PORT=7777 (***required***)
-- RABBITMQ_VHOST=someVhost (***required***)
-- RABBITMQ_USER=some_user (***required***)
-- GRPC_PORT=7878 (***required***)
-- TH2_CONNECTIVITY_QUEUE_NAMES={"fix_client": {"exchangeName":"demo_exchange", "toSendQueueName":"client_to_send", "toSendRawQueueName":"client_to_send_raw", "inQueueName": "fix_codec_out_client", "inRawQueueName": "client_in_raw", "outQueueName": "client_out" , "outRawQueueName": "client_out_raw"  }, "fix_server": {"exchangeName":"demo_exchange", "toSendQueueName":"server_to_send", "toSendRawQueueName":"server_to_send_raw", "inQueueName": "fix_codec_out_server", "inRawQueueName": "server_in_raw", "outQueueName": "server_out" , "outRawQueueName": "server_out_raw"  }} (***required***)
-- TH2_EVENT_STORAGE_GRPC_HOST=event-store-host-name-or-ip; (***required***)
-- TH2_EVENT_STORAGE_GRPC_PORT=9999; (***required***)
-- MESSAGE_CACHE_SIZE=1000; (***optional***)
-- TH2_VERIFIER_CLEANUP_OLDER_THAN=60; (***optional***) - time that must pass before a task can be removed and no more chain with that task can be created. Default time unit is SECONDS.
-- TH2_VERIFIER_CLEANUP_TIME_UNIT=SECONDS; (***optional***) - time unit for TH2_VERIFIER_CLEANUP_OLDER_THAN variable. Possible values: MILLIS, SECONDS, MINUTES, HOURS and DAYS
+This block describes the configuration for check1.
+
+### Configuration example
+```json
+{
+  "message-cache-size": 1000,
+  "cleanup-older-than": 60,
+  "cleanup-time-unit": "SECONDS"
+}
+```
+
+### Properties description
+
+#### message-cache-size
+The number of messages for each stream (alias + direction) that will be buffered.
+
+#### cleanup-older-than
+The time before the verification chain (from a task that is complete) will be removed.
+The value will be interpreted as time unit defined in _cleanup-time-unit_ setting. _The default value is 60_
+
+#### cleanup-time-unit
+The time unit for _cleanup-older-than_ setting. Available values are MILLIS, SECONDS, MINUTES, HOURS. _The default value is SECONDS_
