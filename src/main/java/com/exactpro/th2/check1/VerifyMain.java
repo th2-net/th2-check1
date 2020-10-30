@@ -15,38 +15,42 @@
  */
 package com.exactpro.th2.check1;
 
-import com.exactpro.th2.configuration.RabbitMQConfiguration;
-import com.exactpro.th2.check1.CollectorService;
-import com.exactpro.th2.check1.cfg.CollectorServiceConfiguration;
-import com.exactpro.th2.check1.configuration.Configuration;
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.exactpro.th2.ConfigurationUtils.safeLoad;
+import com.exactpro.th2.common.grpc.MessageBatch;
+import com.exactpro.th2.common.schema.factory.CommonFactory;
+import com.exactpro.th2.common.schema.grpc.router.GrpcRouter;
+import com.exactpro.th2.common.schema.message.MessageRouter;
+import com.exactpro.th2.check1.configuration.VerifierConfiguration;
 
 public class VerifyMain {
-    private final static Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);
 
-    /**
-     * Environment variables:
-     *  {@link Configuration#ENV_GRPC_PORT}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_HOST}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_PORT}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_USER}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_PASS}
-     *  {@link RabbitMQConfiguration#ENV_RABBITMQ_VHOST}
-     *  {@link Configuration#MESSAGE_CACHE_SIZE}
-     */
     public static void main(String[] args) {
         try {
-            Configuration microserviceConfiguration = readConfiguration(args);
-            CollectorServiceConfiguration configuration = new CollectorServiceConfiguration(microserviceConfiguration);
-            CollectorService collectorService = new CollectorService(configuration);
-            Runtime.getRuntime().addShutdownHook(new Thread(collectorService::close));
+            Deque<AutoCloseable> toDispose = new ArrayDeque<>();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> closeResources(toDispose)));
+
+            CommonFactory commonFactory = CommonFactory.createFromArguments(args);
+            toDispose.add(commonFactory);
+
+            MessageRouter<MessageBatch> messageRouter = commonFactory.getMessageRouterParsedBatch();
+            GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
+            VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
+
+            CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), configuration);
+            toDispose.add(collectorService::close);
+
             VerifierHandler verifierHandler = new VerifierHandler(collectorService);
-            VerifierServer verifierServer = new VerifierServer(microserviceConfiguration.getPort(), verifierHandler);
+            VerifierServer verifierServer = new VerifierServer(grpcRouter.startServer(verifierHandler));
             verifierServer.start();
-            LOGGER.info("verify started on {} port", microserviceConfiguration.getPort());
+            LOGGER.info("verify started");
             verifierServer.blockUntilShutdown();
         } catch (Throwable e) {
             LOGGER.error("Fatal error: {}", e.getMessage(), e);
@@ -54,11 +58,17 @@ public class VerifyMain {
         }
     }
 
-    private static Configuration readConfiguration(String[] args) {
-        Configuration configuration = args.length > 0
-                ? safeLoad(Configuration::load, Configuration::new, args[0])
-                : new Configuration();
-        LOGGER.info("Loading verify with configuration: {}", configuration);
-        return configuration;
+    /**
+     * Close resources in LIFO order
+     * @param resources
+     */
+    private static void closeResources(Deque<AutoCloseable> resources) {
+        resources.descendingIterator().forEachRemaining(resource -> {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                LOGGER.error("Cannot close resource", e);
+            }
+        });
     }
 }

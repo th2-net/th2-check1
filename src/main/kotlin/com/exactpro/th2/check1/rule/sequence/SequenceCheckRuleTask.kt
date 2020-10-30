@@ -33,10 +33,11 @@ import com.exactpro.th2.common.event.Event.Status.PASSED
 import com.exactpro.th2.common.event.EventUtils.createMessageBean
 import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.event.bean.builder.TableBuilder
+import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
-import com.exactpro.th2.estore.grpc.EventStoreServiceGrpc.EventStoreServiceFutureStub
+import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import io.reactivex.Observable
 import java.time.Instant
@@ -60,8 +61,8 @@ class SequenceCheckRuleTask(
         private val checkOrder: Boolean,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
-        eventStoreStub: EventStoreServiceFutureStub
-) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventStoreStub) {
+        eventBatchRouter: MessageRouter<EventBatch>
+) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val protoPreMessageFilter: MessageFilter = protoPreFilter.toMessageFilter()
     private val preFilter: IMessage = converter.fromProtoPreFilter(protoPreMessageFilter)
