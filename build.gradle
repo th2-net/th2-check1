@@ -120,7 +120,9 @@ dependencies {
     implementation "org.slf4j:slf4j-api"
 
     //FIXME: Remove after disabling gRPC estore hidden pin
-    implementation "com.exactpro.th2:th2-grpc-event-store:1.5.0-schema.+"
+    implementation("com.exactpro.th2:th2-grpc-event-store:1.5.0-schema.+") {
+        transitive = false
+    }
 
     implementation "com.google.protobuf:protobuf-java-util"
     implementation "io.grpc:grpc-protobuf"
