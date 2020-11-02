@@ -6,7 +6,7 @@ ARG artifactory_deploy_repo_key
 ARG artifactory_url
 
 COPY ./ .
-RUN gradle clean build dockerPrepare artifactoryPublish \
+RUN gradle --stacktrace clean build dockerPrepare artifactoryPublish \
      -Prelease_version=${release_version} \
      -Partifactory_user=${artifactory_user} \
      -Partifactory_password=${artifactory_password} \
