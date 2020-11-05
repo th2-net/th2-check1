@@ -45,7 +45,7 @@ The time unit for _cleanup-older-than_ setting. Available values are MILLIS, SEC
 ## Requried pins
 
 The Check1 component has got tow types of pin
-* gRPC server pin for connection to it other components via `com.exactpro.th2.check1.grpc.Check1Service` class.
+* gRPC server pin to allow other components to connect via `com.exactpro.th2.check1.grpc.Check1Service` class.
 * MQ pin to listen to parsed messages. You can link several sources with different directions and session alises to it.
 
 ```yaml
