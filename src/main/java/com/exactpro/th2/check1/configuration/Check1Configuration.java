@@ -17,7 +17,7 @@ import java.time.temporal.ChronoUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class VerifierConfiguration {
+public class Check1Configuration {
 
     @JsonProperty(value="message-cache-size", defaultValue = "1000")
     private int messageCacheSize = 1000;
