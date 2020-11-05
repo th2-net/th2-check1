@@ -16,30 +16,27 @@ import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
 import static com.google.protobuf.TextFormat.shortDebugString;
 
-import java.util.concurrent.ExecutorService;
-
-import com.exactpro.th2.check1.CollectorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.exactpro.th2.common.grpc.RequestStatus;
 import com.exactpro.th2.check1.grpc.ChainID;
+import com.exactpro.th2.check1.grpc.Check1Grpc.Check1ImplBase;
 import com.exactpro.th2.check1.grpc.CheckRuleRequest;
 import com.exactpro.th2.check1.grpc.CheckRuleResponse;
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest;
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleResponse;
 import com.exactpro.th2.check1.grpc.CheckpointRequest;
 import com.exactpro.th2.check1.grpc.CheckpointResponse;
-import com.exactpro.th2.check1.grpc.VerifierGrpc.VerifierImplBase;
+import com.exactpro.th2.common.grpc.RequestStatus;
 
 import io.grpc.stub.StreamObserver;
 
-public class VerifierHandler extends VerifierImplBase {
+public class Check1Handler extends Check1ImplBase {
     private final Logger logger = LoggerFactory.getLogger(getClass().getName() + "@" + hashCode());
 
     private final CollectorService collectorService;
 
-    public VerifierHandler(CollectorService collectorService) {
+    public Check1Handler(CollectorService collectorService) {
         this.collectorService = collectorService;
     }
 

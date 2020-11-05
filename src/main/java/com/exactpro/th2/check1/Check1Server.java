@@ -20,11 +20,11 @@ import org.slf4j.LoggerFactory;
 
 import io.grpc.Server;
 
-public class VerifierServer {
+public class Check1Server {
     private final Logger logger = LoggerFactory.getLogger(getClass().getName() + "@" + hashCode());
     private Server server;
 
-    public VerifierServer(Server server) {
+    public Check1Server(Server server) {
         this.server = server;
     }
 
@@ -37,7 +37,7 @@ public class VerifierServer {
                 // Use stderr here since the logger may have been reset by its JVM shutdown hook.
                 System.err.println("*** shutting down gRPC server since JVM is shutting down");
                 try {
-                    VerifierServer.this.stop();
+                    Check1Server.this.stop();
                 } catch (InterruptedException e) {
                     e.printStackTrace(System.err);
                 }

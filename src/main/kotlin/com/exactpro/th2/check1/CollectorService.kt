@@ -24,7 +24,7 @@ import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
-import com.exactpro.th2.check1.configuration.VerifierConfiguration
+import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
@@ -45,7 +45,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
 
 class CollectorService(
-    private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: VerifierConfiguration
+    private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: Check1Configuration
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
@@ -220,22 +220,7 @@ class CollectorService(
     }
 
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
-        val subscriptions = listOf("first", "second")
-            .associateWith { direction ->
-                messageRouter.subscribeAll(listener, "subscribe", direction, "parsed")
-                    ?: throw IllegalStateException("Can not subscribe to queues with direction $direction")
-            }
-        return SubscriberMonitor {
-            subscriptions.forEach { (direction, monitor) ->
-                runCatching(monitor::unsubscribe)
-                    .onSuccess {
-                        logger.info("Unsubscribed from direction $direction")
-                    }
-                    .onFailure {
-                        logger.error("Cannot unsubscribe from direction $direction", it)
-                    }
-            }
-        }
+        return checkNotNull(messageRouter.subscribeAll(listener)) { "Can not subscribe to queues" }
     }
 
     private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
