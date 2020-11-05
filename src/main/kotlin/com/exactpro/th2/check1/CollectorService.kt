@@ -220,7 +220,7 @@ class CollectorService(
     }
 
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
-        return messageRouter.subscribeAll(listener) ?: throw IllegalStateException("Can not subscribe to queues")
+        return checkNotNull(messageRouter.subscribeAll(listener)) { "Can not subscribe to queues" }
     }
 
     private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
