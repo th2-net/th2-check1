@@ -41,3 +41,26 @@ The value will be interpreted as time unit defined in _cleanup-time-unit_ settin
 
 #### cleanup-time-unit
 The time unit for _cleanup-older-than_ setting. Available values are MILLIS, SECONDS, MINUTES, HOURS. _The default value is SECONDS_
+
+## Requried pins
+
+Check1 component has got tow types of pin
+* gRPC server pin for connection to it other components via `com.exactpro.th2.check1.grpc.Check1Service` class.
+* MQ pin for listening parsing messages. You can link several sources with different directions and session alises to it.
+
+```yaml
+apiVersion: th2.exactpro.com/v1
+kind: Th2GenericBox
+metadata:
+  name: check1
+spec:
+  pins:
+    - name: server
+      connection-type: grpc
+    - name: in_parsed_message
+      connection-type: mq
+      attributes:
+        - "subscribe"
+        - "parsed"
+```
+

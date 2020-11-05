@@ -220,22 +220,7 @@ class CollectorService(
     }
 
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
-        val subscriptions = listOf("first", "second")
-            .associateWith { direction ->
-                messageRouter.subscribeAll(listener, "subscribe", direction, "parsed")
-                    ?: throw IllegalStateException("Can not subscribe to queues with direction $direction")
-            }
-        return SubscriberMonitor {
-            subscriptions.forEach { (direction, monitor) ->
-                runCatching(monitor::unsubscribe)
-                    .onSuccess {
-                        logger.info("Unsubscribed from direction $direction")
-                    }
-                    .onFailure {
-                        logger.error("Cannot unsubscribe from direction $direction", it)
-                    }
-            }
-        }
+        return messageRouter.subscribeAll(listener) ?: throw IllegalStateException("Can not subscribe to queues")
     }
 
     private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
