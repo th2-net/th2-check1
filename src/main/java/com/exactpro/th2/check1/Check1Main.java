@@ -15,8 +15,6 @@
  */
 package com.exactpro.th2.check1;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -27,10 +25,10 @@ import com.exactpro.th2.common.grpc.MessageBatch;
 import com.exactpro.th2.common.schema.factory.CommonFactory;
 import com.exactpro.th2.common.schema.grpc.router.GrpcRouter;
 import com.exactpro.th2.common.schema.message.MessageRouter;
-import com.exactpro.th2.check1.configuration.VerifierConfiguration;
+import com.exactpro.th2.check1.configuration.Check1Configuration;
 
-public class VerifyMain {
-    private static final Logger LOGGER = LoggerFactory.getLogger(VerifyMain.class);
+public class Check1Main {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Check1Main.class);
 
     public static void main(String[] args) {
         try {
@@ -42,16 +40,16 @@ public class VerifyMain {
 
             MessageRouter<MessageBatch> messageRouter = commonFactory.getMessageRouterParsedBatch();
             GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
-            VerifierConfiguration configuration = commonFactory.getCustomConfiguration(VerifierConfiguration.class);
+            Check1Configuration configuration = commonFactory.getCustomConfiguration(Check1Configuration.class);
 
             CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), configuration);
             toDispose.add(collectorService::close);
 
-            VerifierHandler verifierHandler = new VerifierHandler(collectorService);
-            VerifierServer verifierServer = new VerifierServer(grpcRouter.startServer(verifierHandler));
-            verifierServer.start();
+            Check1Handler check1Handler = new Check1Handler(collectorService);
+            Check1Server check1Server = new Check1Server(grpcRouter.startServer(check1Handler));
+            check1Server.start();
             LOGGER.info("verify started");
-            verifierServer.blockUntilShutdown();
+            check1Server.blockUntilShutdown();
         } catch (Throwable e) {
             LOGGER.error("Fatal error: {}", e.getMessage(), e);
             System.exit(-1);
