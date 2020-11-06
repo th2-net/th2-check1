@@ -130,7 +130,7 @@ test {
 }
 
 application {
-    mainClassName 'com.exactpro.th2.check1.VerifyMain'
+    mainClassName 'com.exactpro.th2.check1.Check1Main'
 }
 
 applicationName = 'service'
