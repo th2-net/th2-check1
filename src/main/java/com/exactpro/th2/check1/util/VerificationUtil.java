@@ -15,27 +15,40 @@
  */
 package com.exactpro.th2.check1.util;
 
-import com.exactpro.sf.aml.script.MetaContainer;
-import com.exactpro.th2.common.grpc.ListValueFilter;
-import com.exactpro.th2.common.grpc.MessageFilter;
-import com.exactpro.th2.common.grpc.ValueFilter;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+
+import com.exactpro.sf.aml.AMLLangConst;
+import com.exactpro.sf.aml.script.MetaContainer;
+import com.exactpro.th2.common.grpc.FailUnexpected;
+import com.exactpro.th2.common.grpc.ListValueFilter;
+import com.exactpro.th2.common.grpc.MessageFilter;
+import com.exactpro.th2.common.grpc.ValueFilter;
 
 public class VerificationUtil {
 
     public static MetaContainer toMetaContainer(MessageFilter messageFilter, boolean listItemAsSeparate) {
         MetaContainer metaContainer = new MetaContainer();
         Set<String> keyFields = new HashSet<>();
-        for (Map.Entry<String, ValueFilter> filterEntry : messageFilter.getFieldsMap().entrySet()) {
-            toMetaContainer(filterEntry.getKey(), filterEntry.getValue(), metaContainer, keyFields,
-                    listItemAsSeparate);
+
+        messageFilter.getFieldsMap().forEach((name, value) -> {
+            toMetaContainer(name, value, metaContainer, keyFields, listItemAsSeparate);
+        });
+
+        if (messageFilter.hasComparisonSettings()) {
+            FailUnexpected failUnexpected = messageFilter.getComparisonSettings().getFailUnexpected();
+
+            if (failUnexpected == FailUnexpected.FIELDS) {
+                metaContainer.setFailUnexpected(AMLLangConst.YES);
+            } else if (failUnexpected == FailUnexpected.FIELDS_AND_MESSAGES) {
+                metaContainer.setFailUnexpected(AMLLangConst.ALL);
+            }
         }
+
         metaContainer.setKeyFields(keyFields);
+
         return metaContainer;
     }
 

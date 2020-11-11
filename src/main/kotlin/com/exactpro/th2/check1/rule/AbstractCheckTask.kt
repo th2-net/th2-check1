@@ -48,7 +48,6 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import java.util.function.Consumer
 
 /**
  * Implements common logic for check task.
@@ -322,6 +321,7 @@ abstract class AbstractCheckTask(
     protected fun MessageFilter.toCompareSettings(): ComparatorSettings =
         ComparatorSettings().also {
             it.metaContainer = VerificationUtil.toMetaContainer(this, false)
+            it.ignoredFields = this.comparisonSettings.ignoreFieldsList?.toSet() ?: emptySet()
         }
 
     protected fun Event.appendEventWithVerification(protoMessage: Message, protoMessageFilter: MessageFilter, comparisonResult: ComparisonResult): Event {
