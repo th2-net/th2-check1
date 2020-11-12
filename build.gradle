@@ -99,7 +99,7 @@ artifactory {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:2.1.+')
+    api platform('com.exactpro.th2:bom:2.3.+')
     implementation "com.exactpro.th2:common"
     implementation 'com.exactpro.th2:sailfish-utils'
     implementation "com.exactpro.th2:grpc-common"
