@@ -31,15 +31,24 @@ repositories {
         name 'MavenLocal'
         url sharedDir
     }
+
     mavenCentral()
+
+    maven {
+        name 'TH2 Bintray'
+        url 'https://dl.bintray.com/exactpro/th2'
+    }
+
     maven {
         name 'Artifactory snapshot'
         url 'http://artifactory5.exp.exactpro.com/artifactory/libs-snapshot'
     }
+
     maven {
         name 'Artifactory release'
         url 'http://artifactory5.exp.exactpro.com/artifactory/libs-release'
     }
+
     mavenLocal()
 
     configurations.all {
