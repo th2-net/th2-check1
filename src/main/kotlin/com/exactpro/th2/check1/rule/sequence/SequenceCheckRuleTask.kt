@@ -18,6 +18,7 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
+import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.SessionKey
@@ -75,6 +76,7 @@ class SequenceCheckRuleTask(
     private lateinit var preFilterEvent: Event
 
     private var reordered: Boolean = false
+    private lateinit var matchedByKeys: MutableSet<MessageFilterContainer>
 
     init {
         rootEvent
@@ -93,6 +95,8 @@ class SequenceCheckRuleTask(
             MessageFilterContainer(it, converter.fromProtoFilter(it, it.messageType), it.toCompareSettings())
         }.toMutableList()
 
+        matchedByKeys = HashSet(messageFilters.size)
+
         preFilterEvent = Event.start()
             .type("preFiltering")
             .bodyData(createMessageBean("Passed pre-filter will be placed there")) // TODO: Write filter
@@ -106,7 +110,7 @@ class SequenceCheckRuleTask(
             LOGGER.debug("Pre-filter compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
             ComparisonContainer(messageContainer, protoPreMessageFilter, comparisonResult)
         }.filter { preFilterContainer -> // Filter  check result of pre-filter
-            preFilterContainer.comparisonResult?.getStatusType() != StatusType.FAILED
+            preFilterContainer.comparisonResult.let { it != null && it.getStatusType() != StatusType.FAILED }
         }.doOnNext { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer.messageContainer.protoMessage) {
                 preFilterEvent.addSubEventWithSamePeriod()
@@ -120,7 +124,7 @@ class SequenceCheckRuleTask(
     override fun onNext(messageContainer: MessageContainer) {
         for (index in messageFilters.indices) {
             val messageFilter = messageFilters[index]
-            val comparisonResult = MessageComparator.compare(
+            val comparisonResult: ComparisonResult? = MessageComparator.compare(
                 messageContainer.sailfishMessage,
                 messageFilter.sailfishMessageFilter,
                 messageFilter.comparatorSettings
@@ -134,6 +138,8 @@ class SequenceCheckRuleTask(
                     messageFilter.protoMessageFilter,
                     comparisonResult
                 )
+                matchedByKeys.add(messageFilter)
+
                 if (checkOrder || comparisonStatus == StatusType.PASSED) {
                     messageFilters.removeAt(index)
                     break
@@ -141,7 +147,9 @@ class SequenceCheckRuleTask(
             }
         }
 
-        if (messageFilters.isEmpty()) {
+        val expectedMatches = protoMessageFilters.size
+        // rule has found complete match for all filters or each filter has found a match by key fields at least
+        if (messageFilters.isEmpty() || (matchedByKeys.size == expectedMatches && messageFilteringResults.size >= expectedMatches)) {
             checkComplete()
         }
     }

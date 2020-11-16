@@ -28,9 +28,8 @@ import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
-import io.grpc.InternalServer
-import io.grpc.Server
 import io.reactivex.Observable
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -67,19 +66,19 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     )
 
     private val messagesInCorrectOrder: List<Message> = listOf(
-        constructMessage(2, "test_session", "TestMsg")
+        constructMessage(1, "test_session", "TestMsg")
             .putAllFields(mapOf(
                 "A" to Value.newBuilder().setSimpleValue("42").build(),
                 "B" to Value.newBuilder().setSimpleValue("AAA").build()
             ))
             .build(),
-        constructMessage(3, "test_session", "TestMsg")
+        constructMessage(2, "test_session", "TestMsg")
             .putAllFields(mapOf(
                 "A" to Value.newBuilder().setSimpleValue("42").build(),
                 "B" to Value.newBuilder().setSimpleValue("BBB").build()
             ))
             .build(),
-        constructMessage(1, "test_session", "TestMsg")
+        constructMessage(3, "test_session", "TestMsg")
             .putAllFields(mapOf(
                 "A" to Value.newBuilder().setSimpleValue("42").build(),
                 "B" to Value.newBuilder().setSimpleValue("CCC").build()
@@ -175,19 +174,85 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         })
     }
 
+    @Test
+    fun `rules stops when all filters found match by key fields`() {
+        val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(1, "test_session", "TestMsg")
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA1").build()
+                ))
+                .build(),
+            constructMessage(2, "test_session", "TestMsg") // goes to processed messages but should not go to actual comparison
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("43").build(),
+                    "B" to Value.newBuilder().setSimpleValue("BBB1").build()
+                ))
+                .build(),
+            constructMessage(3, "test_session", "TestMsg")
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("BBB1").build()
+                ))
+                .build(),
+            constructMessage(4, "test_session", "TestMsg")
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("CCC1").build()
+                ))
+                .build(),
+            constructMessage(5, "test_session", "TestMsg") // should not be processed
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("DDD1").build()
+                ))
+                .build()
+        )
+
+        val messages = Observable.fromIterable(messagesWithKeyFields)
+
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey("test_session", Direction.FIRST), 10, messages))
+        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+
+        sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
+
+        val batchRequest = awaitEventBatchRequest(1000L)
+        val eventsList: List<Event> = batchRequest.eventsList
+
+        assertAll({
+            val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
+            assertEquals(4, rootEvent.attachedMessageIdsCount) // 3 match key + 1 that doesn't match but between others
+            assertEquals(listOf(1L, 2L, 3L, 4L), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
+            val verifications = eventsList.filter { it.parentId == checkedMessages.id }
+            assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
+            assertTrue("Some verifications are not failed: $verifications") { verifications.all { it.status == EventStatus.FAILED } }
+            assertEquals(listOf(1L, 3L, 4L), verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
+        }, {
+            assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because the actual comparisons count equals to expected
+        })
+    }
+
     private fun assertCheckSequenceStatus(expectedStatus: EventStatus, eventsList: List<Event>) {
         val checkSequenceEvent = assertNotNull(eventsList.find { it.type == "checkSequence" }, "Cannot find checkSequence event")
         assertEquals(expectedStatus, checkSequenceEvent.status)
     }
 
-    private fun sequenceCheckRuleTask(parentEventID: EventID, messageStream: Observable<StreamContainer>, checkOrder: Boolean): SequenceCheckRuleTask {
+    private fun sequenceCheckRuleTask(
+        parentEventID: EventID,
+        messageStream: Observable<StreamContainer>,
+        checkOrder: Boolean,
+        preFilterParam: PreFilter = preFilter,
+        filtersParam: List<MessageFilter> = protoMessageFilters
+    ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
             description = "Test",
             startTime = Instant.now(),
             sessionKey = SessionKey("test_session", Direction.FIRST),
             timeout = 5000L,
-            protoPreFilter = preFilter,
-            protoMessageFilters = protoMessageFilters,
+            protoPreFilter = preFilterParam,
+            protoMessageFilters = filtersParam,
             checkOrder = checkOrder,
             parentEventID = parentEventID,
             messageStream = messageStream,
