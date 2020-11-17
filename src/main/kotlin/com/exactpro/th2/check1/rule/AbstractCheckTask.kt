@@ -332,6 +332,7 @@ abstract class AbstractCheckTask(
 
         with(protoMessage.metadata) {
             name("Verification '${messageType}' message")
+                .type("Verification")
                 .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
                 .messageID(id)
                 .bodyData(verificationComponent.build())
