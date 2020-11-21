@@ -39,6 +39,10 @@ repositories {
         name 'TH2 Bintray'
         url 'https://dl.bintray.com/exactpro/th2'
     }
+    maven {
+        name 'Bintray'
+        url 'https://dl.bintray.com/exactpro/sailfish'
+    }
 
     mavenLocal()
 
