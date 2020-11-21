@@ -11,6 +11,7 @@ apply plugin: 'maven-publish'
 
 ext {
     sharedDir           = file("${project.rootDir}/shared")
+    sailfishVersion     = '3.2'
 }
 
 group = 'com.exactpro.th2'
@@ -126,7 +127,7 @@ dependencies {
     implementation "io.grpc:grpc-core"
     implementation "io.grpc:grpc-netty"
 
-    implementation "com.exactpro.sf:sailfish-core:3.2-SNAPSHOT"
+    implementation "com.exactpro.sf:sailfish-core:${sailfishVersion}"
 
     implementation "com.rabbitmq:amqp-client:5.8.0"
     implementation "com.datastax.cassandra:cassandra-driver-core:3.6.0" //FIXME: Migrate to another library for UUID
