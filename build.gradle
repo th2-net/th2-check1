@@ -112,7 +112,7 @@ bintray {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:2.3.+')
+    api platform('com.exactpro.th2:bom:2.7.+')
     implementation "com.exactpro.th2:common"
     implementation 'com.exactpro.th2:sailfish-utils'
     implementation "com.exactpro.th2:grpc-common"
