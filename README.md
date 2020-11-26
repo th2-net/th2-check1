@@ -64,3 +64,39 @@ spec:
         - "parsed"
 ```
 
+Example of a finished box
+
+```yaml
+apiVersion: th2.exactpro.com/v1
+kind: Th2Generic
+metadata:
+  name: check1
+spec:
+  image-name: ghcr.io/th2-net/th2-check1
+  image-version: <image version>
+  custom-config:
+    message-cache-size: '1000'
+    cleanup-older-than: '60'
+    cleanup-time-unit: 'SECONDS'
+  type: th2-check1
+  pins:
+    - name: server
+      connection-type: grpc
+    - name: from_codec
+      connection-type: mq
+      attributes: ['subscribe', 'parsed']
+  extended-settings:
+    service:
+      enabled: true
+      nodePort: '<port>'
+    envVariables:
+      JAVA_TOOL_OPTIONS: "-XX:+ExitOnOutOfMemoryError"
+    resources:
+      limits:
+        memory: 200Mi
+        cpu: 200m
+      requests:
+        memory: 100Mi
+        cpu: 50m
+```
+
