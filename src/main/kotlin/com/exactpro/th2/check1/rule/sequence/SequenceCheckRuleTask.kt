@@ -132,7 +132,7 @@ class SequenceCheckRuleTask(
 
             if (comparisonResult != null) {
                 val comparisonStatus = comparisonResult.getStatusType()
-                reordered = reordered || index != 0 || comparisonStatus != StatusType.PASSED
+                reordered = reordered || index != 0
                 messageFilteringResults[messageContainer.protoMessage.metadata.id] = ComparisonContainer(
                     messageContainer,
                     messageFilter.protoMessageFilter,

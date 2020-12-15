@@ -22,6 +22,7 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
+import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
@@ -54,13 +55,13 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         MessageFilter.newBuilder()
             .setMessageType("TestMsg")
             .putAllFields(mapOf(
-                "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build(),
+                "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("43").build(),
                 "B" to ValueFilter.newBuilder().setSimpleFilter("BBB").build()
             )).build(),
         MessageFilter.newBuilder()
             .setMessageType("TestMsg")
             .putAllFields(mapOf(
-                "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build(),
+                "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("44").build(),
                 "B" to ValueFilter.newBuilder().setSimpleFilter("CCC").build()
             )).build()
     )
@@ -74,20 +75,20 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             .build(),
         constructMessage(2, "test_session", "TestMsg")
             .putAllFields(mapOf(
-                "A" to Value.newBuilder().setSimpleValue("42").build(),
+                "A" to Value.newBuilder().setSimpleValue("43").build(),
                 "B" to Value.newBuilder().setSimpleValue("BBB").build()
             ))
             .build(),
         constructMessage(3, "test_session", "TestMsg")
             .putAllFields(mapOf(
-                "A" to Value.newBuilder().setSimpleValue("42").build(),
+                "A" to Value.newBuilder().setSimpleValue("44").build(),
                 "B" to Value.newBuilder().setSimpleValue("CCC").build()
             ))
             .build()
     )
 
     private val preFilter = PreFilter.newBuilder()
-        .putFields("A", ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build())
+        .putFields("A", ValueFilter.newBuilder().setKey(true).setOperation(FilterOperation.NOT_EMPTY).build())
         .build()
 
     @ParameterizedTest(name = "checkOrder = {0}")
@@ -121,7 +122,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             set(indexesToSwitch.first, get(indexesToSwitch.second))
             set(indexesToSwitch.second, tmp)
         }
-        val switchedMessagesId = listOf(messagesUnordered[indexesToSwitch.first].metadata.id, messagesUnordered[indexesToSwitch.second].metadata.id)
+        val idsOrder = messagesUnordered.map { it.metadata.id }
         val messages = Observable.fromIterable(messagesUnordered)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey("test_session", Direction.FIRST), 10, messages))
@@ -137,12 +138,61 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             val verifications = eventsList.filter { it.parentId == checkedMessages.id }
             assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
 
-            val failedVerifications = verifications.filter { it.status == EventStatus.FAILED }
-            assertEquals(switchedMessagesId.size, failedVerifications.size, "Unexpected FAILED verifications count: $failedVerifications")
-            assertTrue("Some verifications have more than one message attached") { failedVerifications.all { it.attachedMessageIdsCount == 1 } }
-            assertEquals(switchedMessagesId, failedVerifications.map { it.getAttachedMessageIds(0) })
+            val passedVerifications = verifications.filter { it.status == EventStatus.SUCCESS }
+            // The messages are reordered but all presents. So, all verifications should be passed
+            assertEquals(3, passedVerifications.size, "Unexpected SUCCESS verifications count: $passedVerifications")
+            assertTrue("Some verifications have more than one message attached") { passedVerifications.all { it.attachedMessageIdsCount == 1 } }
+            assertEquals(idsOrder, passedVerifications.map { it.getAttachedMessageIds(0) })
         }, {
             assertCheckSequenceStatus(EventStatus.FAILED, eventsList)
+        })
+    }
+
+    @Test
+    fun `check ordering is not failed in case key fields are matches the order but the rest are not`() {
+        val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(1, "test_session", "TestMsg")
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA1").build()
+                ))
+                .build(),
+            constructMessage(2, "test_session", "TestMsg")
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("43").build(),
+                    "B" to Value.newBuilder().setSimpleValue("BBB1").build()
+                ))
+                .build(),
+            constructMessage(3, "test_session", "TestMsg")
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("44").build(),
+                    "B" to Value.newBuilder().setSimpleValue("CCC1").build()
+                ))
+                .build()
+        )
+
+        val messages = Observable.fromIterable(messagesWithKeyFields)
+
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey("test_session", Direction.FIRST), 10, messages))
+        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+
+        sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
+
+        val batchRequest = awaitEventBatchRequest(1000L)
+        val eventsList: List<Event> = batchRequest.eventsList
+
+        assertAll({
+            val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
+            assertEquals(3, rootEvent.attachedMessageIdsCount)
+            assertEquals(listOf(1L, 2L, 3L), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
+            val verifications = eventsList.filter { it.parentId == checkedMessages.id }
+            assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
+            assertTrue("Some verifications are not failed: $verifications") { verifications.all { it.status == EventStatus.FAILED } }
+            assertEquals(listOf(1L, 2L, 3L), verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
+        }, {
+            assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
         })
     }
 
@@ -185,19 +235,18 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 .build(),
             constructMessage(2, "test_session", "TestMsg") // goes to processed messages but should not go to actual comparison
                 .putAllFields(mapOf(
-                    "A" to Value.newBuilder().setSimpleValue("43").build(),
                     "B" to Value.newBuilder().setSimpleValue("BBB1").build()
                 ))
                 .build(),
             constructMessage(3, "test_session", "TestMsg")
                 .putAllFields(mapOf(
-                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "A" to Value.newBuilder().setSimpleValue("43").build(),
                     "B" to Value.newBuilder().setSimpleValue("BBB1").build()
                 ))
                 .build(),
             constructMessage(4, "test_session", "TestMsg")
                 .putAllFields(mapOf(
-                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "A" to Value.newBuilder().setSimpleValue("44").build(),
                     "B" to Value.newBuilder().setSimpleValue("CCC1").build()
                 ))
                 .build(),
