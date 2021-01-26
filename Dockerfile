@@ -13,13 +13,7 @@ RUN gradle --stacktrace clean build dockerPrepare artifactoryPublish \
      -Partifactory_deploy_repo_key=${artifactory_deploy_repo_key} \
      -Partifactory_url=${artifactory_url}
 
-FROM openjdk:12-alpine
-ENV RABBITMQ_HOST=rabbitmq \
-    RABBITMQ_PORT=5672 \
-    RABBITMQ_USER=guest \
-    RABBITMQ_PASS=guest \
-    RABBITMQ_VHOST=th2 \
-    GRPC_PORT=8080
+FROM adoptopenjdk/openjdk11:alpine
 WORKDIR /home
 COPY --from=build /home/gradle/build/docker ./
 ENTRYPOINT ["/home/service/bin/service"]
