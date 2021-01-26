@@ -11,7 +11,7 @@ apply plugin: 'maven-publish'
 
 ext {
     sharedDir           = file("${project.rootDir}/shared")
-    sailfishVersion     = '3.2'
+    sailfishVersion     = '3.2-SNAPSHOT'
 }
 
 group = 'com.exactpro.th2'
@@ -43,6 +43,10 @@ repositories {
     maven {
         name 'Bintray'
         url 'https://dl.bintray.com/exactpro/sailfish'
+    }
+    maven {
+        name 'Artifactory-snapshot-oss'
+        url 'https://oss.jfrog.org/artifactory/libs-snapshot'
     }
 
     mavenLocal()
