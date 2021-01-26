@@ -13,7 +13,7 @@ RUN gradle --stacktrace clean build dockerPrepare artifactoryPublish \
      -Partifactory_deploy_repo_key=${artifactory_deploy_repo_key} \
      -Partifactory_url=${artifactory_url}
 
-FROM openjdk:12-alpine
+FROM adoptopenjdk/openjdk11:alpine
 ENV RABBITMQ_HOST=rabbitmq \
     RABBITMQ_PORT=5672 \
     RABBITMQ_USER=guest \
