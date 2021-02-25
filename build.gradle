@@ -118,9 +118,9 @@ bintray {
 
 dependencies {
     api platform('com.exactpro.th2:bom:2.10.1')
-    implementation 'com.exactpro.th2:common:2.9.0'
-    implementation 'com.exactpro.th2:sailfish-utils:2.2.2'
-    implementation 'com.exactpro.th2:grpc-common:2.3.2'
+    implementation 'com.exactpro.th2:common:3.0.3'
+    implementation 'com.exactpro.th2:sailfish-utils:3.0.0'
+    implementation 'com.exactpro.th2:grpc-common:3.0.1'
     implementation 'com.exactpro.th2:grpc-check1:2.2.1'
     implementation "org.slf4j:slf4j-log4j12"
     implementation "org.slf4j:slf4j-api"
