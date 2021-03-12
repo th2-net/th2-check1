@@ -17,8 +17,15 @@ import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.check1.rule.MessageContainer
+import com.exactpro.th2.common.grpc.MetadataFilter
+import com.exactpro.th2.common.grpc.RootMessageFilter
 
-class ComparisonContainer(val messageContainer: MessageContainer, val protoFilter: MessageFilter, val comparisonResult: ComparisonResult?) {
+class ComparisonContainer(
+    val messageContainer: MessageContainer,
+    val protoFilter: RootMessageFilter,
+    val comparisonResult: ComparisonResult?,
+    val metadataComparisonResult: ComparisonResult?
+) {
     val sailfishActual: IMessage
         get() = messageContainer.sailfishMessage
 
