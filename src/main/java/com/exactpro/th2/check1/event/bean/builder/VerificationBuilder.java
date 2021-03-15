@@ -26,6 +26,7 @@ import com.exactpro.th2.common.event.bean.Verification;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.grpc.MessageFilter;
 import com.exactpro.th2.check1.event.VerificationEntryUtils;
+import com.exactpro.th2.common.grpc.MetadataFilter;
 
 public class VerificationBuilder {
 
@@ -44,6 +45,12 @@ public class VerificationBuilder {
     public VerificationBuilder verification(String fieldName, ComparisonResult comparisonResult, MessageFilter messageFilter, boolean listItemAsSeparate) {
         fields.put(fieldName, VerificationEntryUtils.createVerificationEntry(comparisonResult,
                 toMetaContainer(messageFilter, listItemAsSeparate)));
+        return this;
+    }
+
+    public VerificationBuilder verification(String fieldName, ComparisonResult comparisonResult, MetadataFilter messageFilter) {
+        fields.put(fieldName, VerificationEntryUtils.createVerificationEntry(comparisonResult,
+                toMetaContainer(messageFilter)));
         return this;
     }
 

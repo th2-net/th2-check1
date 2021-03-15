@@ -13,9 +13,14 @@
 package com.exactpro.th2.check1.event;
 
 import java.util.List;
+import java.util.Map.Entry;
 
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow;
 import com.exactpro.th2.common.grpc.MessageFilter;
+import com.exactpro.th2.common.grpc.MessageMetadata;
+import com.exactpro.th2.common.grpc.MetadataFilter;
+import com.exactpro.th2.common.grpc.MetadataFilter.SimpleFilter;
+import com.exactpro.th2.common.grpc.RootMessageFilter;
 import com.exactpro.th2.common.grpc.ValueFilter;
 import com.exactpro.sf.common.messages.IMessage;
 
@@ -27,20 +32,24 @@ public class CheckSequenceUtils {
     /**
      * In the case when no actual message was found for the MessageFitler.
      */
-    public static CheckSequenceRow createOnlyExpectedSide(MessageFilter messageFilter, String connectivityId) {
+    public static CheckSequenceRow createOnlyExpectedSide(RootMessageFilter filter, String connectivityId) {
         CheckSequenceRow row = new CheckSequenceRow();
         row.setActualMessage("");
-        row.setExpectedMessage(messageFilter.getMessageType() + ", " + connectivityId + getKeyFields(messageFilter));
+        row.setActualMetadata("");
+        row.setExpectedMessage(filter.getMessageType() + ", " + connectivityId + getKeyFields(filter.getMessageFilter()));
+        row.setExpectedMetadata("Metadata, " + connectivityId + getKeyFields(filter.getMetadataFilter()));
         return row;
     }
 
     /**
      * In the case when actual message was found for the MessageFilter.
      */
-    public static CheckSequenceRow createBothSide(IMessage actual, MessageFilter filter, String sessionAlias) {
+    public static CheckSequenceRow createBothSide(IMessage actual, MessageMetadata metadata, RootMessageFilter filter, String sessionAlias) {
         CheckSequenceRow row = new CheckSequenceRow();
-        row.setActualMessage(actual.getName() + ", " + sessionAlias + getKeyFields(actual, filter));
-        row.setExpectedMessage(filter.getMessageType() + ", " + sessionAlias + getKeyFields(filter));
+        row.setActualMessage(actual.getName() + ", " + sessionAlias + getKeyFields(actual, filter.getMessageFilter()));
+        row.setActualMetadata("Metadata, " + sessionAlias + getKeyFields(metadata, filter.getMetadataFilter()));
+        row.setExpectedMessage(filter.getMessageType() + ", " + sessionAlias + getKeyFields(filter.getMessageFilter()));
+        row.setExpectedMetadata("Metadata, " + sessionAlias + getKeyFields(filter.getMetadataFilter()));
         return row;
     }
 
@@ -50,8 +59,34 @@ public class CheckSequenceUtils {
     public static CheckSequenceRow createOnlyActualSide(IMessage actualMessage, String connectivityId) {
         CheckSequenceRow row = new CheckSequenceRow();
         row.setActualMessage(actualMessage.getName() + ", " + connectivityId);
+        row.setActualMetadata("");
         row.setExpectedMessage("");
+        row.setExpectedMetadata("");
         return row;
+    }
+
+    private static String getKeyFields(MessageMetadata metadata, MetadataFilter metadataFilter) {
+        StringBuilder builder = new StringBuilder();
+        for (Entry<String, SimpleFilter> filters : metadataFilter.getPropertyFiltersMap().entrySet()) {
+            String value = metadata.getPropertiesMap().get(filters.getKey());
+            if (value == null) {
+                continue;
+            }
+            if (filters.getValue().getKey()) {
+                builder.append(", ").append(filters.getKey()).append('=').append(value);
+            }
+        }
+
+        return builder.toString();
+    }
+
+    private static String getKeyFields(MetadataFilter metadataFilter) {
+        StringBuilder builder = new StringBuilder();
+        for (Entry<String, SimpleFilter> filters : metadataFilter.getPropertyFiltersMap().entrySet()) {
+            builder.append(getKeyFields(filters.getKey(), filters.getValue()));
+        }
+
+        return builder.toString();
     }
 
     private static String getKeyFields(MessageFilter messageFilter) {
@@ -103,6 +138,13 @@ public class CheckSequenceUtils {
             result.append(", ").append(name).append('=').append(valueFilter.getSimpleFilter());
         }
         return result.toString();
+    }
+
+    private static String getKeyFields(String name, SimpleFilter valueFilter) {
+        if (valueFilter.getKey()) {
+            return ", " + name + '=' + valueFilter.getValue();
+        }
+        return "";
     }
 
     public String getExpectedMessage() {
