@@ -14,6 +14,7 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
+import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.grpc.Message
 

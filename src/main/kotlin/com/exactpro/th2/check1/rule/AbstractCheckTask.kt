@@ -15,20 +15,25 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
-import com.exactpro.sf.comparison.ComparisonUtil
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
-import com.exactpro.th2.check1.rule.sequence.ComparisonContainer
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.grpc.Checkpoint
+import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.MessageFilter
+import com.exactpro.th2.common.grpc.MessageMetadata
+import com.exactpro.th2.common.grpc.MetadataFilter
+import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -343,18 +348,6 @@ abstract class AbstractCheckTask(
         }
     }
 
-    protected class AggregatedFilterResult(
-        val messageResult: ComparisonResult?,
-        val metadataResult: ComparisonResult?
-    ) {
-        operator fun component1(): ComparisonResult? = messageResult
-        operator fun component2(): ComparisonResult? = metadataResult
-        companion object {
-            @JvmField
-            val EMPTY = AggregatedFilterResult(null, null)
-        }
-    }
-
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
 
@@ -414,18 +407,20 @@ abstract class AbstractCheckTask(
 
     protected fun Event.appendEventWithVerifications(comparisonContainers: Collection<ComparisonContainer>): Event {
         for (comparisonContainer in comparisonContainers) {
-            val protoFilter = comparisonContainer.protoFilter
-            addSubEventWithSamePeriod()
-                .appendEventWithVerification(comparisonContainer.protoActual, protoFilter.messageFilter, comparisonContainer.comparisonResult!!)
-            if (protoFilter.hasMetadataFilter()) {
-                addSubEventWithSamePeriod()
-                    .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.metadataComparisonResult!!)
-            }
+            appendEventsWithVerification(comparisonContainer)
         }
         return this
     }
 
-    protected fun ComparisonResult.getStatusType(): StatusType = ComparisonUtil.getStatusType(this)
+    protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {
+        val protoFilter = comparisonContainer.protoFilter
+        addSubEventWithSamePeriod()
+            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter.messageFilter, comparisonContainer.result.messageResult!!)
+        if (protoFilter.hasMetadataFilter()) {
+            addSubEventWithSamePeriod()
+                .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.result.metadataResult!!)
+        }
+    }
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
         map { message -> MessageContainer(message, converter.fromProtoMessage(message, false)) }

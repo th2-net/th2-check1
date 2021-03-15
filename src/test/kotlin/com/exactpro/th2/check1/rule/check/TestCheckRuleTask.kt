@@ -17,7 +17,13 @@ import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.util.toSimpleFilter
-import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
+import com.exactpro.th2.common.grpc.FilterOperation
+import com.exactpro.th2.common.grpc.MessageMetadata
+import com.exactpro.th2.common.grpc.MetadataFilter
+import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.message
 import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertNotNull

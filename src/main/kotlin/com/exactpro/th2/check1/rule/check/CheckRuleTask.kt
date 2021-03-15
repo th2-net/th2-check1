@@ -13,12 +13,12 @@
 
 package com.exactpro.th2.check1.rule.check
 
-import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.rule.AbstractCheckTask
-import com.exactpro.th2.check1.rule.SailfishFilter
+import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
+import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil.METADATA_MESSAGE_NAME
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -75,18 +75,12 @@ class CheckRuleTask(
     }
 
     override fun onNext(messageContainer: MessageContainer) {
-        val (messageResult: ComparisonResult?, metadataResult: ComparisonResult?) = matchFilter(messageContainer, messageFilter, metadataFilter)
+        val aggregatedResult = matchFilter(messageContainer, messageFilter, metadataFilter)
 
-        if (messageResult != null && (metadataFilter == null || metadataResult != null)) {
-            rootEvent.apply {
-                val protoMessage = messageContainer.protoMessage
-                addSubEventWithSamePeriod()
-                    .appendEventWithVerification(protoMessage, protoMessageFilter.messageFilter, messageResult)
-                if (metadataResult != null) {
-                    addSubEventWithSamePeriod()
-                        .appendEventWithVerification(protoMessage.metadata, protoMessageFilter.metadataFilter, metadataResult)
-                }
-            }
+        val container = ComparisonContainer(messageContainer, protoMessageFilter, aggregatedResult)
+
+        if (container.matchesByKeys) {
+            rootEvent.appendEventsWithVerification(container)
             checkComplete()
         }
     }

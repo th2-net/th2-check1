@@ -17,7 +17,6 @@
 package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.sf.common.messages.IMessage
-import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
@@ -25,8 +24,11 @@ import com.exactpro.th2.check1.event.CheckSequenceUtils
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTask
-import com.exactpro.th2.check1.rule.SailfishFilter
+import com.exactpro.th2.check1.rule.AggregatedFilterResult
+import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
+import com.exactpro.th2.check1.rule.SailfishFilter
+import com.exactpro.th2.check1.rule.getStatusType
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -34,13 +36,20 @@ import com.exactpro.th2.common.event.Event.Status.PASSED
 import com.exactpro.th2.common.event.EventUtils.createMessageBean
 import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.event.bean.builder.TableBuilder
-import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.MessageFilter
+import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import java.time.Instant
 import java.util.LinkedHashMap
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.set
 
 /**
  * This rule checks the sequence of specified messages.
@@ -122,20 +131,13 @@ class SequenceCheckRuleTask(
             if (LOGGER.isDebugEnabled) {
                 LOGGER.debug("Pre-filtering message with id: {}", shortDebugString(messageContainer.protoMessage.metadata.id))
             }
-            val (messageResult: ComparisonResult?, metadataResult: ComparisonResult?) = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, false)
-            ComparisonContainer(messageContainer, protoPreMessageFilter, messageResult, metadataResult)
+            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, false)
+            ComparisonContainer(messageContainer, protoPreMessageFilter, result)
         }.filter { preFilterContainer -> // Filter  check result of pre-filter
-            preFilterContainer.comparisonResult.let { it != null && it.getStatusType() != StatusType.FAILED }
-                && (!preFilterContainer.protoFilter.hasMetadataFilter()
-                    || preFilterContainer.metadataComparisonResult.let { it != null && it.getStatusType() != StatusType.FAILED })
+            preFilterContainer.fullyMatches
         }.doOnNext { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
-                preFilterEvent.addSubEventWithSamePeriod()
-                    .appendEventWithVerification(protoActual, protoPreMessageFilter.messageFilter, comparisonResult!!)
-                if (protoFilter.hasMetadataFilter()) {
-                    preFilterEvent.addSubEventWithSamePeriod()
-                        .appendEventWithVerification(protoActual.metadata, protoFilter.metadataFilter, metadataComparisonResult!!)
-                }
+                preFilterEvent.appendEventsWithVerification(preFilterContainer)
                 preFilterEvent.messageID(protoActual.metadata.id)
 
                 preFilteringResults[protoActual.metadata.id] = preFilterContainer
@@ -148,18 +150,22 @@ class SequenceCheckRuleTask(
 
             val messageFilter: SailfishFilter = messageFilterContainer.messageFilter
             val metadataFilter: SailfishFilter? = messageFilterContainer.metadataFilter
-            val (messageResult: ComparisonResult?, metadataResult: ComparisonResult?) = matchFilter(messageContainer, messageFilter, metadataFilter)
+            val result: AggregatedFilterResult = matchFilter(messageContainer, messageFilter, metadataFilter)
 
-            if (messageResult != null && (metadataFilter == null || metadataResult != null)) {
-                val comparisonStatus = messageResult.getStatusType()
+            val comparisonContainer = ComparisonContainer(
+                messageContainer,
+                messageFilterContainer.protoMessageFilter,
+                result
+            )
+            if (comparisonContainer.matchesByKeys) {
                 reordered = reordered || index != 0
-                messageFilteringResults[messageContainer.protoMessage.metadata.id] = ComparisonContainer(
-                    messageContainer,
-                    messageFilterContainer.protoMessageFilter,
-                    messageResult,
-                    metadataResult
-                )
+                messageFilteringResults[messageContainer.protoMessage.metadata.id] = comparisonContainer
                 matchedByKeys.add(messageFilterContainer)
+
+                val comparisonStatus = requireNotNull(result.messageResult) {
+                    "Message result must not be null because the result said the message is matched by key fields. Filter: " +
+                        shortDebugString(messageFilterContainer.protoMessageFilter)
+                }.getStatusType()
 
                 if (checkOrder || comparisonStatus == StatusType.PASSED) {
                     messageFilters.removeAt(index)

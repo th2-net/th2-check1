@@ -12,11 +12,6 @@
  */
 package com.exactpro.th2.check1
 
-import com.exactpro.th2.common.event.Event
-import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.schema.message.MessageListener
-import com.exactpro.th2.common.schema.message.MessageRouter
-import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
@@ -25,7 +20,21 @@ import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
-import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.common.event.EventUtils
+import com.exactpro.th2.common.grpc.ComparisonSettings
+import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.MessageBatch
+import com.exactpro.th2.common.grpc.MessageFilter
+import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.grpc.RootComparisonSettings
+import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.schema.message.MessageListener
+import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
