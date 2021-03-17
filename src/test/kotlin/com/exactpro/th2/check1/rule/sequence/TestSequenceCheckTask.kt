@@ -27,6 +27,7 @@ import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.MessageMetadata
+import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
 import io.reactivex.Observable
@@ -45,25 +46,34 @@ import kotlin.test.assertTrue
 
 class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
-    private val protoMessageFilters: List<MessageFilter> = listOf(
-        MessageFilter.newBuilder()
+    private val protoMessageFilters: List<RootMessageFilter> = listOf(
+        RootMessageFilter.newBuilder()
             .setMessageType("TestMsg")
-            .putAllFields(mapOf(
-                "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build(),
-                "B" to ValueFilter.newBuilder().setSimpleFilter("AAA").build()
-            )).build(),
-        MessageFilter.newBuilder()
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putAllFields(mapOf(
+                        "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build(),
+                        "B" to ValueFilter.newBuilder().setSimpleFilter("AAA").build()
+                    ))
+            ).build(),
+        RootMessageFilter.newBuilder()
             .setMessageType("TestMsg")
-            .putAllFields(mapOf(
-                "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("43").build(),
-                "B" to ValueFilter.newBuilder().setSimpleFilter("BBB").build()
-            )).build(),
-        MessageFilter.newBuilder()
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putAllFields(mapOf(
+                        "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("43").build(),
+                        "B" to ValueFilter.newBuilder().setSimpleFilter("BBB").build()
+                    ))
+            ).build(),
+        RootMessageFilter.newBuilder()
             .setMessageType("TestMsg")
-            .putAllFields(mapOf(
-                "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("44").build(),
-                "B" to ValueFilter.newBuilder().setSimpleFilter("CCC").build()
-            )).build()
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putAllFields(mapOf(
+                        "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("44").build(),
+                        "B" to ValueFilter.newBuilder().setSimpleFilter("CCC").build()
+                    ))
+            ).build()
     )
 
     private val messagesInCorrectOrder: List<Message> = listOf(
@@ -293,7 +303,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         messageStream: Observable<StreamContainer>,
         checkOrder: Boolean,
         preFilterParam: PreFilter = preFilter,
-        filtersParam: List<MessageFilter> = protoMessageFilters
+        filtersParam: List<RootMessageFilter> = protoMessageFilters
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
             description = "Test",

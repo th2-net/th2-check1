@@ -17,9 +17,6 @@
 package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.sf.common.messages.IMessage
-import com.exactpro.sf.comparison.ComparatorSettings
-import com.exactpro.sf.comparison.ComparisonResult
-import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
@@ -27,7 +24,12 @@ import com.exactpro.th2.check1.event.CheckSequenceUtils
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTask
+import com.exactpro.th2.check1.rule.AggregatedFilterResult
+import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
+import com.exactpro.th2.check1.rule.SailfishFilter
+import com.exactpro.th2.check1.rule.getStatusType
+import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
@@ -38,11 +40,16 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
+import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import java.time.Instant
 import java.util.LinkedHashMap
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.set
 
 /**
  * This rule checks the sequence of specified messages.
@@ -58,16 +65,24 @@ class SequenceCheckRuleTask(
         sessionKey: SessionKey,
         timeout: Long,
         protoPreFilter: PreFilter,
-        private val protoMessageFilters: List<MessageFilter>,
+        private val protoMessageFilters: List<RootMessageFilter>,
         private val checkOrder: Boolean,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
         eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private val protoPreMessageFilter: MessageFilter = protoPreFilter.toMessageFilter()
-    private val preFilter: IMessage = converter.fromProtoPreFilter(protoPreMessageFilter)
-    private val settingsPreFilter: ComparatorSettings = protoPreFilter.toCompareSettings()
+    private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
+    private val messagePreFilter = SailfishFilter(
+        converter.fromProtoPreFilter(protoPreMessageFilter),
+        protoPreMessageFilter.toCompareSettings()
+    )
+    private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
+            SailfishFilter(
+                converter.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                it.toComparisonSettings()
+            )
+    }
     private lateinit var preFilteringResults: MutableMap<MessageID, ComparisonContainer>
 
     private lateinit var messageFilters: MutableList<MessageFilterContainer>
@@ -92,7 +107,14 @@ class SequenceCheckRuleTask(
 
         messageFilteringResults = LinkedHashMap()
         messageFilters = protoMessageFilters.map {
-            MessageFilterContainer(it, converter.fromProtoFilter(it, it.messageType), it.toCompareSettings())
+            MessageFilterContainer(
+                it,
+                SailfishFilter(converter.fromProtoFilter(it.messageFilter, it.messageType), it.toCompareSettings()),
+                it.metadataFilterOrNull()?.let { metadataFilter ->
+                    SailfishFilter(converter.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
+                        metadataFilter.toComparisonSettings())
+                }
+            )
         }.toMutableList()
 
         matchedByKeys = HashSet(messageFilters.size)
@@ -106,39 +128,44 @@ class SequenceCheckRuleTask(
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
         map { messageContainer -> // Compare the message with pre-filter
-            val comparisonResult = MessageComparator.compare(messageContainer.sailfishMessage, preFilter, settingsPreFilter, false)
-            LOGGER.debug("Pre-filter compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
-            ComparisonContainer(messageContainer, protoPreMessageFilter, comparisonResult)
+            if (LOGGER.isDebugEnabled) {
+                LOGGER.debug("Pre-filtering message with id: {}", shortDebugString(messageContainer.protoMessage.metadata.id))
+            }
+            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, false)
+            ComparisonContainer(messageContainer, protoPreMessageFilter, result)
         }.filter { preFilterContainer -> // Filter  check result of pre-filter
-            preFilterContainer.comparisonResult.let { it != null && it.getStatusType() != StatusType.FAILED }
+            preFilterContainer.fullyMatches
         }.doOnNext { preFilterContainer -> // Update pre-filter state
-            with(preFilterContainer.messageContainer.protoMessage) {
-                preFilterEvent.addSubEventWithSamePeriod()
-                    .appendEventWithVerification(this, protoPreMessageFilter, preFilterContainer.comparisonResult!!)
-                preFilterEvent.messageID(metadata.id)
+            with(preFilterContainer) {
+                preFilterEvent.appendEventsWithVerification(preFilterContainer)
+                preFilterEvent.messageID(protoActual.metadata.id)
 
-                preFilteringResults[metadata.id] = preFilterContainer
+                preFilteringResults[protoActual.metadata.id] = preFilterContainer
             }
         }.map(ComparisonContainer::messageContainer)
 
     override fun onNext(messageContainer: MessageContainer) {
         for (index in messageFilters.indices) {
-            val messageFilter = messageFilters[index]
-            val comparisonResult: ComparisonResult? = MessageComparator.compare(
-                messageContainer.sailfishMessage,
-                messageFilter.sailfishMessageFilter,
-                messageFilter.comparatorSettings
-            )
+            val messageFilterContainer = messageFilters[index]
 
-            if (comparisonResult != null) {
-                val comparisonStatus = comparisonResult.getStatusType()
+            val messageFilter: SailfishFilter = messageFilterContainer.messageFilter
+            val metadataFilter: SailfishFilter? = messageFilterContainer.metadataFilter
+            val result: AggregatedFilterResult = matchFilter(messageContainer, messageFilter, metadataFilter)
+
+            val comparisonContainer = ComparisonContainer(
+                messageContainer,
+                messageFilterContainer.protoMessageFilter,
+                result
+            )
+            if (comparisonContainer.matchesByKeys) {
                 reordered = reordered || index != 0
-                messageFilteringResults[messageContainer.protoMessage.metadata.id] = ComparisonContainer(
-                    messageContainer,
-                    messageFilter.protoMessageFilter,
-                    comparisonResult
-                )
-                matchedByKeys.add(messageFilter)
+                messageFilteringResults[messageContainer.protoMessage.metadata.id] = comparisonContainer
+                matchedByKeys.add(messageFilterContainer)
+
+                val comparisonStatus = requireNotNull(result.messageResult) {
+                    "Message result must not be null because the result said the message is matched by key fields. Filter: " +
+                        shortDebugString(messageFilterContainer.protoMessageFilter)
+                }.getStatusType()
 
                 if (checkOrder || comparisonStatus == StatusType.PASSED) {
                     messageFilters.removeAt(index)
@@ -183,9 +210,10 @@ class SequenceCheckRuleTask(
     private fun fillSequenceEvent() {
         val sequenceTable = TableBuilder<CheckSequenceRow>()
         preFilteringResults.forEach { (messageID: MessageID, comparisonContainer: ComparisonContainer) ->
+            val container = messageFilteringResults[messageID]
             sequenceTable.row(
-                messageFilteringResults[messageID]?.let {
-                    CheckSequenceUtils.createBothSide(it.sailfishActual, it.protoFilter, sessionKey.sessionAlias)
+                container?.let {
+                    CheckSequenceUtils.createBothSide(it.sailfishActual, it.protoActual.metadata, it.protoFilter, sessionKey.sessionAlias)
                 } ?: CheckSequenceUtils.createOnlyActualSide(comparisonContainer.sailfishActual, sessionKey.sessionAlias)
             )
         }
@@ -208,13 +236,22 @@ class SequenceCheckRuleTask(
             .bodyData(sequenceTable.build())
     }
 
-    private fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: MessageFilter): IMessage =
-        fromProtoFilter(protoPreMessageFilter, PRE_FILTER_MESSAGE_NAME)
+    private fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter): IMessage =
+        fromProtoFilter(protoPreMessageFilter.messageFilter, PRE_FILTER_MESSAGE_NAME)
 
     private fun PreFilter.toCompareSettings() = toMessageFilter().toCompareSettings()
 
-    private fun PreFilter.toMessageFilter() = MessageFilter.newBuilder()
+    private fun PreFilter.toRootMessageFilter() = RootMessageFilter.newBuilder()
         .setMessageType(PRE_FILTER_MESSAGE_NAME)
+        .setMessageFilter(toMessageFilter())
+        .also {
+            if (hasMetadataFilter()) {
+                it.metadataFilter = metadataFilter
+            }
+        }
+        .build()
+
+    private fun PreFilter.toMessageFilter() = MessageFilter.newBuilder()
         .putAllFields(fieldsMap)
         .build()
 
