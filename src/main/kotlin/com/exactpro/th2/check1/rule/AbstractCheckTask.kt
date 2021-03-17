@@ -15,14 +15,12 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
-import com.exactpro.sf.comparison.ComparisonUtil
+import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.AbstractSessionObserver
-import com.exactpro.th2.check1.DefaultMessageFactoryProxy
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
-import com.exactpro.th2.check1.rule.sequence.ComparisonContainer
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -33,6 +31,9 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
+import com.exactpro.th2.common.grpc.MessageMetadata
+import com.exactpro.th2.common.grpc.MetadataFilter
+import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -65,7 +66,7 @@ abstract class AbstractCheckTask(
 ) : AbstractSessionObserver<MessageContainer>() {
     protected var handledMessageCounter: Long = 0
 
-    protected val converter = ProtoToIMessageConverter(DefaultMessageFactoryProxy(), null, null)
+    protected val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
     protected val rootEvent: Event = Event.from(submitTime)
         .description(description)
 
@@ -312,16 +313,64 @@ abstract class AbstractCheckTask(
         }
     }
 
+    protected fun matchFilter(
+        messageContainer: MessageContainer,
+        messageFilter: SailfishFilter,
+        metadataFilter: SailfishFilter?,
+        matchNames: Boolean = true
+    ): AggregatedFilterResult {
+        val metadataComparisonResult: ComparisonResult? = metadataFilter?.let {
+            MessageComparator.compare(
+                messageContainer.metadataMessage,
+                it.message, it.comparatorSettings,
+                matchNames
+            )
+        }
+        if (metadataFilter != null) {
+            LOGGER.debug("Metadata comparison result\n {}", metadataComparisonResult)
+        }
+        if (metadataFilter != null && metadataComparisonResult == null) {
+            if (LOGGER.isDebugEnabled) {
+                LOGGER.debug("Metadata for message {} does not match the filter by key fields. Skip message checking",
+                    shortDebugString(messageContainer.protoMessage.metadata.id))
+            }
+            return AggregatedFilterResult.EMPTY
+        }
+        val comparisonResult: ComparisonResult? = messageFilter.let {
+            MessageComparator.compare(messageContainer.sailfishMessage, it.message, it.comparatorSettings, matchNames)
+        }
+        LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
+
+        return if (comparisonResult != null || metadataComparisonResult != null) {
+            AggregatedFilterResult(comparisonResult, metadataComparisonResult)
+        } else {
+            AggregatedFilterResult.EMPTY
+        }
+    }
+
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
 
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
     }
 
+    protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
+        if (hasMetadataFilter()) metadataFilter else null
+
+    protected fun RootMessageFilter.toCompareSettings(): ComparatorSettings =
+        ComparatorSettings().also {
+            it.metaContainer = VerificationUtil.toMetaContainer(this.messageFilter, false)
+            it.ignoredFields = this.comparisonSettings.ignoreFieldsList.toSet()
+        }
+
     protected fun MessageFilter.toCompareSettings(): ComparatorSettings =
         ComparatorSettings().also {
             it.metaContainer = VerificationUtil.toMetaContainer(this, false)
-            it.ignoredFields = this.comparisonSettings.ignoreFieldsList?.toSet() ?: emptySet()
+        }
+
+    protected fun MetadataFilter.toComparisonSettings(): ComparatorSettings =
+        ComparatorSettings().also {
+            it.metaContainer = VerificationUtil.toMetaContainer(this)
         }
 
     protected fun Event.appendEventWithVerification(protoMessage: Message, protoMessageFilter: MessageFilter, comparisonResult: ComparisonResult): Event {
@@ -340,14 +389,38 @@ abstract class AbstractCheckTask(
         return this
     }
 
-    protected fun Event.appendEventWithVerifications(comparisonContainers: Collection<ComparisonContainer>): Event {
-        for (comparisonContainer in comparisonContainers) {
-            addSubEventWithSamePeriod().appendEventWithVerification(comparisonContainer.protoActual, comparisonContainer.protoFilter, comparisonContainer.comparisonResult!!)
+    protected fun Event.appendEventWithVerification(metadata: MessageMetadata, metadataFilter: MetadataFilter, comparisonResult: ComparisonResult): Event {
+        val verificationComponent = VerificationBuilder()
+        comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
+            verificationComponent.verification(key, value, metadataFilter)
+        }
+
+        with(metadata) {
+            name("Verification '${messageType}' metadata")
+                    .type("Verification")
+                    .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
+                    .messageID(id)
+                    .bodyData(verificationComponent.build())
         }
         return this
     }
 
-    protected fun ComparisonResult.getStatusType(): StatusType = ComparisonUtil.getStatusType(this)
+    protected fun Event.appendEventWithVerifications(comparisonContainers: Collection<ComparisonContainer>): Event {
+        for (comparisonContainer in comparisonContainers) {
+            appendEventsWithVerification(comparisonContainer)
+        }
+        return this
+    }
+
+    protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {
+        val protoFilter = comparisonContainer.protoFilter
+        addSubEventWithSamePeriod()
+            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter.messageFilter, comparisonContainer.result.messageResult!!)
+        if (protoFilter.hasMetadataFilter()) {
+            addSubEventWithSamePeriod()
+                .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.result.metadataResult!!)
+        }
+    }
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
         map { message -> MessageContainer(message, converter.fromProtoMessage(message, false)) }

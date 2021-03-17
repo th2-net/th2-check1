@@ -20,7 +20,9 @@ import com.exactpro.th2.common.event.bean.IRow;
 public class CheckSequenceRow implements IRow {
 
     private String expectedMessage;
+    private String expectedMetadata;
     private String actualMessage;
+    private String actualMetadata;
 
     public String getExpectedMessage() {
         return expectedMessage;
@@ -36,5 +38,21 @@ public class CheckSequenceRow implements IRow {
 
     public void setActualMessage(String actualMessage) {
         this.actualMessage = actualMessage;
+    }
+
+    public String getExpectedMetadata() {
+        return expectedMetadata;
+    }
+
+    public void setExpectedMetadata(String expectedMetadata) {
+        this.expectedMetadata = expectedMetadata;
+    }
+
+    public String getActualMetadata() {
+        return actualMetadata;
+    }
+
+    public void setActualMetadata(String actualMetadata) {
+        this.actualMetadata = actualMetadata;
     }
 }

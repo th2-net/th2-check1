@@ -12,13 +12,18 @@
  */
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.th2.check1.SessionKey
+import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.nhaarman.mockitokotlin2.any
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
+import io.reactivex.Observable
 import org.slf4j.LoggerFactory
 import kotlin.test.assertNotNull
 
@@ -29,6 +34,12 @@ abstract class AbstractCheckTaskTest {
         val argumentCaptor = argumentCaptor<EventBatch>()
         verify(clientStub, timeout(timeoutValue).times(1)).send(argumentCaptor.capture(), any())
         return assertNotNull(argumentCaptor.lastValue, "Request was not received during $timeoutValue millis")
+    }
+
+    fun createStreams(alias: String, direction: Direction, messages: List<Message>): Observable<StreamContainer> {
+        return Observable.just(
+            StreamContainer(SessionKey(alias, direction), messages.size + 1, Observable.fromIterable(messages))
+        )
     }
 
     companion object {
