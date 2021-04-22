@@ -1,4 +1,6 @@
-# Overview
+# th2 check1 (3.2.1)
+
+## Overview
 
 The component is responsible for verifying decoded messages.
 
@@ -100,3 +102,17 @@ spec:
         - "subscribe"
         - "parsed"
 ```
+
+## Release Notes
+
+### 3.2.1
+
++ removed gRPC event loop handling
++ fixed dictionary reading
+
+### 3.2.0
+
++ reads dictionaries from the /var/th2/config/dictionary folder.
++ uses mq_router, grpc_router, cradle_manager optional JSON configs from the /var/th2/config folder
++ tries to load log4j.properties files from sources in order: '/var/th2/config', '/home/etc', configured path via cmd, default configuration
++ update Cradle version. Introduce async API for storing events
