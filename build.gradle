@@ -41,14 +41,6 @@ repositories {
         url 'https://dl.bintray.com/exactpro/th2'
     }
     maven {
-        name 'Bintray'
-        url 'https://dl.bintray.com/exactpro/sailfish'
-    }
-    maven {
-        name 'Artifactory-snapshot-oss'
-        url 'https://oss.jfrog.org/artifactory/libs-snapshot'
-    }
-    maven {
         name 'Sonatype_snapshots'
         url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
     }
@@ -128,7 +120,7 @@ dependencies {
     api platform('com.exactpro.th2:bom:2.10.1')
     implementation 'com.exactpro.th2:grpc-check1:3.1.0'
     implementation 'com.exactpro.th2:common:3.13.1'
-    implementation 'com.exactpro.th2:sailfish-utils:3.1.0'
+    implementation 'com.exactpro.th2:sailfish-utils:3.3.1'
     implementation "org.slf4j:slf4j-log4j12"
     implementation "org.slf4j:slf4j-api"
 
