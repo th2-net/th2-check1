@@ -32,6 +32,7 @@ spec:
     message-cache-size: '1000'
     cleanup-older-than: '60'
     cleanup-time-unit: 'SECONDS'
+    max-event-batch-content-size: '1048576'
   type: th2-check1
   pins:
     - name: server
@@ -63,7 +64,8 @@ This block describes the configuration for check1.
 {
   "message-cache-size": 1000,
   "cleanup-older-than": 60,
-  "cleanup-time-unit": "SECONDS"
+  "cleanup-time-unit": "SECONDS",
+  "max-event-batch-content-size": "1048576"
 }
 ```
 
@@ -78,6 +80,9 @@ The value will be interpreted as time unit defined in _cleanup-time-unit_ settin
 
 #### cleanup-time-unit
 The time unit for _cleanup-older-than_ setting. Available values are MILLIS, SECONDS, MINUTES, HOURS. _The default value is SECONDS_
+
+#### max-event-batch-content-size
+The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is 1048576_
 
 ## Requried pins
 

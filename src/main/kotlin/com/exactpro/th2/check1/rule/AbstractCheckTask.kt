@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -52,17 +52,18 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Implements common logic for check task.
- *
+ * @param maxEventBatchContentSize max size in bytes of summary events content in a batch
  * **Class in not thread-safe**
  */
 abstract class AbstractCheckTask(
-        val description: String?,
-        private val timeout: Long,
-        submitTime: Instant,
-        protected val sessionKey: SessionKey,
-        private val parentEventID: EventID,
-        private val messageStream: Observable<StreamContainer>,
-        private val eventBatchRouter: MessageRouter<EventBatch>
+    val description: String?,
+    private val timeout: Long,
+    private val maxEventBatchContentSize: Int,
+    submitTime: Instant,
+    protected val sessionKey: SessionKey,
+    private val parentEventID: EventID,
+    private val messageStream: Observable<StreamContainer>,
+    private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
     protected var handledMessageCounter: Long = 0
 
@@ -292,24 +293,64 @@ abstract class AbstractCheckTask(
         if (prevState != State.PUBLISHED) {
             completeEvent(prevState == State.TIMEOUT)
             _endTime = Instant.now()
-            LOGGER.debug("Sending event tree id '{}' parent id '{}'", rootEvent.id, parentEventID)
-           val batch = EventBatch.newBuilder()
-               .setParentEventId(parentEventID)
-               .addAllEvents(rootEvent.toProtoEvents(parentEventID.id))
-               .build()
 
-            RESPONSE_EXECUTOR.execute {
-                try {
-                    eventBatchRouter.send(batch, "publish", "event")
-                    if (LOGGER.isDebugEnabled) {
-                        LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
+            val events = rootEvent.toProtoEvents(parentEventID)
+            val batches = batch(events, parentEventID)
+
+            batches.forEach { batch ->
+                LOGGER.debug("Sending event batch parent id '{}'", parentEventID) //TODO: add list of ides
+                RESPONSE_EXECUTOR.execute {
+                    try {
+                        eventBatchRouter.send(batch, "publish", "event")
+                        if (LOGGER.isDebugEnabled) {
+                            LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
+                        }
+                    } catch (e: Exception) {
+                        LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
                     }
-                } catch (e: Exception) {
-                    LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
                 }
             }
         } else {
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
+        }
+    }
+
+    private fun batch(events: List<com.exactpro.th2.common.grpc.Event>, parentEventID: EventID): List<EventBatch> {
+        val result = ArrayList<EventBatch>();
+        val eventGroups = events.groupBy(com.exactpro.th2.common.grpc.Event::getParentId)
+
+        batch(result, eventGroups, parentEventID)
+
+        return result
+    }
+
+    private fun batch(result: MutableList<EventBatch>, eventGroups: Map<EventID, List<com.exactpro.th2.common.grpc.Event>>, eventID: EventID) {
+        val factory = { EventBatch.newBuilder().setParentEventId(eventID) }
+
+        var builder = factory.invoke()
+
+        eventGroups[eventID]?.forEach { event ->
+            if (event.body.size() > maxEventBatchContentSize) {
+                throw java.lang.IllegalStateException("Event ${shortDebugString(event.id)} exceeds max size, max $maxEventBatchContentSize, actual ${event.body.size()}, content ${event.body.toStringUtf8()}")
+            }
+
+            if(eventGroups.containsKey(event.id)) {
+                builder.addEvents(event)
+                result.add(builder.build())
+                builder = factory.invoke()
+
+                batch(result, eventGroups, event.id)
+            } else {
+                if(builder.getContentSize() + event.getContentSize() >= maxEventBatchContentSize) {
+                    result.add(builder.build())
+                    builder = factory.invoke()
+                }
+                builder.addEvents(event)
+            }
+        } ?: throw java.lang.IllegalStateException("Neither of events refers to ${shortDebugString(eventID)}")
+
+        if(builder.eventsCount > 0) {
+            result.add(builder.build())
         }
     }
 
@@ -350,8 +391,16 @@ abstract class AbstractCheckTask(
 
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
-
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
+
+    }
+
+    private fun com.exactpro.th2.common.grpc.Event.getContentSize(): Int {
+        return body.size()
+    }
+
+    private fun EventBatch.Builder.getContentSize(): Int {
+        return eventsList.map { it.getContentSize() }.sum()
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -24,15 +24,14 @@ import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
-import org.slf4j.LoggerFactory
 import kotlin.test.assertNotNull
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
 
-    fun awaitEventBatchRequest(timeoutValue: Long = 1000L): EventBatch {
+    fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int = 2): EventBatch {
         val argumentCaptor = argumentCaptor<EventBatch>()
-        verify(clientStub, timeout(timeoutValue).times(1)).send(argumentCaptor.capture(), any())
+        verify(clientStub, timeout(timeoutValue).times(times)).send(argumentCaptor.capture(), any())
         return assertNotNull(argumentCaptor.lastValue, "Request was not received during $timeoutValue millis")
     }
 
@@ -40,9 +39,5 @@ abstract class AbstractCheckTaskTest {
         return Observable.just(
             StreamContainer(SessionKey(alias, direction), messages.size + 1, Observable.fromIterable(messages))
         )
-    }
-
-    companion object {
-        protected val LOGGER = LoggerFactory.getLogger(AbstractCheckTaskTest::class.java)
     }
 }

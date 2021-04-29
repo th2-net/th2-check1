@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -34,15 +34,16 @@ import java.time.Instant
  * This rule checks the presents of the single message in the messages stream.
  */
 class CheckRuleTask(
-        description: String?,
-        startTime: Instant,
-        sessionKey: SessionKey,
-        timeout: Long,
-        private val protoMessageFilter: RootMessageFilter,
-        parentEventID: EventID,
-        messageStream: Observable<StreamContainer>,
-        eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(description, timeout, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+    description: String?,
+    startTime: Instant,
+    sessionKey: SessionKey,
+    timeout: Long,
+    maxEventBatchContentSize: Int,
+    private val protoMessageFilter: RootMessageFilter,
+    parentEventID: EventID,
+    messageStream: Observable<StreamContainer>,
+    eventBatchRouter: MessageRouter<EventBatch>
+) : AbstractCheckTask(description, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val messageFilter: SailfishFilter = SailfishFilter(
         converter.fromProtoFilter(protoMessageFilter.messageFilter, protoMessageFilter.messageType),

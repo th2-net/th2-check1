@@ -41,11 +41,53 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         Instant.now(),
         SessionKey("test", Direction.FIRST),
         1000,
+        1024 * 1024,
         messageFilter,
         parentEventID,
         messageStream,
         clientStub
     )
+
+    @Test
+    internal fun eventContentExceedsMaxSize() {
+        val streams = createStreams("test", Direction.FIRST, listOf(
+            message("TestMsg", Direction.FIRST, "test")
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .build())
+                .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType("TestMsg")
+            .setMetadataFilter(MetadataFilter.newBuilder()
+                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
+            .build()
+        val task = CheckRuleTask(
+            "test",
+            Instant.now(),
+            SessionKey("test", Direction.FIRST),
+            1000,
+            10,
+            filter,
+            eventID,
+            streams,
+            clientStub)
+        task.begin()
+
+        val eventBatch = awaitEventBatchRequest(1000L)
+
+        assertNotNull(eventBatch)
+        assertTrue({
+            eventBatch.eventsList.none { it.status == EventStatus.FAILED }
+        }) {
+            "Some events are failed $eventBatch"
+        }
+
+//        verify(clientStub, timeout(1000).times(0)).send(any(), any())
+    }
 
     @Test
     internal fun findsMessageByMetadata() {
