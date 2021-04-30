@@ -18,7 +18,6 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.nhaarman.mockitokotlin2.any
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
@@ -29,10 +28,10 @@ import kotlin.test.assertNotNull
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
 
-    fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int = 2): EventBatch {
+    fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int): List<EventBatch> {
         val argumentCaptor = argumentCaptor<EventBatch>()
-        verify(clientStub, timeout(timeoutValue).times(times)).send(argumentCaptor.capture(), any())
-        return assertNotNull(argumentCaptor.lastValue, "Request was not received during $timeoutValue millis")
+        verify(clientStub, timeout(timeoutValue).times(times)).send(argumentCaptor.capture())
+        return assertNotNull(argumentCaptor.allValues, "Request was not received during $timeoutValue millis")
     }
 
     fun createStreams(alias: String, direction: Direction, messages: List<Message>): Observable<StreamContainer> {

@@ -20,6 +20,7 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Event
+import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.FilterOperation
@@ -111,10 +112,32 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin()
 
-        val batchRequest = awaitEventBatchRequest(1000L)
-        val eventsList: List<Event> = batchRequest.eventsList
+        val batchRequest = awaitEventBatchRequest(1000L, 5)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
 
         assertAll({
+            with(batchRequest[0]) {
+                assertEquals(1, eventsCount)
+                assertEquals("checkSequenceRule", getEvents(0).type)
+            }
+            with(batchRequest[1]) {
+                assertEquals(1, eventsCount)
+                assertEquals("preFiltering", getEvents(0).type)
+            }
+            with(batchRequest[2]) {
+                assertEquals(3, eventsCount)
+                assertTrue (getEventsList().all { "Verification" == it.type })
+            }
+            with(batchRequest[3]) {
+                assertEquals(2, eventsCount)
+                assertNotNull (getEventsList().firstOrNull { "checkSequence" == it.type })
+                assertNotNull (getEventsList().firstOrNull { "checkMessages" == it.type })
+            }
+            with(batchRequest[4]) {
+                assertEquals(3, eventsCount)
+                assertTrue (getEventsList().all { "Verification" == it.type })
+            }
+        }, {
             val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
             val verifications = eventsList.filter { it.parentId == checkedMessages.id }
             assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
@@ -140,8 +163,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
-        val batchRequest = awaitEventBatchRequest(1000L)
-        val eventsList: List<Event> = batchRequest.eventsList
+        val batchRequest = awaitEventBatchRequest(1000L, 5)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
 
         assertAll({
             val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
@@ -188,8 +211,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
-        val batchRequest = awaitEventBatchRequest(1000L)
-        val eventsList: List<Event> = batchRequest.eventsList
+        val batchRequest = awaitEventBatchRequest(1000L, 5)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
 
         assertAll({
             val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
@@ -221,8 +244,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
-        val batchRequest = awaitEventBatchRequest(1000L)
-        val eventsList: List<Event> = batchRequest.eventsList
+        val batchRequest = awaitEventBatchRequest(1000L, 5)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
 
         assertAll({
             val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
@@ -275,8 +298,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
-        val batchRequest = awaitEventBatchRequest(1000L)
-        val eventsList: List<Event> = batchRequest.eventsList
+        val batchRequest = awaitEventBatchRequest(1000L, 5)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
 
         assertAll({
             val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
@@ -303,14 +326,15 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         messageStream: Observable<StreamContainer>,
         checkOrder: Boolean,
         preFilterParam: PreFilter = preFilter,
-        filtersParam: List<RootMessageFilter> = protoMessageFilters
+        filtersParam: List<RootMessageFilter> = protoMessageFilters,
+        maxEventBatchContentSize: Int = 1024 * 1024
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
             description = "Test",
             startTime = Instant.now(),
             sessionKey = SessionKey("test_session", Direction.FIRST),
             timeout = 5000L,
-            maxEventBatchContentSize = 10,
+            maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = filtersParam,
             checkOrder = checkOrder,
