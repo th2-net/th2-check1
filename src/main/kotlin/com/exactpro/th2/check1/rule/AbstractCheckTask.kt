@@ -29,7 +29,6 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
@@ -37,15 +36,12 @@ import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.protobuf.ByteString
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.SingleSubject
-import java.lang.IllegalArgumentException
 import java.time.Instant
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -53,7 +49,6 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import com.exactpro.th2.common.grpc.Event as ProtoEvent
 
 /**
  * Implements common logic for check task.
@@ -73,7 +68,7 @@ abstract class AbstractCheckTask(
 
     init {
         if (maxEventBatchContentSize <= 0) {
-            throw IllegalArgumentException("'maxEventBatchContentSize' can't be lower zero, actual: $maxEventBatchContentSize")
+            throw IllegalArgumentException("'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize")
         }
     }
 
@@ -309,7 +304,7 @@ abstract class AbstractCheckTask(
     protected open fun completeEvent(canceled: Boolean) {}
 
     /**
-     * Publishes event to the [eventStoreStub].
+     * Publishes event to the [eventBatchRouter].
      */
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
@@ -317,8 +312,7 @@ abstract class AbstractCheckTask(
             completeEvent(prevState == State.TIMEOUT)
             _endTime = Instant.now()
 
-            val events = rootEvent.toListProto(parentEventID)
-            val batches = batch(events, parentEventID)
+            val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
 
             RESPONSE_EXECUTOR.execute {
                 batches.forEach { batch ->
@@ -336,62 +330,6 @@ abstract class AbstractCheckTask(
         } else {
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
         }
-    }
-
-    private fun batch(events: List<ProtoEvent>, parentEventID: EventID): List<EventBatch> {
-        val result = ArrayList<EventBatch>()
-        val eventGroups = events.groupBy(ProtoEvent::getParentId)
-        batch(result, eventGroups, parentEventID)
-        return result
-    }
-
-    private fun batch(result: MutableList<EventBatch>, eventGroups: Map<EventID, List<ProtoEvent>>, eventID: EventID) {
-        val factory = { EventBatch.newBuilder().setParentEventId(eventID) }
-
-        var builder = factory.invoke()
-
-        eventGroups[eventID]?.forEach { event ->
-            val checkedEvent = checkAndRebuild(event)
-
-            LOGGER.debug("Process ${checkedEvent.name} ${checkedEvent.type}")
-            if(eventGroups.containsKey(checkedEvent.id)) {
-                builder.addEvents(checkedEvent)
-                result.add(checkAndBuild(builder))
-                builder = factory.invoke()
-
-                batch(result, eventGroups, checkedEvent.id)
-            } else {
-                if(builder.getContentSize() + checkedEvent.getContentSize() >= maxEventBatchContentSize) {
-                    if (builder.eventsCount > 0) {
-                        result.add(checkAndBuild(builder))
-                        builder = factory.invoke()
-                    }
-                }
-                builder.addEvents(checkedEvent)
-            }
-        } ?: throw java.lang.IllegalStateException("Neither of events refers to ${shortDebugString(eventID)}")
-
-        if(builder.eventsCount > 0) {
-            result.add(checkAndBuild(builder))
-        }
-    }
-
-    private fun checkAndRebuild(event: ProtoEvent): ProtoEvent {
-        return if (event.body.size() > maxEventBatchContentSize) {
-            ProtoEvent.newBuilder(event).apply {
-                status = EventStatus.FAILED
-                body = "Event ${shortDebugString(event.id)} exceeds max size, max $maxEventBatchContentSize, actual ${event.body.size()}".toEventBody()
-            }.build()
-        } else { event }
-    }
-
-    private fun checkAndBuild(builder: EventBatch.Builder): EventBatch {
-        val contentSize = builder.getContentSize()
-        if (contentSize >= maxEventBatchContentSize) {
-            throw java.lang.IllegalStateException("The smallest batch size exceeds the max event batch content size, max $maxEventBatchContentSize, actual $contentSize. Please check the box settings. ")
-        }
-
-        return builder.build()
     }
 
     protected fun matchFilter(
@@ -432,17 +370,6 @@ abstract class AbstractCheckTask(
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
-        private val OBJECT_MAPPER = ObjectMapper()
-    }
-
-    private fun String.toEventBody(): ByteString = ByteString.copyFrom(OBJECT_MAPPER.writeValueAsBytes(listOf(EventUtils.createMessageBean(this))))
-
-    private fun ProtoEvent.getContentSize(): Int {
-        return body.size()
-    }
-
-    private fun EventBatch.Builder.getContentSize(): Int {
-        return eventsList.map { it.getContentSize() }.sum()
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
