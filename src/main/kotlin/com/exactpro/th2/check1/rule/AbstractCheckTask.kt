@@ -322,7 +322,7 @@ abstract class AbstractCheckTask(
 
             RESPONSE_EXECUTOR.execute {
                 batches.forEach { batch ->
-                    LOGGER.debug("Sending event batch parent id '{}'", parentEventID.id) //TODO: add list of ides
+                    LOGGER.debug("Sending event batch parent id '{}'", parentEventID.id)
                     try {
                         eventBatchRouter.send(batch)
                         if (LOGGER.isDebugEnabled) {
