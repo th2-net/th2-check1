@@ -114,7 +114,7 @@ class CheckTaskUtilsTest {
     }
 
     @Test
-    fun `several events in the middle of hierarchy`() {
+    fun `event with children is after the event without children`() {
         val rootEvent = Event.start()
             .bodyData(data).apply {
                 addSubEventWithSamePeriod()
@@ -124,6 +124,24 @@ class CheckTaskUtilsTest {
                         addSubEventWithSamePeriod()
                             .bodyData(data)
                     }
+            }
+
+        val batches = rootEvent.disperseToBatches(dataSize, parentEventId)
+        assertEquals(4, batches.size)
+        checkEventStatus(batches, 4, 0)
+    }
+
+    @Test
+    fun `event with children is before the event without children`() {
+        val rootEvent = Event.start()
+            .bodyData(data).apply {
+                addSubEventWithSamePeriod()
+                    .bodyData(data).apply {
+                        addSubEventWithSamePeriod()
+                            .bodyData(data)
+                    }
+                addSubEventWithSamePeriod()
+                    .bodyData(data)
             }
 
         val batches = rootEvent.disperseToBatches(dataSize, parentEventId)

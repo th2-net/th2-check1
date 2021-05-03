@@ -67,8 +67,8 @@ abstract class AbstractCheckTask(
 ) : AbstractSessionObserver<MessageContainer>() {
 
     init {
-        if (maxEventBatchContentSize <= 0) {
-            throw IllegalArgumentException("'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize")
+        require(maxEventBatchContentSize > 0) {
+            "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize"
         }
     }
 

@@ -13,7 +13,6 @@
 @file:JvmName("CheckTaskUtils")
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.EventBatch
@@ -23,14 +22,15 @@ import com.exactpro.th2.common.grpc.EventStatus
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.protobuf.ByteString
 import com.google.protobuf.TextFormat
-import java.lang.IllegalArgumentException
+import mu.KotlinLogging
 import com.exactpro.th2.common.grpc.Event as ProtoEvent
 
 val OBJECT_MAPPER = ObjectMapper()
+val LOGGER = KotlinLogging.logger {}
 
 fun Event.disperseToBatches(maxEventBatchContentSize: Int, parentEventId: EventID): List<EventBatch> {
-    if(maxEventBatchContentSize <= 0) {
-        throw IllegalArgumentException("'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize")
+    require(maxEventBatchContentSize > 0) {
+        "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize"
     }
 
     val events = toListProto(parentEventId)
@@ -41,7 +41,7 @@ fun Event.disperseToBatches(maxEventBatchContentSize: Int, parentEventId: EventI
     return result
 }
 
-private fun batch(maxEventBatchContentSize: Int, result: MutableList<EventBatch>, eventGroups: Map<EventID, List<com.exactpro.th2.common.grpc.Event>>, eventID: EventID) {
+private fun batch(maxEventBatchContentSize: Int, result: MutableList<EventBatch>, eventGroups: Map<EventID, List<ProtoEvent>>, eventID: EventID) {
     val factory = { EventBatch.newBuilder().setParentEventId(eventID) }
 
     var builder = factory.invoke()
@@ -51,7 +51,7 @@ private fun batch(maxEventBatchContentSize: Int, result: MutableList<EventBatch>
     }.forEach { event ->
         val checkedEvent = checkAndRebuild(maxEventBatchContentSize, event)
 
-        AbstractSessionObserver.LOGGER.trace("Process ${checkedEvent.name} ${checkedEvent.type}")
+        LOGGER.trace("Process ${checkedEvent.name} ${checkedEvent.type}")
         if(eventGroups.containsKey(checkedEvent.id)) {
             result.add(checkAndBuild(maxEventBatchContentSize, factory.invoke()
                 .addEvents(checkedEvent)))
@@ -81,7 +81,7 @@ private fun checkAndBuild(maxEventBatchContentSize: Int, builder: Builder): Even
     return builder.build()
 }
 
-private fun checkAndRebuild(maxEventBatchContentSize: Int, event: com.exactpro.th2.common.grpc.Event): ProtoEvent {
+private fun checkAndRebuild(maxEventBatchContentSize: Int, event: ProtoEvent): ProtoEvent {
     return if (event.body.size() > maxEventBatchContentSize) {
         ProtoEvent.newBuilder(event).apply {
             status = EventStatus.FAILED
