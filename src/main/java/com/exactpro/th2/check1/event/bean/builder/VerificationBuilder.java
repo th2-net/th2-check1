@@ -15,17 +15,15 @@
  */
 package com.exactpro.th2.check1.event.bean.builder;
 
-import static com.exactpro.th2.check1.util.VerificationUtil.toMetaContainer;
-
 import java.util.HashMap;
 import java.util.Map;
 
 import com.exactpro.sf.comparison.ComparisonResult;
+import com.exactpro.th2.check1.event.VerificationEntryUtils;
 import com.exactpro.th2.common.event.IBodyData;
 import com.exactpro.th2.common.event.bean.Verification;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.grpc.MessageFilter;
-import com.exactpro.th2.check1.event.VerificationEntryUtils;
 import com.exactpro.th2.common.grpc.MetadataFilter;
 
 public class VerificationBuilder {
@@ -43,14 +41,12 @@ public class VerificationBuilder {
     }
 
     public VerificationBuilder verification(String fieldName, ComparisonResult comparisonResult, MessageFilter messageFilter, boolean listItemAsSeparate) {
-        fields.put(fieldName, VerificationEntryUtils.createVerificationEntry(comparisonResult,
-                toMetaContainer(messageFilter, listItemAsSeparate)));
+        fields.put(fieldName, VerificationEntryUtils.createVerificationEntry(comparisonResult));
         return this;
     }
 
     public VerificationBuilder verification(String fieldName, ComparisonResult comparisonResult, MetadataFilter messageFilter) {
-        fields.put(fieldName, VerificationEntryUtils.createVerificationEntry(comparisonResult,
-                toMetaContainer(messageFilter)));
+        fields.put(fieldName, VerificationEntryUtils.createVerificationEntry(comparisonResult));
         return this;
     }
 

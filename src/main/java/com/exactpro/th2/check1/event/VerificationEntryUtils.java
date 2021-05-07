@@ -16,13 +16,11 @@
 package com.exactpro.th2.check1.event;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.BooleanUtils;
-
-import com.exactpro.sf.aml.script.MetaContainer;
 import com.exactpro.sf.aml.scriptutil.StaticUtil.IFilter;
 import com.exactpro.sf.comparison.ComparisonResult;
 import com.exactpro.sf.comparison.Formatter;
@@ -31,26 +29,20 @@ import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
 import com.exactpro.th2.common.grpc.FilterOperation;
 
-import static com.exactpro.sf.comparison.ComparisonUtil.getStatusType;
-import static java.lang.String.format;
-
 public class VerificationEntryUtils {
 
-    public static VerificationEntry createVerificationEntry(ComparisonResult result, MetaContainer metaContainer) {
+    public static VerificationEntry createVerificationEntry(ComparisonResult result) {
         VerificationEntry verificationEntry = new VerificationEntry();
         verificationEntry.setActual(Objects.toString(result.getActual(), null));
         verificationEntry.setExpected(Formatter.formatExpected(result));
         verificationEntry.setStatus(toVerificationStatus(result.getStatus()));
-        verificationEntry.setKey(isKey(result, metaContainer));
+        verificationEntry.setKey(result.isKey());
         verificationEntry.setOperation(resolveOperation(result));
-        MetaContainer children = metaContainer == null ? null
-                : metaContainer.get(result.getName()) == null ? metaContainer
-                : metaContainer.get(result.getName()).get(0);
         if (result.hasResults()) {
             verificationEntry.setFields(result.getResults().entrySet().stream()
                     .collect(Collectors.toMap(
                             Entry::getKey,
-                            entry -> createVerificationEntry(entry.getValue(), children),
+                            entry -> createVerificationEntry(entry.getValue()),
                             (entry1, entry2) -> entry1,
                             LinkedHashMap::new)));
             verificationEntry.setType("collection");
@@ -76,10 +68,6 @@ public class VerificationEntryUtils {
             }
         }
         return FilterOperation.EQUAL.name();
-    }
-
-    private static boolean isKey(ComparisonResult result, MetaContainer metaContainer) {
-        return metaContainer != null && BooleanUtils.isFalse(metaContainer.getKeyFields().get(result.getName()));
     }
 
     private static VerificationStatus toVerificationStatus(StatusType statusType) {
