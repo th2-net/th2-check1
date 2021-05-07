@@ -18,9 +18,7 @@ package com.exactpro.th2.check1.util;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import com.exactpro.sf.aml.AMLLangConst;
 import com.exactpro.sf.aml.script.MetaContainer;
@@ -30,7 +28,6 @@ import com.exactpro.th2.check1.DefaultMessageFactoryProxy;
 import com.exactpro.th2.common.grpc.FailUnexpected;
 import com.exactpro.th2.common.grpc.ListValueFilter;
 import com.exactpro.th2.common.grpc.MessageFilter;
-import com.exactpro.th2.common.grpc.MessageMetadata;
 import com.exactpro.th2.common.grpc.MessageMetadataOrBuilder;
 import com.exactpro.th2.common.grpc.MetadataFilter;
 import com.exactpro.th2.common.grpc.ValueFilter;
@@ -92,7 +89,8 @@ public class VerificationUtil {
             } else {
                 convertList(parent, fieldName, value.getListFilter());
             }
-        } else if (value.getKey()) {
+        }
+        if (value.getKey()) {
             keyFields.add(fieldName);
         }
     }
