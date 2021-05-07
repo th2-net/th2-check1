@@ -11,7 +11,7 @@ apply plugin: 'maven-publish'
 
 ext {
     sharedDir           = file("${project.rootDir}/shared")
-    sailfishVersion     = '3.2-SNAPSHOT'
+    sailfishVersion     = '3.2.1050'
 }
 
 group = 'com.exactpro.th2'
@@ -35,18 +35,13 @@ repositories {
     }
 
     mavenCentral()
-
     maven {
-        name 'TH2 Bintray'
-        url 'https://dl.bintray.com/exactpro/th2'
+        name 'Sonatype_snapshots'
+        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
     }
     maven {
-        name 'Bintray'
-        url 'https://dl.bintray.com/exactpro/sailfish'
-    }
-    maven {
-        name 'Artifactory-snapshot-oss'
-        url 'https://oss.jfrog.org/artifactory/libs-snapshot'
+        name 'Sonatype_releases'
+        url 'https://s01.oss.sonatype.org/content/repositories/releases/'
     }
 
     mavenLocal()
@@ -117,10 +112,10 @@ bintray {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:2.10.1')
-    implementation 'com.exactpro.th2:grpc-check1:2.4.0'
-    implementation 'com.exactpro.th2:common:2.12.0'
-    implementation 'com.exactpro.th2:sailfish-utils:2.3.0'
+    api platform('com.exactpro.th2:bom:3.0.0')
+    implementation 'com.exactpro.th2:grpc-check1:2.4.3'
+    implementation 'com.exactpro.th2:common:2.17.2'
+    implementation 'com.exactpro.th2:sailfish-utils:2.4.2'
     implementation "org.slf4j:slf4j-log4j12"
     implementation "org.slf4j:slf4j-api"
 
