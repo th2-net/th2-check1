@@ -1,4 +1,4 @@
-# th2 check1 (3.2.1)
+# th2 check1 (3.3.0)
 
 ## Overview
 
@@ -104,6 +104,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.3.0
+
++ Fix problem with missing key field markers in verification entry
 
 ### 3.2.1
 
