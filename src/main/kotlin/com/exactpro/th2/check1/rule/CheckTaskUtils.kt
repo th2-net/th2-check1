@@ -82,10 +82,10 @@ private fun checkAndBuild(maxEventBatchContentSize: Int, builder: Builder): Even
 }
 
 private fun checkAndRebuild(maxEventBatchContentSize: Int, event: ProtoEvent): ProtoEvent {
-    return if (event.body.size() > maxEventBatchContentSize) {
+    return if (event.getContentSize() > maxEventBatchContentSize) {
         ProtoEvent.newBuilder(event).apply {
             status = EventStatus.FAILED
-            body = "Event ${TextFormat.shortDebugString(event.id)} exceeds max size, max $maxEventBatchContentSize, actual ${event.body.size()}".toEventBody()
+            body = "Event ${TextFormat.shortDebugString(event.id)} exceeds max size, max $maxEventBatchContentSize, actual ${event.getContentSize()}".toEventBody()
         }.build()
     } else { event }
 }

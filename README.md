@@ -6,15 +6,15 @@ Communication with the script takes place via grpc, messages are received via ra
 
 The component subscribes to queues specified in the configuration and accumulates messages from them in a FIFO buffer. 
 
-The buffer size is configurable and is 1000 by default.
+The buffer size is configurable, and it is set to 1000 by default.
 
-When the component starts, the grpc server starts and then the component waits for incoming grpc requests for verification.
+When the component starts, the grpc server also starts and then the component waits for incoming grpc requests for verification.
 
 # Verification requests
 
-Available requests described in [this repository](https://gitlab.exactpro.com/vivarium/th2/th2-core-open-source/th2-grpc-check1)
+Available requests are described in [this repository](https://gitlab.exactpro.com/vivarium/th2/th2-core-open-source/th2-grpc-check1)
 
-- CheckSequenceRuleRequest - prefilters messages and verify all of them by filter. Order checking configured from request.
+- CheckSequenceRuleRequest - prefilters the messages and verify all of them by filter. Order checking configured from request.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
 
 ## Quick start
@@ -86,7 +86,7 @@ The max size in bytes of summary events content in a batch defined in _max-event
 
 ## Required pins
 
-The Check1 component has got tow types of pin
+The Check1 component has two types of pin:
 * gRPC server pin to allow other components to connect via `com.exactpro.th2.check1.grpc.Check1Service` class.
 * MQ pin to listen to parsed messages. You can link several sources with different directions and session alises to it.
 
