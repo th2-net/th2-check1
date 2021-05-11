@@ -304,7 +304,7 @@ abstract class AbstractCheckTask(
     protected open fun completeEvent(canceled: Boolean) {}
 
     /**
-     * Publishes event to the [eventBatchRouter].
+     * Publishes the event to [eventBatchRouter].
      */
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
