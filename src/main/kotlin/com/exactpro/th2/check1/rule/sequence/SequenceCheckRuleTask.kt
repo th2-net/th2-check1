@@ -56,7 +56,7 @@ import kotlin.collections.set
  * If **protoFilter** parameter is specified the messages will be pre-filtered before going to the actual comparison.
  *
  * If **checkOrder** parameter is set to `true` the messages must be received in the exact same order as filters were specified.
- * If this parameter is `false` the order won't be checked.
+ * If this parameter is set to `false`, the order won't be checked.
  */
 class SequenceCheckRuleTask(
     description: String?,
