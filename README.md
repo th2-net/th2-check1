@@ -79,7 +79,7 @@ The time before the verification chain (from a task that is complete) will be re
 The value will be interpreted as time unit defined in _cleanup-time-unit_ setting. _The default value is 60_
 
 #### cleanup-time-unit
-The time unit for _cleanup-older-than_ setting. Available values are MILLIS, SECONDS, MINUTES, HOURS. _The default value is SECONDS_
+The time unit for _cleanup-older-than_ setting. The available values are MILLIS, SECONDS, MINUTES, HOURS. _The default value is set to SECONDS_
 
 #### max-event-batch-content-size
 The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is 1048576_
