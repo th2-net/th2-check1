@@ -84,7 +84,7 @@ The time unit for _cleanup-older-than_ setting. The available values are MILLIS,
 #### max-event-batch-content-size
 The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is 1048576_
 
-## Requried pins
+## Required pins
 
 The Check1 component has got tow types of pin
 * gRPC server pin to allow other components to connect via `com.exactpro.th2.check1.grpc.Check1Service` class.
