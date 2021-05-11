@@ -31,7 +31,7 @@ import io.reactivex.Observable
 import java.time.Instant
 
 /**
- * This rule checks the presents of the single message in the messages stream.
+ * This rule checks for the presence of a single message in the messages stream.
  */
 class CheckRuleTask(
     description: String?,
