@@ -1,4 +1,4 @@
-# th2 check1 (3.3.0)
+# th2 check1 (3.4.0)
 
 ## Overview
 
@@ -8,15 +8,15 @@ Communication with the script takes place via grpc, messages are received via ra
 
 The component subscribes to queues specified in the configuration and accumulates messages from them in a FIFO buffer. 
 
-The buffer size is configurable and is 1000 by default.
+The buffer size is configurable, and it is set to 1000 by default.
 
-When the component starts, the grpc server starts and then the component waits for incoming grpc requests for verification.
+When the component starts, the grpc server also starts and then the component waits for incoming grpc requests for verification.
 
 # Verification requests
 
-Available requests described in [this repository](https://gitlab.exactpro.com/vivarium/th2/th2-core-open-source/th2-grpc-check1)
+Available requests are described in [this repository](https://gitlab.exactpro.com/vivarium/th2/th2-core-open-source/th2-grpc-check1)
 
-- CheckSequenceRuleRequest - prefilters messages and verify all of them by filter. Order checking configured from request.
+- CheckSequenceRuleRequest - prefilters the messages and verify all of them by filter. Order checking configured from request.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
 
 ## Quick start
@@ -34,6 +34,7 @@ spec:
     message-cache-size: '1000'
     cleanup-older-than: '60'
     cleanup-time-unit: 'SECONDS'
+    max-event-batch-content-size: '1048576'
   type: th2-check1
   pins:
     - name: server
@@ -65,7 +66,8 @@ This block describes the configuration for check1.
 {
   "message-cache-size": 1000,
   "cleanup-older-than": 60,
-  "cleanup-time-unit": "SECONDS"
+  "cleanup-time-unit": "SECONDS",
+  "max-event-batch-content-size": "1048576"
 }
 ```
 
@@ -79,11 +81,14 @@ The time before the verification chain (from a task that is complete) will be re
 The value will be interpreted as time unit defined in _cleanup-time-unit_ setting. _The default value is 60_
 
 #### cleanup-time-unit
-The time unit for _cleanup-older-than_ setting. Available values are MILLIS, SECONDS, MINUTES, HOURS. _The default value is SECONDS_
+The time unit for _cleanup-older-than_ setting. The available values are MILLIS, SECONDS, MINUTES, HOURS. _The default value is set to SECONDS_
 
-## Requried pins
+#### max-event-batch-content-size
+The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is 1048576_
 
-The Check1 component has got tow types of pin
+## Required pins
+
+The Check1 component has two types of pin:
 * gRPC server pin to allow other components to connect via `com.exactpro.th2.check1.grpc.Check1Service` class.
 * MQ pin to listen to parsed messages. You can link several sources with different directions and session alises to it.
 
@@ -104,6 +109,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.4.0
+
++ Added the max-event-batch-content-size option
 
 ### 3.3.0
 

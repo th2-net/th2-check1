@@ -18,6 +18,7 @@ import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.FilterOperation
@@ -30,22 +31,77 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import kotlin.test.assertEquals
 
 internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     private fun checkTask(
         messageFilter: RootMessageFilter,
         parentEventID: EventID,
-        messageStream: Observable<StreamContainer>
+        messageStream: Observable<StreamContainer>,
+        maxEventBatchContentSize: Int = 1024 * 1024
     ) = CheckRuleTask(
         "test",
         Instant.now(),
         SessionKey("test", Direction.FIRST),
         1000,
+        maxEventBatchContentSize,
         messageFilter,
         parentEventID,
         messageStream,
         clientStub
     )
+
+    @Test
+    internal fun `very little value of max event batch content size`() {
+        val streams = createStreams("test", Direction.FIRST, listOf(
+            message("TestMsg", Direction.FIRST, "test")
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .build())
+                .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType("TestMsg")
+            .setMetadataFilter(MetadataFilter.newBuilder()
+                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
+            .build()
+        val task = checkTask(filter, eventID, streams, 1)
+        task.begin()
+
+        val eventBatches = awaitEventBatchRequest(1000L, 1)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertEquals(1, eventList.size)
+        assertEquals(EventStatus.FAILED, eventList[0].status)
+    }
+
+    @Test
+    internal fun `exceeds max event batch content size`() {
+        val streams = createStreams("test", Direction.FIRST, listOf(
+            message("TestMsg", Direction.FIRST, "test")
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .build())
+                .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType("TestMsg")
+            .setMetadataFilter(MetadataFilter.newBuilder()
+                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
+            .build()
+        val task = checkTask(filter, eventID, streams, 200)
+        task.begin()
+
+        val eventBatches = awaitEventBatchRequest(1000L, 3)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertEquals(4, eventList.size)
+        assertEquals(1, eventList.filter { it.status == EventStatus.FAILED }.size)
+    }
 
     @Test
     internal fun findsMessageByMetadata() {
@@ -67,11 +123,11 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val task = checkTask(filter, eventID, streams)
         task.begin()
 
-        val eventBatch = awaitEventBatchRequest(1000L)
-
-        assertNotNull(eventBatch)
+        val eventBatch = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatch.flatMap(EventBatch::getEventsList)
+        assertEquals(4, eventList.size)
         assertTrue({
-            eventBatch.eventsList.none { it.status == EventStatus.FAILED }
+            eventList.none { it.status == EventStatus.FAILED }
         }) {
             "Some events are failed $eventBatch"
         }
@@ -97,10 +153,9 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val task = checkTask(filter, eventID, streams)
         task.begin()
 
-        val eventBatch = awaitEventBatchRequest(1000L)
+        val eventBatch = awaitEventBatchRequest(1000L, 2)
 
-        assertNotNull(eventBatch)
-        val checkFailedEvent = eventBatch.eventsList.firstOrNull {
+        val checkFailedEvent = eventBatch.flatMap(EventBatch::getEventsList).firstOrNull {
             it.status == EventStatus.FAILED && it.type == "Check failed"
         }
         assertNotNull(checkFailedEvent) {
