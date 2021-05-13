@@ -23,7 +23,9 @@ import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
@@ -31,7 +33,8 @@ abstract class AbstractCheckTaskTest {
     fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int): List<EventBatch> {
         val argumentCaptor = argumentCaptor<EventBatch>()
         verify(clientStub, timeout(timeoutValue).times(times)).send(argumentCaptor.capture())
-        return assertNotNull(argumentCaptor.allValues, "Request was not received during $timeoutValue millis")
+        assertEquals(times, argumentCaptor.allValues.count(), "Request was not received during $timeoutValue millis")
+        return argumentCaptor.allValues
     }
 
     fun createStreams(alias: String, direction: Direction, messages: List<Message>): Observable<StreamContainer> {
