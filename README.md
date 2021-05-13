@@ -1,4 +1,4 @@
-# Overview
+# Overview (2.8.0)
 
 The component is responsible for verifying decoded messages.
 
@@ -105,3 +105,9 @@ spec:
         - "subscribe"
         - "parsed"
 ```
+
+## Release Notes
+
+### 2.8.0
+
++ Added the max-event-batch-content-size option 
