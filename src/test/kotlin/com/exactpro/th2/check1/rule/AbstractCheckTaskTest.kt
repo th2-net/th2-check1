@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,31 +18,27 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.nhaarman.mockitokotlin2.any
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
-import org.slf4j.LoggerFactory
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
 
-    fun awaitEventBatchRequest(timeoutValue: Long = 1000L): EventBatch {
+    fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int): List<EventBatch> {
         val argumentCaptor = argumentCaptor<EventBatch>()
-        verify(clientStub, timeout(timeoutValue).times(1)).send(argumentCaptor.capture(), any())
-        return assertNotNull(argumentCaptor.lastValue, "Request was not received during $timeoutValue millis")
+        verify(clientStub, timeout(timeoutValue).times(times)).send(argumentCaptor.capture())
+        return argumentCaptor.allValues
     }
 
     fun createStreams(alias: String, direction: Direction, messages: List<Message>): Observable<StreamContainer> {
         return Observable.just(
             StreamContainer(SessionKey(alias, direction), messages.size + 1, Observable.fromIterable(messages))
         )
-    }
-
-    companion object {
-        protected val LOGGER = LoggerFactory.getLogger(AbstractCheckTaskTest::class.java)
     }
 }

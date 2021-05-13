@@ -43,8 +43,6 @@ repositories {
         url 'https://s01.oss.sonatype.org/content/repositories/releases/'
     }
 
-    mavenLocal()
-
     configurations.all {
         resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
         resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
@@ -167,7 +165,7 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:3.0.0')
-    implementation 'com.exactpro.th2:grpc-check1:2.4.3'
+    implementation 'com.exactpro.th2:grpc-check1:2.4.4'
     implementation 'com.exactpro.th2:common:2.17.2'
     implementation 'com.exactpro.th2:sailfish-utils:2.4.2'
     implementation "org.slf4j:slf4j-log4j12"
