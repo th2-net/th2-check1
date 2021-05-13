@@ -33,7 +33,6 @@ abstract class AbstractCheckTaskTest {
     fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int): List<EventBatch> {
         val argumentCaptor = argumentCaptor<EventBatch>()
         verify(clientStub, timeout(timeoutValue).times(times)).send(argumentCaptor.capture())
-        assertEquals(times, argumentCaptor.allValues.count(), "Request was not received during $timeoutValue millis")
         return argumentCaptor.allValues
     }
 
