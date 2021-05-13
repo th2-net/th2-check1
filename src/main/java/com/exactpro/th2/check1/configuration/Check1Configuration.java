@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -25,6 +25,9 @@ public class Check1Configuration {
     @JsonProperty(value="cleanup-older-than", defaultValue = "60")
     private long cleanupOlderThan = 60L;
 
+    @JsonProperty(value="max-event-batch-content-size", defaultValue = "1048576")
+    private int maxEventBatchContentSize = 1_048_576;
+
     @JsonProperty(value="cleanup-time-unit", defaultValue = "SECONDS")
     private ChronoUnit cleanupTimeUnit = ChronoUnit.SECONDS;
 
@@ -34,6 +37,10 @@ public class Check1Configuration {
 
     public long getCleanupOlderThan() {
         return cleanupOlderThan;
+    }
+
+    public int getMaxEventBatchContentSize() {
+        return maxEventBatchContentSize;
     }
 
     public ChronoUnit getCleanupTimeUnit() {

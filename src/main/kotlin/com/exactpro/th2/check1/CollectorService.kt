@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -63,6 +63,7 @@ class CollectorService(
 
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
+    private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
 
     init {
         val limitSize = configuration.messageCacheSize
@@ -96,8 +97,8 @@ class CollectorService(
 
         val chainID = request.getChainIdOrGenerate()
 
-        val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, filter,
-            parentEventID, streamObservable, eventBatchRouter)
+        val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, maxEventBatchContentSize,
+            filter, parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -127,8 +128,8 @@ class CollectorService(
         } else {
             request.messageFiltersList.map { it.toRootMessageFilter() }
         }
-        val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, request.preFilter,
-                protoMessageFilters, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
+        val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, maxEventBatchContentSize,
+            request.preFilter, protoMessageFilters, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 

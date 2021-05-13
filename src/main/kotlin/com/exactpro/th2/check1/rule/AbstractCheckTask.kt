@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -52,18 +52,26 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Implements common logic for check task.
- *
+ * @param maxEventBatchContentSize max size in bytes of summary events content in a batch
  * **Class in not thread-safe**
  */
 abstract class AbstractCheckTask(
-        val description: String?,
-        private val timeout: Long,
-        submitTime: Instant,
-        protected val sessionKey: SessionKey,
-        private val parentEventID: EventID,
-        private val messageStream: Observable<StreamContainer>,
-        private val eventBatchRouter: MessageRouter<EventBatch>
+    val description: String?,
+    private val timeout: Long,
+    private val maxEventBatchContentSize: Int,
+    submitTime: Instant,
+    protected val sessionKey: SessionKey,
+    private val parentEventID: EventID,
+    private val messageStream: Observable<StreamContainer>,
+    private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
+
+    init {
+        require(maxEventBatchContentSize > 0) {
+            "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize"
+        }
+    }
+
     protected var handledMessageCounter: Long = 0
 
     protected val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
@@ -241,7 +249,18 @@ abstract class AbstractCheckTask(
             publishEvent()
             LOGGER.info("Task '$description' has been finished")
         } catch (ex: Exception) {
-            LOGGER.error("Cannot finish task '$description'", ex)
+            val message = "Cannot finish task '$description'"
+            LOGGER.error(message, ex)
+            eventBatchRouter.send(EventBatch.newBuilder()
+                .setParentEventId(parentEventID)
+                .addEvents(Event.start()
+                    .name("Check rule $description problem")
+                    .type("Exception")
+                    .status(FAILED)
+                    .bodyData(EventUtils.createMessageBean(message))
+                    .bodyData(EventUtils.createMessageBean(ex.message))
+                    .toProto(parentEventID))
+                .build())
         } finally {
             sequenceSubject.onSuccess(lastSequence)
         }
@@ -285,27 +304,27 @@ abstract class AbstractCheckTask(
     protected open fun completeEvent(canceled: Boolean) {}
 
     /**
-     * Publishes event to the [eventStoreStub].
+     * Publishes the event to [eventBatchRouter].
      */
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
             completeEvent(prevState == State.TIMEOUT)
             _endTime = Instant.now()
-            LOGGER.debug("Sending event tree id '{}' parent id '{}'", rootEvent.id, parentEventID)
-           val batch = EventBatch.newBuilder()
-               .setParentEventId(parentEventID)
-               .addAllEvents(rootEvent.toProtoEvents(parentEventID.id))
-               .build()
+
+            val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
 
             RESPONSE_EXECUTOR.execute {
-                try {
-                    eventBatchRouter.send(batch, "publish", "event")
-                    if (LOGGER.isDebugEnabled) {
-                        LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
+                batches.forEach { batch ->
+                    LOGGER.debug("Sending event batch parent id '{}'", parentEventID.id)
+                    try {
+                        eventBatchRouter.send(batch)
+                        if (LOGGER.isDebugEnabled) {
+                            LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
+                        }
+                    } catch (e: Exception) {
+                        LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
                     }
-                } catch (e: Exception) {
-                    LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
                 }
             }
         } else {
@@ -350,7 +369,6 @@ abstract class AbstractCheckTask(
 
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
-
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
     }
 
