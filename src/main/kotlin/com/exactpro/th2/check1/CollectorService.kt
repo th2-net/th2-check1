@@ -185,11 +185,15 @@ class CollectorService(
         for ((key, task) in eventIdToLastCheckTask.entries) {
             val endTime = task.endTime
             if (olderThan(now, delta, unit, endTime)) {
-                logger.debug("Remove task ${task.description} ($endTime) from tasks map")
-                if (eventIdToLastCheckTask.remove(key, task)) {
-                    runCatching { task.shutdownExecutor() }
-                        .onFailure { logger.error("Cannot shutdown scheduler for task '${task.description}'", it) }
-                }
+                runCatching { eventIdToLastCheckTask.compute(key) { _, value ->
+                    if (task == value) {
+                        value.shutdownExecutor()
+                        null
+                    } else {
+                        value
+                    }
+                }}.onFailure { logger.error("Task ${task.description} can't be removed because it has continuation ") }
+                    .onSuccess { logger.debug("Removed task ${task.description} ($endTime) from tasks map") }
             }
         }
     }
