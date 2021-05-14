@@ -150,8 +150,9 @@ abstract class AbstractCheckTask(
                     executorService
                 }
             sequenceSubject.subscribe { sequence -> checkTask.begin(sequence, executor) }
+            LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
         } else {
-            throw IllegalStateException("Subscription to last sequence for task $description is already executed")
+            throw IllegalStateException("Subscription to last sequence for task $description (${hashCode()}) is already executed, subscriber ${checkTask.description} (${checkTask.hashCode()})")
         }
     }
 
