@@ -40,6 +40,7 @@ import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -121,7 +122,7 @@ class SequenceCheckRuleTask(
 
         preFilterEvent = Event.start()
             .type("preFiltering")
-            .bodyData(createMessageBean("Passed pre-filter will be placed there")) // TODO: Write filter
+            .bodyData(protoPreMessageFilter.toTreeTable())
 
         rootEvent.addSubEvent(preFilterEvent)
     }
@@ -197,6 +198,7 @@ class SequenceCheckRuleTask(
             .type("checkMessages")
             .appendEventWithVerifications(messageFilteringResults.values)
         if (protoMessageFilters.size != messageFilteringResults.size) {
+            messageFilteringResults.values.map(ComparisonContainer::protoFilter)
             checkMessagesEvent.status(FAILED)
                 .bodyData(createMessageBean("Incorrect number of comparisons (expected ${protoMessageFilters.size} / actual ${messageFilteringResults.size})"))
         } else {

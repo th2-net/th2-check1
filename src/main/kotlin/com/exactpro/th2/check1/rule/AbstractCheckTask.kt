@@ -103,7 +103,7 @@ abstract class AbstractCheckTask(
 
     private lateinit var endFuture: Disposable
 
-    private var lastSequence = Long.MIN_VALUE
+    private var lastSequence = DEFAULT_SEQUENCE
 
     override fun onStart() {
         super.onStart()
@@ -208,6 +208,7 @@ abstract class AbstractCheckTask(
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
+        this.lastSequence = sequence
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
 
@@ -228,7 +229,6 @@ abstract class AbstractCheckTask(
                 handledMessageCounter++
 
                 with(it.metadata.id) {
-                    lastSequence = this.sequence
                     rootEvent.messageID(this)
                 }
             }
@@ -344,10 +344,9 @@ abstract class AbstractCheckTask(
                 messageContainer.metadataMessage,
                 it.message, it.comparatorSettings,
                 matchNames
-            )
-        }
-        if (metadataFilter != null) {
-            LOGGER.debug("Metadata comparison result\n {}", metadataComparisonResult)
+            )?.also { comparisonResult ->
+                LOGGER.debug("Metadata comparison result\n {}", comparisonResult)
+            }
         }
         if (metadataFilter != null && metadataComparisonResult == null) {
             if (LOGGER.isDebugEnabled) {
@@ -362,6 +361,7 @@ abstract class AbstractCheckTask(
         LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
+            lastSequence = messageContainer.protoMessage.metadata.id.sequence
             AggregatedFilterResult(comparisonResult, metadataComparisonResult)
         } else {
             AggregatedFilterResult.EMPTY
