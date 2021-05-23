@@ -163,7 +163,6 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             set(indexesToSwitch.first, get(indexesToSwitch.second))
             set(indexesToSwitch.second, tmp)
         }
-        val idsOrder = messagesUnordered.map { it.metadata.id }
         val messages = Observable.fromIterable(messagesUnordered)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
@@ -183,7 +182,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             // The messages are reordered but all presents. So, all verifications should be passed
             assertEquals(3, passedVerifications.size, "Unexpected SUCCESS verifications count: $passedVerifications")
             assertTrue("Some verifications have more than one message attached") { passedVerifications.all { it.attachedMessageIdsCount == 1 } }
-            assertEquals(idsOrder, passedVerifications.map { it.getAttachedMessageIds(0) })
+            // Ids in the result of the rule are in order by filters because the rule creates events related to verifications/filters in the source order.
+            assertEquals(messagesInCorrectOrder.map { it.metadata.id }, passedVerifications.map { it.getAttachedMessageIds(0) })
         }, {
             assertCheckSequenceStatus(EventStatus.FAILED, eventsList)
         })

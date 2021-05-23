@@ -34,6 +34,7 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -337,7 +338,8 @@ abstract class AbstractCheckTask(
         messageContainer: MessageContainer,
         messageFilter: SailfishFilter,
         metadataFilter: SailfishFilter?,
-        matchNames: Boolean = true
+        matchNames: Boolean = true,
+        significant: Boolean = true
     ): AggregatedFilterResult {
         val metadataComparisonResult: ComparisonResult? = metadataFilter?.let {
             MessageComparator.compare(
@@ -361,7 +363,9 @@ abstract class AbstractCheckTask(
         LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
-            lastSequence = messageContainer.protoMessage.metadata.id.sequence
+            if (significant) {
+                lastSequence = messageContainer.protoMessage.metadata.id.sequence
+            }
             AggregatedFilterResult(comparisonResult, metadataComparisonResult)
         } else {
             AggregatedFilterResult.EMPTY
@@ -424,11 +428,22 @@ abstract class AbstractCheckTask(
         return this
     }
 
-    protected fun Event.appendEventWithVerifications(comparisonContainers: Collection<ComparisonContainer>): Event {
-        for (comparisonContainer in comparisonContainers) {
-            appendEventsWithVerification(comparisonContainer)
+    protected fun Event.appendEventWithVerificationsAndFilters(protoMessageFilters: Collection<RootMessageFilter>, comparisonContainers: Collection<ComparisonContainer>): Event {
+        for (messageFilter in protoMessageFilters) {
+            val comparisonContainer = comparisonContainers.firstOrNull { it.protoFilter == messageFilter }
+            comparisonContainer?.let {
+                appendEventsWithVerification(it)
+            } ?: appendEventsWithFilter(messageFilter)
         }
         return this
+    }
+
+    protected fun Event.appendEventsWithFilter(rootMessageFilter: RootMessageFilter): Event = this.apply {
+        addSubEventWithSamePeriod()
+            .name("Message filter")
+            .type("Filter")
+            .status(FAILED)
+            .bodyData(rootMessageFilter.toTreeTable())
     }
 
     protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {

@@ -132,7 +132,7 @@ class SequenceCheckRuleTask(
             if (LOGGER.isDebugEnabled) {
                 LOGGER.debug("Pre-filtering message with id: {}", shortDebugString(messageContainer.protoMessage.metadata.id))
             }
-            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, false)
+            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false, significant = false)
             ComparisonContainer(messageContainer, protoPreMessageFilter, result)
         }.filter { preFilterContainer -> // Filter  check result of pre-filter
             preFilterContainer.fullyMatches
@@ -195,8 +195,8 @@ class SequenceCheckRuleTask(
     private fun fillCheckMessagesEvent() {
         val checkMessagesEvent = rootEvent.addSubEventWithSamePeriod()
             .name("Check messages")
-            .type("checkMessages")
-            .appendEventWithVerifications(messageFilteringResults.values)
+            .type(CHECK_MESSAGES_TYPE)
+            .appendEventWithVerificationsAndFilters(protoMessageFilters, messageFilteringResults.values)
         if (protoMessageFilters.size != messageFilteringResults.size) {
             messageFilteringResults.values.map(ComparisonContainer::protoFilter)
             checkMessagesEvent.status(FAILED)
@@ -259,5 +259,6 @@ class SequenceCheckRuleTask(
 
     companion object {
         const val PRE_FILTER_MESSAGE_NAME = "PreFilter"
+        const val CHECK_MESSAGES_TYPE = "checkMessages"
     }
 }
