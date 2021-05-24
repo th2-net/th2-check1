@@ -42,9 +42,7 @@ fun Event.disperseToBatches(maxEventBatchContentSize: Int, parentEventId: EventI
 }
 
 private fun batch(maxEventBatchContentSize: Int, result: MutableList<EventBatch>, eventGroups: Map<EventID, List<ProtoEvent>>, eventID: EventID) {
-    val factory = { EventBatch.newBuilder().setParentEventId(eventID) }
-
-    var builder = factory.invoke()
+    var builder = EventBatch.newBuilder().setParentEventId(eventID)
 
     checkNotNull(eventGroups[eventID]) {
         "Neither of events refers to ${TextFormat.shortDebugString(eventID)}"
@@ -53,7 +51,7 @@ private fun batch(maxEventBatchContentSize: Int, result: MutableList<EventBatch>
 
         LOGGER.trace("Process ${checkedEvent.name} ${checkedEvent.type}")
         if(eventGroups.containsKey(checkedEvent.id)) {
-            result.add(checkAndBuild(maxEventBatchContentSize, factory.invoke()
+            result.add(checkAndBuild(maxEventBatchContentSize, EventBatch.newBuilder()
                 .addEvents(checkedEvent)))
 
             batch(maxEventBatchContentSize, result, eventGroups, checkedEvent.id)
@@ -61,7 +59,7 @@ private fun batch(maxEventBatchContentSize: Int, result: MutableList<EventBatch>
             if(builder.eventsCount > 0
                 && builder.getContentSize() + checkedEvent.getContentSize() > maxEventBatchContentSize) {
                 result.add(checkAndBuild(maxEventBatchContentSize, builder))
-                builder = factory.invoke()
+                builder = EventBatch.newBuilder().setParentEventId(eventID)
             }
             builder.addEvents(checkedEvent)
         }

@@ -28,8 +28,8 @@ import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
-import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
+import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import java.time.Instant
