@@ -46,9 +46,7 @@ abstract class AbstractCheckTaskTest {
             idBuilder.apply {
                 this.sequence = sequence
                 this.direction = direction
-                connectionIdBuilder.apply {
-                    this.sessionAlias = alias
-                }
+                connectionIdBuilder.sessionAlias = alias
             }
         }
     }

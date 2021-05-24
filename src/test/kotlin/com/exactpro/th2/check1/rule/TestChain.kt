@@ -178,8 +178,8 @@ class TestChain: AbstractCheckTaskTest() {
 
     private fun createMessage(sequence: Int) = constructMessage(sequence.toLong())
         .putAllFields(mapOf(
-            KEY_FIELD to Value.newBuilder().setSimpleValue("$KEY_FIELD$sequence").build(),
-            NOT_KEY_FIELD to Value.newBuilder().setSimpleValue("$NOT_KEY_FIELD$sequence").build()
+            KEY_FIELD to "$KEY_FIELD$sequence".toValue(),
+            NOT_KEY_FIELD to "$NOT_KEY_FIELD$sequence".toValue()
         )).build()
 
     private fun createMessageFilter(sequence: Int) = RootMessageFilter.newBuilder()
