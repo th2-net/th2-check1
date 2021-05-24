@@ -46,11 +46,11 @@ class TestChain: AbstractCheckTaskTest() {
     fun `simple rules - two succeed`() {
         val streams = createStreams(messages = (1..3).map(::createMessage))
 
-        val task = checkTask(1, eventID, streams).also { it.begin() }
+        val task = checkRuleTask(1, eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(2, 2)
         checkSimpleVerifySuccess(eventList, 1)
 
-        val task2 = checkTask(3, eventID, streams).also { task.subscribeNextTask(it) }
+        checkRuleTask(3, eventID, streams).also { task.subscribeNextTask(it) }
         eventList = awaitEventBatchAndGetEvents(4, 2)
         checkSimpleVerifySuccess(eventList, 3)
     }
@@ -59,11 +59,11 @@ class TestChain: AbstractCheckTaskTest() {
     fun `simple rules - failed, succeed`() {
         val streams = createStreams(messages = (1..3).map(::createMessage))
 
-        val task = checkTask(4, eventID, streams).also { it.begin() }
+        val task = checkRuleTask(4, eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(2, 2)
         checkSimpleVerifyFailure(eventList)
 
-        val task2 = checkTask(1, eventID, streams).also { task.subscribeNextTask(it) }
+        checkRuleTask(1, eventID, streams).also { task.subscribeNextTask(it) }
         eventList = awaitEventBatchAndGetEvents(4, 2)
         checkSimpleVerifySuccess(eventList, 1)
     }
@@ -76,7 +76,7 @@ class TestChain: AbstractCheckTaskTest() {
         var eventList = awaitEventBatchAndGetEvents(6, 6)
         checkSequenceVerifySuccess(eventList, listOf(1, 2))
 
-        val task2 = sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { task.subscribeNextTask(it) }
+        sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { task.subscribeNextTask(it) }
         eventList = awaitEventBatchAndGetEvents(12, 6)
         checkSequenceVerifySuccess(eventList, listOf(3, 4))
     }
@@ -91,7 +91,7 @@ class TestChain: AbstractCheckTaskTest() {
         assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(4, eventList.filter { it.status == FAILED }.size)
 
-        val task2 = sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { task.subscribeNextTask(it) }
+        sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { task.subscribeNextTask(it) }
         eventList = awaitEventBatchAndGetEvents(12, 6)
         checkSequenceVerifySuccess(eventList, listOf(1, 2))
     }
@@ -106,9 +106,29 @@ class TestChain: AbstractCheckTaskTest() {
         assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(4, eventList.filter { it.status == FAILED }.size)
 
-        val task2 = sequenceCheckRuleTask(listOf(2, 3), eventID, streams).also { task.subscribeNextTask(it) }
+        sequenceCheckRuleTask(listOf(2, 3), eventID, streams).also { task.subscribeNextTask(it) }
         eventList = awaitEventBatchAndGetEvents(12, 6)
         checkSequenceVerifySuccess(eventList, listOf(2, 3))
+    }
+
+    @Test
+    fun `make long chain before begin`() {
+        val streams = createStreams(messages = (1..4).map(::createMessage))
+
+        val task = checkRuleTask(1, eventID, streams).also { one ->
+            one.subscribeNextTask(checkRuleTask(2, eventID, streams).also { two ->
+                two.subscribeNextTask(checkRuleTask(3, eventID, streams).also { three ->
+                    three.subscribeNextTask(checkRuleTask(4, eventID, streams))
+                })
+            })
+        }
+
+        task.begin()
+
+        val eventList = awaitEventBatchRequest(1000L, 4 * 2).flatMap(EventBatch::getEventsList)
+        assertEquals(4 * 3, eventList.size)
+        assertEquals(4 * 3, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(listOf(1L, 2L, 3L, 4L), eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList).map(MessageID::getSequence))
     }
 
     private fun awaitEventBatchAndGetEvents(times: Int, last: Int): List<Event> =
@@ -159,7 +179,7 @@ class TestChain: AbstractCheckTaskTest() {
         )
     }
 
-    private fun checkTask(
+    private fun checkRuleTask(
         sequence: Int,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,

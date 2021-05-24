@@ -79,7 +79,7 @@ abstract class AbstractCheckTask(
     protected val rootEvent: Event = Event.from(submitTime)
         .description(description)
 
-    private val sequenceSubject = SingleSubject.create<Long>()
+    private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
     private val taskState = AtomicReference(State.CREATED)
 
@@ -143,14 +143,15 @@ abstract class AbstractCheckTask(
      */
     fun subscribeNextTask(checkTask: AbstractCheckTask) {
         if (hasNextTask.compareAndSet(false, true)) {
-            val executor =
-                if (executorService.isShutdown) {
-                    LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
-                    createExecutorService()
-                } else {
-                    executorService
-                }
-            sequenceSubject.subscribe { sequence -> checkTask.begin(sequence, executor) }
+            sequenceSubject.subscribe { legacy ->
+                val executor = if (legacy.executorService.isShutdown) {
+                        LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
+                        createExecutorService()
+                    } else {
+                        legacy.executorService
+                    }
+                checkTask.begin(legacy.lastSequence, executor)
+             }
             LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
         } else {
             throw IllegalStateException("Subscription to last sequence for task $description (${hashCode()}) is already executed, subscriber ${checkTask.description} (${checkTask.hashCode()})")
@@ -264,7 +265,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
-            sequenceSubject.onSuccess(lastSequence)
+            sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
         }
     }
 
@@ -346,7 +347,7 @@ abstract class AbstractCheckTask(
                 messageContainer.metadataMessage,
                 it.message, it.comparatorSettings,
                 matchNames
-            )?.also { comparisonResult ->
+            ).also { comparisonResult ->
                 LOGGER.debug("Metadata comparison result\n {}", comparisonResult)
             }
         }
@@ -482,4 +483,6 @@ abstract class AbstractCheckTask(
 
         return sequence ?: DEFAULT_SEQUENCE
     }
+
+    private data class Legacy(val executorService: ExecutorService, val lastSequence: Long)
 }
