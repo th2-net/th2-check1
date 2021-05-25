@@ -431,7 +431,7 @@ abstract class AbstractCheckTask(
 
     protected fun Event.appendEventWithVerificationsAndFilters(protoMessageFilters: Collection<RootMessageFilter>, comparisonContainers: Collection<ComparisonContainer>): Event {
         for (messageFilter in protoMessageFilters) {
-            val comparisonContainer = comparisonContainers.firstOrNull { it.protoFilter == messageFilter }
+            val comparisonContainer = comparisonContainers.firstOrNull { it.protoFilter === messageFilter }
             comparisonContainer?.let {
                 appendEventsWithVerification(it)
             } ?: appendEventsWithFilter(messageFilter)

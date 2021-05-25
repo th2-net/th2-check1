@@ -190,6 +190,71 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     }
 
     @Test
+    fun `check sequence of messages with the same value of key field`() {
+        val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
+            constructMessage(2, SESSION_ALIAS, MESSAGE_TYPE)
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
+            constructMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build()
+        )
+
+        val messageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putAllFields(
+                        mapOf(
+                            "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build(),
+                            "B" to ValueFilter.newBuilder().setSimpleFilter("AAA").build()
+                        )
+                    )
+            ).build()
+        val messageFilters: List<RootMessageFilter> = listOf(
+            RootMessageFilter.newBuilder(messageFilter).build(),
+            RootMessageFilter.newBuilder(messageFilter).build(),
+            RootMessageFilter.newBuilder(messageFilter).build()
+        )
+
+        val messages = Observable.fromIterable(messagesWithKeyFields)
+
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+
+        sequenceCheckRuleTask(parentEventID, messageStream, true, filtersParam = messageFilters).begin()
+
+        val batchRequest = awaitEventBatchRequest(100000L, 6)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
+
+        assertAll({
+            val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
+            assertEquals(3, rootEvent.attachedMessageIdsCount)
+            assertEquals(listOf(1L, 2L, 3L), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val checkedMessages = assertNotNull(eventsList.find { it.type == "checkMessages" }, "Cannot find checkMessages event")
+            val verifications = eventsList.filter { it.parentId == checkedMessages.id }
+            assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
+            assertTrue("Some verifications are not success: $verifications") { verifications.all { it.status == EventStatus.SUCCESS } }
+            assertEquals(listOf(1L, 2L, 3L), verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
+        }, {
+            assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
+        })
+    }
+
+    @Test
     fun `check ordering is not failed in case key fields are matches the order but the rest are not`() {
         val messagesWithKeyFields: List<Message> = listOf(
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)

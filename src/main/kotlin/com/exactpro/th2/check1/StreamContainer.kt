@@ -13,7 +13,6 @@
 
 package com.exactpro.th2.check1
 
-import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.common.grpc.Message
 import io.reactivex.Observable
 
