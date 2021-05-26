@@ -1,4 +1,4 @@
-# Overview (2.8.0)
+# Overview (2.9.0)
 
 The component is responsible for verifying decoded messages.
 
@@ -107,6 +107,12 @@ spec:
 ```
 
 ## Release Notes
+
+### 2.9.0
+
++ moves the message cursor in the message stream when a filter matched by key fields
++ creates events with a message filter
++ fixed an event layout problem for the sequence check rule
 
 ### 2.8.0
 
