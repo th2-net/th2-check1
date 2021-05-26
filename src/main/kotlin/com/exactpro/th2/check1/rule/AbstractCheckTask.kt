@@ -85,7 +85,7 @@ abstract class AbstractCheckTask(
 
     /**
      * Used for observe messages in one thread.
-     * It provides feature to write no thread-safe code in children classes.
+     * It provides the feature to write no thread-safe code in children classes.
      *
      * Executor is shared between connected tasks.
      */
@@ -124,7 +124,7 @@ abstract class AbstractCheckTask(
     /**
      * Shutdowns the executor that is used to perform this task.
      *
-     * @throws IllegalStateException if this task has connected task
+     * @throws IllegalStateException if this task has a connected task
      */
     fun shutdownExecutor() {
         if (hasNextTask.get()) {
@@ -135,8 +135,8 @@ abstract class AbstractCheckTask(
 
     /**
      * Registers a task as the next task in continuous verification chain. Its [begin] method will be called
-     * when current task completes check or timeout is over for it.
-     * The scheduler for current task will be passed to the next task.
+     * when the current task completes its check or if timeout is over for it.
+     * The scheduler for the current task will be passed to the next task.
      *
      * This method should be called only once otherwise it throws IllegalStateException.
      * @throws IllegalStateException when method is called more than once.
@@ -159,8 +159,8 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * Observe a message sequence from checkpoint.
-     * Task subscribe to messages stream with sequence after call.
+     * Observe a message sequence from the checkpoint.
+     * Task subscribe to messages stream with its sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param checkpoint message sequence from previous task.
      * @throws IllegalStateException when method is called more than once.
@@ -170,12 +170,12 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * It is called when timeout is over and task in not complete yet
+     * It is called when the timeout is over and the task is not complete yet
      */
     protected open fun onTimeout() {}
 
     /**
-     * Marks the task as successfully completed. If task timeout had been exited and then the task was marked as successfully completed
+     * Marks the task as successfully completed. If the task timeout had been exited and then the task was marked as successfully completed
      * the task will be considered as successfully completed because it had actually found that it should
      */
     protected fun checkComplete() {
@@ -193,15 +193,15 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * Provides feature to define custom filter for observe.
+     * Provides a feature to define custom filter for observe.
      */
     protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
 
     /**
-     * Observe a message sequence from previous task.
+     * Observe a message sequence from the previous task.
      * Task subscribe to messages stream with sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
-     * @param sequence message sequence from previous task.
+     * @param sequence message sequence from the previous task.
      * @param executorService executor to schedule pipeline execution.
      * @throws IllegalStateException when method is called more than once.
      */
@@ -220,10 +220,10 @@ abstract class AbstractCheckTask(
             // All sources above will be disposed on this scheduler.
             //
             // This method should be called as closer as possible
-            // to the actual dispose you want to execute on this scheduler
+            // to the actual dispose that you want to execute on this scheduler
             // because other operations are executed on the same single-thread scheduler.
             //
-            // If we move [Observable#unsubscribeOn] after them they won't be disposed until scheduler is free.
+            // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
             // In the worst-case scenario, it might never happen.
             .unsubscribeOn(scheduler)
             .continueObserve(sessionKey, sequence)
@@ -280,10 +280,10 @@ abstract class AbstractCheckTask(
     private fun createExecutorService(): ExecutorService = Executors.newSingleThreadExecutor()
 
     /**
-     * Disposes task when timeout is over or message stream is completed normally or with an exception.
-     * Task unsubscribe from message stream.
+     * Disposes the task when the timeout is over or the message stream is completed normally or with an exception.
+     * Task unsubscribe from the message stream.
      *
-     * @param reason the cause why task must be stopped
+     * @param reason the cause why a task must be stopped
      */
     private fun end(reason: String) {
         if (taskState.compareAndSet(State.BEGIN, State.TIMEOUT)) {
@@ -462,7 +462,7 @@ abstract class AbstractCheckTask(
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then
-     * filters message which sequence grete than passed
+     * filters the message which its sequence is greater than passed
      */
     private fun Observable<StreamContainer>.continueObserve(sessionKey: SessionKey, sequence: Long): Observable<Message> =
         filter { streamContainer -> streamContainer.sessionKey == sessionKey }
