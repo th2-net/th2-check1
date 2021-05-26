@@ -182,7 +182,7 @@ class CollectorService(
 
     private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
         val now = Instant.now()
-        eventIdToLastCheckTask.entries.removeIf { (_, task) ->
+        eventIdToLastCheckTask.values.removeIf { task ->
             val endTime = task.endTime
             if (olderThan(now, delta, unit, endTime)) {
                 if (task.tryShutdownExecutor()) {

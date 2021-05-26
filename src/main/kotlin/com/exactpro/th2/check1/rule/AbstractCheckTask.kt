@@ -122,12 +122,12 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * Shutdowns the executor that is used to perform this task if it hasn't got a next task
-     * @return true if the task hasn't got a next task otherwise false
+     * Shutdown the executor that is used to perform this task in case it doesn't have a next task
+     * @return true if the task doesn't have a next task, otherwise it will return false
      */
     fun tryShutdownExecutor(): Boolean {
         if (hasNextTask.get()) {
-            LOGGER.warn("Cannot shutdown executor for task '$description' that has connected task")
+            LOGGER.warn("Cannot shutdown executor for task '$description' that has a connected task")
             return false
         }
         executorService.shutdown()
@@ -135,8 +135,8 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * Registers a task as the next task in continuous verification chain. Its [begin] method will be called
-     * when the current task completes its check or if timeout is over for it.
+     * Registers a task as the next task in the continuous verification chain. Its [begin] method will be called
+     * when the current task completes its check or if the timeout is over for it.
      * The scheduler for the current task will be passed to the next task.
      *
      * This method should be called only once otherwise it throws IllegalStateException.
@@ -463,7 +463,7 @@ abstract class AbstractCheckTask(
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then
-     * filters the message whCich its sequence is greater than passed
+     * filters the message which its sequence is greater than passed
      */
     private fun Observable<StreamContainer>.continueObserve(sessionKey: SessionKey, sequence: Long): Observable<Message> =
         filter { streamContainer -> streamContainer.sessionKey == sessionKey }
