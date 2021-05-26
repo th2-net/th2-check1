@@ -110,7 +110,7 @@ spec:
 
 ### 2.9.0
 
-+ moves the message cursor in the message stream when a filter matched by key fields
++ moves the message cursor in the message stream when a filter is matched by the key fields
 + creates events with a message filter
 + fixed an event layout problem for the sequence check rule
 
