@@ -1,4 +1,4 @@
-# Overview (2.8.0)
+# Overview (2.9.0)
 
 The component is responsible for verifying decoded messages.
 
@@ -76,19 +76,19 @@ The number of messages for each stream (alias + direction) that will be buffered
 
 #### cleanup-older-than
 The time before the verification chain (from a task that is complete) will be removed.
-The value will be interpreted as time unit defined in _cleanup-time-unit_ setting. _The default value is 60_
+The value will be interpreted as time unit defined in _cleanup-time-unit_ setting. _The default value is set to 60_
 
 #### cleanup-time-unit
 The time unit for _cleanup-older-than_ setting. The available values are MILLIS, SECONDS, MINUTES, HOURS. _The default value is set to SECONDS_
 
 #### max-event-batch-content-size
-The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is 1048576_
+The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is set to 1048576_
 
 ## Required pins
 
 The Check1 component has two types of pin:
-* gRPC server pin to allow other components to connect via `com.exactpro.th2.check1.grpc.Check1Service` class.
-* MQ pin to listen to parsed messages. You can link several sources with different directions and session alises to it.
+* gRPC server pin: it allows other components to connect via `com.exactpro.th2.check1.grpc.Check1Service` class.
+* MQ pin: it is used for listening to parsed messages. You can link several sources with different directions and session alises to it.
 
 ```yaml
 apiVersion: th2.exactpro.com/v1
@@ -107,6 +107,12 @@ spec:
 ```
 
 ## Release Notes
+
+### 2.9.0
+
++ moves the message cursor in the message stream when a filter is matched by the key fields
++ creates events with a message filter
++ fixed an event layout problem for the sequence check rule
 
 ### 2.8.0
 

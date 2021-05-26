@@ -182,13 +182,17 @@ class CollectorService(
 
     private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
         val now = Instant.now()
-        for ((key, task) in eventIdToLastCheckTask.entries) {
+        eventIdToLastCheckTask.values.removeIf { task ->
             val endTime = task.endTime
-            if (olderThan(now, delta, unit, endTime)) {
-                logger.debug("Remove task ${task.description} ($endTime) from tasks map")
-                if (eventIdToLastCheckTask.remove(key, task)) {
-                    runCatching { task.shutdownExecutor() }
-                        .onFailure { logger.error("Cannot shutdown scheduler for task '${task.description}'", it) }
+            when {
+                !olderThan(now, delta, unit, endTime) -> false
+                task.tryShutdownExecutor() -> {
+                    logger.info("Removed task ${task.description} ($endTime) from tasks map")
+                    true
+                }
+                else -> {
+                    logger.warn("Task ${task.description} can't be removed because it has a continuation")
+                    false
                 }
             }
         }

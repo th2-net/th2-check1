@@ -22,10 +22,10 @@ import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil.METADATA_MESSAGE_NAME
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
-import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
 import io.reactivex.Observable
 import java.time.Instant
@@ -69,7 +69,7 @@ class CheckRuleTask(
             .endTimestamp()
             .name("Message filter")
             .type("Filter")
-            .bodyData(EventUtils.createMessageBean("Passed filter will be placed there")) // TODO: Write filter
+            .bodyData(protoMessageFilter.toTreeTable())
 
         rootEvent.addSubEvent(subEvent)
 
