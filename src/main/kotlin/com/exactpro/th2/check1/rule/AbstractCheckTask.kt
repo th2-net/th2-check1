@@ -34,6 +34,7 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -78,13 +79,13 @@ abstract class AbstractCheckTask(
     protected val rootEvent: Event = Event.from(submitTime)
         .description(description)
 
-    private val sequenceSubject = SingleSubject.create<Long>()
+    private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
     private val taskState = AtomicReference(State.CREATED)
 
     /**
      * Used for observe messages in one thread.
-     * It provides feature to write no thread-safe code in children classes.
+     * It provides the feature to write no thread-safe code in children classes.
      *
      * Executor is shared between connected tasks.
      */
@@ -103,7 +104,7 @@ abstract class AbstractCheckTask(
 
     private lateinit var endFuture: Disposable
 
-    private var lastSequence = Long.MIN_VALUE
+    private var lastSequence = DEFAULT_SEQUENCE
 
     override fun onStart() {
         super.onStart()
@@ -121,43 +122,46 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * Shutdowns the executor that is used to perform this task.
-     *
-     * @throws IllegalStateException if this task has connected task
+     * Shutdown the executor that is used to perform this task in case it doesn't have a next task
+     * @return true if the task doesn't have a next task, otherwise it will return false
      */
-    fun shutdownExecutor() {
+    fun tryShutdownExecutor(): Boolean {
         if (hasNextTask.get()) {
-            throw IllegalStateException("Cannot shutdown executor for task '$description' that has connected task")
+            LOGGER.warn("Cannot shutdown executor for task '$description' that has a connected task")
+            return false
         }
         executorService.shutdown()
+        return true
     }
 
     /**
-     * Registers a task as the next task in continuous verification chain. Its [begin] method will be called
-     * when current task completes check or timeout is over for it.
-     * The scheduler for current task will be passed to the next task.
+     * Registers a task as the next task in the continuous verification chain. Its [begin] method will be called
+     * when the current task completes its check or if the timeout is over for it.
+     * The scheduler for the current task will be passed to the next task.
      *
      * This method should be called only once otherwise it throws IllegalStateException.
      * @throws IllegalStateException when method is called more than once.
      */
     fun subscribeNextTask(checkTask: AbstractCheckTask) {
         if (hasNextTask.compareAndSet(false, true)) {
-            val executor =
-                if (executorService.isShutdown) {
-                    LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
-                    createExecutorService()
-                } else {
-                    executorService
-                }
-            sequenceSubject.subscribe { sequence -> checkTask.begin(sequence, executor) }
+            sequenceSubject.subscribe { legacy ->
+                val executor = if (legacy.executorService.isShutdown) {
+                        LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
+                        createExecutorService()
+                    } else {
+                        legacy.executorService
+                    }
+                checkTask.begin(legacy.lastSequence, executor)
+             }
+            LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
         } else {
-            throw IllegalStateException("Subscription to last sequence for task $description is already executed")
+            throw IllegalStateException("Subscription to last sequence for task $description (${hashCode()}) is already executed, subscriber ${checkTask.description} (${checkTask.hashCode()})")
         }
     }
 
     /**
-     * Observe a message sequence from checkpoint.
-     * Task subscribe to messages stream with sequence after call.
+     * Observe a message sequence from the checkpoint.
+     * Task subscribe to messages stream with its sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param checkpoint message sequence from previous task.
      * @throws IllegalStateException when method is called more than once.
@@ -167,12 +171,12 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * It is called when timeout is over and task in not complete yet
+     * It is called when the timeout is over and the task is not complete yet
      */
     protected open fun onTimeout() {}
 
     /**
-     * Marks the task as successfully completed. If task timeout had been exited and then the task was marked as successfully completed
+     * Marks the task as successfully completed. If the task timeout had been exited and then the task was marked as successfully completed
      * the task will be considered as successfully completed because it had actually found that it should
      */
     protected fun checkComplete() {
@@ -190,15 +194,15 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * Provides feature to define custom filter for observe.
+     * Provides a feature to define custom filter for observe.
      */
     protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
 
     /**
-     * Observe a message sequence from previous task.
+     * Observe a message sequence from the previous task.
      * Task subscribe to messages stream with sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
-     * @param sequence message sequence from previous task.
+     * @param sequence message sequence from the previous task.
      * @param executorService executor to schedule pipeline execution.
      * @throws IllegalStateException when method is called more than once.
      */
@@ -207,6 +211,7 @@ abstract class AbstractCheckTask(
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
+        this.lastSequence = sequence
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
 
@@ -216,10 +221,10 @@ abstract class AbstractCheckTask(
             // All sources above will be disposed on this scheduler.
             //
             // This method should be called as closer as possible
-            // to the actual dispose you want to execute on this scheduler
+            // to the actual dispose that you want to execute on this scheduler
             // because other operations are executed on the same single-thread scheduler.
             //
-            // If we move [Observable#unsubscribeOn] after them they won't be disposed until scheduler is free.
+            // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
             // In the worst-case scenario, it might never happen.
             .unsubscribeOn(scheduler)
             .continueObserve(sessionKey, sequence)
@@ -227,7 +232,6 @@ abstract class AbstractCheckTask(
                 handledMessageCounter++
 
                 with(it.metadata.id) {
-                    lastSequence = this.sequence
                     rootEvent.messageID(this)
                 }
             }
@@ -262,7 +266,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
-            sequenceSubject.onSuccess(lastSequence)
+            sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
         }
     }
 
@@ -277,10 +281,10 @@ abstract class AbstractCheckTask(
     private fun createExecutorService(): ExecutorService = Executors.newSingleThreadExecutor()
 
     /**
-     * Disposes task when timeout is over or message stream is completed normally or with an exception.
-     * Task unsubscribe from message stream.
+     * Disposes the task when the timeout is over or the message stream is completed normally or with an exception.
+     * Task unsubscribe from the message stream.
      *
-     * @param reason the cause why task must be stopped
+     * @param reason the cause why a task must be stopped
      */
     private fun end(reason: String) {
         if (taskState.compareAndSet(State.BEGIN, State.TIMEOUT)) {
@@ -336,17 +340,17 @@ abstract class AbstractCheckTask(
         messageContainer: MessageContainer,
         messageFilter: SailfishFilter,
         metadataFilter: SailfishFilter?,
-        matchNames: Boolean = true
+        matchNames: Boolean = true,
+        significant: Boolean = true
     ): AggregatedFilterResult {
         val metadataComparisonResult: ComparisonResult? = metadataFilter?.let {
             MessageComparator.compare(
                 messageContainer.metadataMessage,
                 it.message, it.comparatorSettings,
                 matchNames
-            )
-        }
-        if (metadataFilter != null) {
-            LOGGER.debug("Metadata comparison result\n {}", metadataComparisonResult)
+            ).also { comparisonResult ->
+                LOGGER.debug("Metadata comparison result\n {}", comparisonResult)
+            }
         }
         if (metadataFilter != null && metadataComparisonResult == null) {
             if (LOGGER.isDebugEnabled) {
@@ -361,6 +365,9 @@ abstract class AbstractCheckTask(
         LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
+            if (significant) {
+                lastSequence = messageContainer.protoMessage.metadata.id.sequence
+            }
             AggregatedFilterResult(comparisonResult, metadataComparisonResult)
         } else {
             AggregatedFilterResult.EMPTY
@@ -423,11 +430,22 @@ abstract class AbstractCheckTask(
         return this
     }
 
-    protected fun Event.appendEventWithVerifications(comparisonContainers: Collection<ComparisonContainer>): Event {
-        for (comparisonContainer in comparisonContainers) {
-            appendEventsWithVerification(comparisonContainer)
+    protected fun Event.appendEventWithVerificationsAndFilters(protoMessageFilters: Collection<RootMessageFilter>, comparisonContainers: Collection<ComparisonContainer>): Event {
+        for (messageFilter in protoMessageFilters) {
+            val comparisonContainer = comparisonContainers.firstOrNull { it.protoFilter === messageFilter }
+            comparisonContainer?.let {
+                appendEventsWithVerification(it)
+            } ?: appendEventsWithFilter(messageFilter)
         }
         return this
+    }
+
+    protected fun Event.appendEventsWithFilter(rootMessageFilter: RootMessageFilter): Event = this.apply {
+        addSubEventWithSamePeriod()
+            .name("Message filter")
+            .type("Filter")
+            .status(FAILED)
+            .bodyData(rootMessageFilter.toTreeTable())
     }
 
     protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {
@@ -445,7 +463,7 @@ abstract class AbstractCheckTask(
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then
-     * filters message which sequence grete than passed
+     * filters the message which its sequence is greater than passed
      */
     private fun Observable<StreamContainer>.continueObserve(sessionKey: SessionKey, sequence: Long): Observable<Message> =
         filter { streamContainer -> streamContainer.sessionKey == sessionKey }
@@ -466,4 +484,6 @@ abstract class AbstractCheckTask(
 
         return sequence ?: DEFAULT_SEQUENCE
     }
+
+    private data class Legacy(val executorService: ExecutorService, val lastSequence: Long)
 }

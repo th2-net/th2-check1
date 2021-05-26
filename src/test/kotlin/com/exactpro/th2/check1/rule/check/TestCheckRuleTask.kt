@@ -21,6 +21,7 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
+import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
@@ -40,9 +41,9 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         messageStream: Observable<StreamContainer>,
         maxEventBatchContentSize: Int = 1024 * 1024
     ) = CheckRuleTask(
-        "test",
+        SESSION_ALIAS,
         Instant.now(),
-        SessionKey("test", Direction.FIRST),
+        SessionKey(SESSION_ALIAS, Direction.FIRST),
         1000,
         maxEventBatchContentSize,
         messageFilter,
@@ -52,9 +53,9 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     )
 
     @Test
-    internal fun `very little value of max event batch content size`() {
-        val streams = createStreams("test", Direction.FIRST, listOf(
-            message("TestMsg", Direction.FIRST, "test")
+    fun `success verification`() {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -64,7 +65,33 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventID = EventID.newBuilder().setId("root").build()
         val filter = RootMessageFilter.newBuilder()
-            .setMessageType("TestMsg")
+            .setMessageType(MESSAGE_TYPE)
+            .setMetadataFilter(MetadataFilter.newBuilder()
+                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
+            .build()
+        val task = checkTask(filter, eventID, streams)
+        task.begin()
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertEquals(4, eventList.size)
+        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
+    }
+
+    @Test
+    internal fun `very little value of max event batch content size`() {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .build())
+                .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
             .build()
@@ -79,8 +106,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
     @Test
     internal fun `exceeds max event batch content size`() {
-        val streams = createStreams("test", Direction.FIRST, listOf(
-            message("TestMsg", Direction.FIRST, "test")
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -90,7 +117,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventID = EventID.newBuilder().setId("root").build()
         val filter = RootMessageFilter.newBuilder()
-            .setMessageType("TestMsg")
+            .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
             .build()
@@ -100,13 +127,13 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val eventBatches = awaitEventBatchRequest(1000L, 3)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertEquals(4, eventList.size)
-        assertEquals(1, eventList.filter { it.status == EventStatus.FAILED }.size)
+        assertEquals(2, eventList.filter { it.status == EventStatus.FAILED }.size) // Message filter and verification exceed max event batch content size
     }
 
     @Test
     internal fun findsMessageByMetadata() {
-        val streams = createStreams("test", Direction.FIRST, listOf(
-            message("TestMsg", Direction.FIRST, "test")
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -116,7 +143,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventID = EventID.newBuilder().setId("root").build()
         val filter = RootMessageFilter.newBuilder()
-            .setMessageType("TestMsg")
+            .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
             .build()
@@ -135,8 +162,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
     @Test
     internal fun ignoresMessageIfMetadataDoesNotMatchByKeys() {
-        val streams = createStreams("test", Direction.FIRST, listOf(
-            message("TestMsg", Direction.FIRST, "test")
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -146,7 +173,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventID = EventID.newBuilder().setId("root").build()
         val filter = RootMessageFilter.newBuilder()
-            .setMessageType("TestMsg")
+            .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "43".toSimpleFilter(FilterOperation.EQUAL, key = true)))
             .build()

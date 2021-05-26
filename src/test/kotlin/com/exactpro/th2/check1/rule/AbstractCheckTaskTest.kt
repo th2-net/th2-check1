@@ -15,6 +15,7 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.Direction.FIRST
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.schema.message.MessageRouter
@@ -23,9 +24,6 @@ import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
@@ -36,9 +34,26 @@ abstract class AbstractCheckTaskTest {
         return argumentCaptor.allValues
     }
 
-    fun createStreams(alias: String, direction: Direction, messages: List<Message>): Observable<StreamContainer> {
+    fun createStreams(alias: String = SESSION_ALIAS, direction: Direction = FIRST, messages: List<Message>): Observable<StreamContainer> {
         return Observable.just(
             StreamContainer(SessionKey(alias, direction), messages.size + 1, Observable.fromIterable(messages))
         )
+    }
+
+    fun constructMessage(sequence: Long = 0, alias: String = SESSION_ALIAS, type: String = MESSAGE_TYPE, direction: Direction = FIRST): Message.Builder = Message.newBuilder().apply {
+        metadataBuilder.apply {
+            messageType = type
+            idBuilder.apply {
+                this.sequence = sequence
+                this.direction = direction
+                connectionIdBuilder.sessionAlias = alias
+            }
+        }
+    }
+
+    companion object {
+        const val MESSAGE_TYPE = "TestMsg"
+        const val SESSION_ALIAS = "test_session"
+        const val VERIFICATION_TYPE = "Verification"
     }
 }

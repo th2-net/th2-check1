@@ -40,6 +40,7 @@ import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -121,7 +122,7 @@ class SequenceCheckRuleTask(
 
         preFilterEvent = Event.start()
             .type("preFiltering")
-            .bodyData(createMessageBean("Passed pre-filter will be placed there")) // TODO: Write filter
+            .bodyData(protoPreMessageFilter.toTreeTable())
 
         rootEvent.addSubEvent(preFilterEvent)
     }
@@ -131,7 +132,7 @@ class SequenceCheckRuleTask(
             if (LOGGER.isDebugEnabled) {
                 LOGGER.debug("Pre-filtering message with id: {}", shortDebugString(messageContainer.protoMessage.metadata.id))
             }
-            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, false)
+            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false, significant = false)
             ComparisonContainer(messageContainer, protoPreMessageFilter, result)
         }.filter { preFilterContainer -> // Filter  check result of pre-filter
             preFilterContainer.fullyMatches
@@ -194,9 +195,10 @@ class SequenceCheckRuleTask(
     private fun fillCheckMessagesEvent() {
         val checkMessagesEvent = rootEvent.addSubEventWithSamePeriod()
             .name("Check messages")
-            .type("checkMessages")
-            .appendEventWithVerifications(messageFilteringResults.values)
+            .type(CHECK_MESSAGES_TYPE)
+            .appendEventWithVerificationsAndFilters(protoMessageFilters, messageFilteringResults.values)
         if (protoMessageFilters.size != messageFilteringResults.size) {
+            messageFilteringResults.values.map(ComparisonContainer::protoFilter)
             checkMessagesEvent.status(FAILED)
                 .bodyData(createMessageBean("Incorrect number of comparisons (expected ${protoMessageFilters.size} / actual ${messageFilteringResults.size})"))
         } else {
@@ -257,5 +259,6 @@ class SequenceCheckRuleTask(
 
     companion object {
         const val PRE_FILTER_MESSAGE_NAME = "PreFilter"
+        const val CHECK_MESSAGES_TYPE = "checkMessages"
     }
 }

@@ -19,10 +19,12 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus.FAILED
 import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class CheckTaskUtilsTest {
 
@@ -111,6 +113,30 @@ class CheckTaskUtilsTest {
                 checkEventStatus(batches, 5, 0)
             }
         )
+    }
+
+    @Test
+    fun `batch structure`() {
+        val rootEvent = Event.start()
+            .bodyData(data)
+        val subEvent1 = rootEvent.addSubEventWithSamePeriod()
+            .bodyData(data)
+        val subEvent2 = rootEvent.addSubEventWithSamePeriod()
+            .bodyData(data)
+
+        val batches = rootEvent.disperseToBatches(1024 * 1024, parentEventId)
+        assertEquals(2, batches.size)
+        checkEventStatus(batches, 3, 0)
+
+        assertFalse(batches[0].hasParentEventId())
+        assertEquals(parentEventId, batches[0].eventsList[0].parentId)
+        assertEquals(rootEvent.id, batches[0].eventsList[0].id.id)
+
+        assertEquals(rootEvent.id, batches[1].parentEventId.id)
+        assertEquals(rootEvent.id, batches[1].eventsList[0].parentId.id)
+        assertEquals(subEvent1.id, batches[1].eventsList[0].id.id)
+        assertEquals(rootEvent.id, batches[1].eventsList[1].parentId.id)
+        assertEquals(subEvent2.id, batches[1].eventsList[1].id.id)
     }
 
     @Test
