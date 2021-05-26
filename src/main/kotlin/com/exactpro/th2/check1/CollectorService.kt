@@ -184,15 +184,17 @@ class CollectorService(
         val now = Instant.now()
         eventIdToLastCheckTask.values.removeIf { task ->
             val endTime = task.endTime
-            if (olderThan(now, delta, unit, endTime)) {
-                if (task.tryShutdownExecutor()) {
+            when {
+                !olderThan(now, delta, unit, endTime) -> false
+                task.tryShutdownExecutor() -> {
                     logger.info("Removed task ${task.description} ($endTime) from tasks map")
-                    return@removeIf true
-                } else {
+                    true
+                }
+                else -> {
                     logger.warn("Task ${task.description} can't be removed because it has a continuation")
+                    false
                 }
             }
-            return@removeIf false
         }
     }
 
