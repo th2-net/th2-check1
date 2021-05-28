@@ -438,7 +438,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         assertAll({
             val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
-            assertEquals(4, rootEvent.attachedMessageIdsCount) // 3 match key + 1 that doesn't match but between others
+            assertEquals(4, rootEvent.attachedMessageIdsCount) // 3 match key + 1 that doesn't match but is between others
             assertEquals(listOf(1L, 2L, 3L, 4L), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val checkedMessages = assertNotNull(eventsList.find { it.type == CHECK_MESSAGES_TYPE }, "Cannot find checkMessages event")
