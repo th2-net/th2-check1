@@ -16,7 +16,6 @@
 package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.sf.common.messages.IMessage
-import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.CheckSequenceUtils
@@ -27,7 +26,6 @@ import com.exactpro.th2.check1.rule.AggregatedFilterResult
 import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
-import com.exactpro.th2.check1.rule.getStatusType
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -86,7 +84,11 @@ class SequenceCheckRuleTask(
     }
     private lateinit var preFilteringResults: MutableMap<MessageID, ComparisonContainer>
 
+    /**
+     * List of filters which haven't matched yet. It is created from the requested filters and reduced after every match
+     */
     private lateinit var messageFilters: MutableList<MessageFilterContainer>
+
     private lateinit var messageFilteringResults: MutableMap<MessageID, ComparisonContainer>
 
     private lateinit var preFilterEvent: Event
@@ -160,18 +162,17 @@ class SequenceCheckRuleTask(
             )
             if (comparisonContainer.matchesByKeys) {
                 reordered = reordered || index != 0
+
+                messageFilters.removeAt(index)
+
                 messageFilteringResults[messageContainer.protoMessage.metadata.id] = comparisonContainer
                 matchedByKeys.add(messageFilterContainer)
 
-                val comparisonStatus = requireNotNull(result.messageResult) {
+                requireNotNull(result.messageResult) {
                     "Message result must not be null because the result said the message is matched by key fields. Filter: " +
                         shortDebugString(messageFilterContainer.protoMessageFilter)
-                }.getStatusType()
-
-                if (checkOrder || comparisonStatus == StatusType.PASSED) {
-                    messageFilters.removeAt(index)
-                    break
                 }
+                break
             }
         }
 
@@ -241,8 +242,6 @@ class SequenceCheckRuleTask(
     private fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter): IMessage =
         fromProtoFilter(protoPreMessageFilter.messageFilter, PRE_FILTER_MESSAGE_NAME)
 
-    private fun PreFilter.toCompareSettings() = toMessageFilter().toCompareSettings()
-
     private fun PreFilter.toRootMessageFilter() = RootMessageFilter.newBuilder()
         .setMessageType(PRE_FILTER_MESSAGE_NAME)
         .setMessageFilter(toMessageFilter())
@@ -260,5 +259,6 @@ class SequenceCheckRuleTask(
     companion object {
         const val PRE_FILTER_MESSAGE_NAME = "PreFilter"
         const val CHECK_MESSAGES_TYPE = "checkMessages"
+        const val CHECK_SEQUENCE_TYPE = "checkSequence"
     }
 }
