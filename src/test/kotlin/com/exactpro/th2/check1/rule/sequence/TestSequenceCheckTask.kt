@@ -181,7 +181,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
 
             val passedVerifications = verifications.filter { it.status == EventStatus.SUCCESS }
-            // The messages are reordered but all presents. So, all verifications should be passed
+            // The messages are reordered but every verification is presented. So, every verification should be passed
             assertEquals(3, passedVerifications.size, "Unexpected SUCCESS verifications count: $passedVerifications")
             assertTrue("Some verifications have more than one message attached") { passedVerifications.all { it.attachedMessageIdsCount == 1 } }
             // Ids in the result of the rule are in order by filters because the rule creates events related to verifications/filters in the source order.
@@ -401,7 +401,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     "B" to Value.newBuilder().setSimpleValue("AAA1").build()
                 ))
                 .build(),
-            constructMessage(2, SESSION_ALIAS, MESSAGE_TYPE) // goes to processed messages but should not go to actual comparison
+            constructMessage(2, SESSION_ALIAS, MESSAGE_TYPE) // goes to processed messages but should not go to the actual comparison
                 .putAllFields(mapOf(
                     "B" to Value.newBuilder().setSimpleValue("BBB1").build()
                 ))
