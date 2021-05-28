@@ -84,8 +84,8 @@ class SequenceCheckRuleTask(
     }
     private lateinit var preFilteringResults: MutableMap<MessageID, ComparisonContainer>
 
-    /**
-     * List of no matched filter was not created yet. It is created from the requested filters and reduced after every match
+    /**i
+     * List of filters which haven't matched yet. It is created from the requested filters and reduced after every match
      */
     private lateinit var messageFilters: MutableList<MessageFilterContainer>
 
