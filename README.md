@@ -110,7 +110,7 @@ spec:
 
 ### 2.9.1
 
-+ sequence check rule matches message filters to a messages by key fields only when the check order option is disabled
++ fixed problem with using full verification instead of verification by key fields to matching filter in sequence rule when order check is disabled
 
 ### 2.9.0
 
