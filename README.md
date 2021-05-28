@@ -1,4 +1,4 @@
-# Overview (2.9.0)
+# Overview (2.9.1)
 
 The component is responsible for verifying decoded messages.
 
@@ -107,6 +107,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 2.9.1
+
++ sequence check rule matches message filters to a messages by key fields only when the check order option is disabled
 
 ### 2.9.0
 
