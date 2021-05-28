@@ -1,4 +1,4 @@
-# th2 check1 (3.5.0)
+# th2 check1 (3.5.1)
 
 ## Overview
 
@@ -109,6 +109,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.5.1
+
++ fixed a problem while using full verification instead of verification by key fields in matching-filter of sequence rule when order check is disabled
 
 ### 3.5.0
 
