@@ -3,8 +3,11 @@ name: Dev build and publish Java distributions to sonatype snapshot repository
 on:
   push:
     branches-ignore:
-    - master
-    - version-*
+      - master
+      - version-*
+      - dependabot*
+    paths-ignore:
+      - README.md
     # paths:
     # - gradle.properties
 
