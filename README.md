@@ -1,4 +1,4 @@
-# th2 check1 (3.6.0)
+# th2 check1 (3.6.1)
 
 ## Overview
 
@@ -109,6 +109,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.6.1
+
++ Fixed a problem where rule completes check before the timer for execution has been scheduled
 
 ### 3.6.0
 

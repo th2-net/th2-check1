@@ -102,6 +102,7 @@ abstract class AbstractCheckTask(
         PUBLISHED
     }
 
+    @Volatile
     private lateinit var endFuture: Disposable
 
     private var lastSequence = DEFAULT_SEQUENCE
@@ -215,6 +216,9 @@ abstract class AbstractCheckTask(
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
 
+        endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
+            .subscribe { _ -> end("Timeout is exited") }
+
         messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
             .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
 
@@ -238,9 +242,6 @@ abstract class AbstractCheckTask(
             .mapToMessageContainer()
             .taskPipeline()
             .subscribe(this)
-
-        endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
-            .subscribe { _ -> end("Timeout is exited") }
     }
 
     private fun taskFinished() {
