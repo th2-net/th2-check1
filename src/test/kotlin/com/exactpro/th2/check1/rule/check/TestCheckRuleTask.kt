@@ -13,20 +13,36 @@
 
 package com.exactpro.th2.check1.rule.check
 
+import com.exactpro.sf.comparison.ComparatorSettings
+import com.exactpro.sf.comparison.ComparisonResult
+import com.exactpro.sf.comparison.MessageComparator
+import com.exactpro.sf.scriptrunner.StatusType.FAILED
+import com.exactpro.sf.scriptrunner.StatusType.PASSED
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
+import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.check1.util.toSimpleFilter
+import com.exactpro.th2.common.grpc.ComplexFilter
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.FilterOperation
+import com.exactpro.th2.common.grpc.FilterOperation.IN
+import com.exactpro.th2.common.grpc.FilterOperation.LESS
+import com.exactpro.th2.common.grpc.FilterOperation.LIKE
+import com.exactpro.th2.common.grpc.FilterOperation.MORE
+import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
+import com.exactpro.th2.common.value.toValue
+import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -188,5 +204,172 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertNotNull(checkFailedEvent) {
             "No failed event $eventBatch"
         }
+    }
+    private val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
+
+    @Test
+    internal fun listContainsValueFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("containFilter", ValueFilter.newBuilder()
+                    .setComplexFilter(ComplexFilter.newBuilder().apply {
+                        addAllComplexValues(listOf("A", "B", "C"))
+                    })
+                    .setOperation(IN)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("containFilter", "A".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("containFilter").status)
+    }
+
+    @Test
+    internal fun listDoesNotContainValueFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("containFilter", ValueFilter.newBuilder()
+                    .setComplexFilter(ComplexFilter.newBuilder().apply {
+                        addAllComplexValues(listOf("A", "B", "C"))
+                    })
+                    .setOperation(IN)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("containFilter", "D".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("containFilter").status)
+    }
+
+    @Test
+    internal fun regExGreedyFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("regexFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("A.+a")
+                    .setOperation(LIKE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("regexFilter", "bbbb Abba Abbbbabbb".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("regexFilter").status)
+        assertEquals("Abba Abbbba", result.getResult("regexFilter").expressionResult.description)
+    }
+
+    @Test
+    internal fun regExPossessiveFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("regexFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("A.++a")
+                    .setOperation(LIKE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("regexFilter", "bbbb Abba Abbbbabbb".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("regexFilter").status)
+        assertEquals("", result.getResult("regexFilter").expressionResult.description )
+    }
+
+    @Test
+    internal fun regExLazyFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("regexFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("A.+?a")
+                    .setOperation(LIKE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("regexFilter", "bbbb Abba Abbbbabbb".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("regexFilter").status)
+        assertEquals("AbbaAbbbba", result.getResult("regexFilter").expressionResult.description)
+    }
+
+    @Test
+    internal fun mathMoreFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("10")
+                    .setOperation(MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "15".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("mathFilter").status)
+    }
+
+    @Test
+    internal fun mathLessFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("10")
+                    .setOperation(LESS)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "15".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("mathFilter").status)
+    }
+
+    private fun getResult(actual: Message, filter: RootMessageFilter) :ComparisonResult {
+        val container = VerificationUtil.toMetaContainer(filter.messageFilter, false)
+        val settings = ComparatorSettings().apply {
+            metaContainer = container
+        }
+
+        val actualIMessage = converter.fromProtoMessage(actual, false)
+        val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
+
+        return MessageComparator.compare(actualIMessage, filterIMessage, settings)
     }
 }

@@ -66,6 +66,18 @@ public class VerificationEntryUtils {
             if ("#".equals(condition)) {
                 return FilterOperation.EMPTY.name();
             }
+            if ("IN".equals(condition)) {
+                return FilterOperation.IN.name();
+            }
+            if (">".equals(condition)) {
+                return FilterOperation.MORE.name();
+            }
+            if ("<".equals(condition)) {
+                return FilterOperation.LESS.name();
+            }
+            if (condition.contains("LIKE_")) {
+                return FilterOperation.LIKE.name();
+            }
         }
         return FilterOperation.EQUAL.name();
     }
