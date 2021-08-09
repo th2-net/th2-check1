@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -22,7 +22,14 @@ class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
         sessionSet += item
     }
 
-    fun createCheckpoint() : Checkpoint = Checkpoint(sessionSet.associateBy(
+    fun createCheckpoint(): Checkpoint = Checkpoint(
+        sessionSet.associateBy(
             { session -> session.sessionKey },
-            { session -> session.lastMessage.metadata.id.sequence }))
+            { session ->
+                CheckpointData(
+                    session.lastMessage.metadata.id.sequence,
+                    session.lastMessage.metadata.timestamp
+                )
+            })
+    )
 }

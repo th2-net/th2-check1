@@ -61,6 +61,7 @@ class SequenceCheckRuleTask(
     description: String?,
     startTime: Instant,
     sessionKey: SessionKey,
+    messageTimeout: Long? = null,
     timeout: Long,
     maxEventBatchContentSize: Int,
     protoPreFilter: PreFilter,
@@ -69,7 +70,7 @@ class SequenceCheckRuleTask(
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(description, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+) : AbstractCheckTask(description, messageTimeout, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(

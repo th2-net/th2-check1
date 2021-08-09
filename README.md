@@ -1,4 +1,4 @@
-# th2 check1 (3.6.1)
+# th2 check1 (3.7.0)
 
 ## Overview
 
@@ -18,6 +18,7 @@ Available requests are described in [this repository](https://gitlab.exactpro.co
 
 - CheckSequenceRuleRequest - prefilters the messages and verify all of them by filter. Order checking configured from request.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
+- NoMessageCheckRequest - prefilters messages and verifies that no other messages have been received.
 
 ## Quick start
 General view of the component will look like this:
@@ -109,6 +110,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.7.0
+
++ Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
 
 ### 3.6.1
 

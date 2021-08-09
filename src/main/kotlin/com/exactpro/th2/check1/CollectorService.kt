@@ -13,25 +13,14 @@
 package com.exactpro.th2.check1
 
 import com.exactpro.th2.check1.configuration.Check1Configuration
-import com.exactpro.th2.check1.grpc.ChainID
-import com.exactpro.th2.check1.grpc.CheckRuleRequest
-import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
-import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
+import com.exactpro.th2.check1.grpc.*
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
+import com.exactpro.th2.check1.rule.sequence.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.grpc.ComparisonSettings
-import com.exactpro.th2.common.grpc.ConnectionID
-import com.exactpro.th2.common.grpc.Direction
-import com.exactpro.th2.common.grpc.EventBatch
-import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.MessageBatch
-import com.exactpro.th2.common.grpc.MessageFilter
-import com.exactpro.th2.common.grpc.MessageID
-import com.exactpro.th2.common.grpc.RootComparisonSettings
-import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
@@ -97,7 +86,8 @@ class CollectorService(
 
         val chainID = request.getChainIdOrGenerate()
 
-        val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, maxEventBatchContentSize,
+        val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction),
+            request.messageTimeout, request.timeout, maxEventBatchContentSize,
             filter, parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
@@ -128,8 +118,39 @@ class CollectorService(
         } else {
             request.messageFiltersList.map { it.toRootMessageFilter() }
         }
-        val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, maxEventBatchContentSize,
-            request.preFilter, protoMessageFilters, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
+        
+        val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction),
+            request.messageTimeout, request.timeout, maxEventBatchContentSize, request.preFilter, protoMessageFilters,
+            request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
+
+        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            task.apply { addToChainOrBegin(value, request.checkpoint) }
+        }
+        return chainID
+    }
+
+    fun verifyNoMessageCheck(request: NoMessageCheckRequest): ChainID {
+        check(request.hasParentEventId()) { "Parent event id can't be null" }
+        val parentEventID: EventID = request.parentEventId
+        check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
+        val sessionAlias: String = request.connectivityId.sessionAlias
+        val direction = directionOrDefault(request.direction)
+        val chainID = request.getChainIdOrGenerate()
+
+        val task = NoMessageCheckTask(
+            request.description,
+            Instant.now(),
+            SessionKey(sessionAlias, direction),
+            request.messageTimeout,
+            request.timeout,
+            maxEventBatchContentSize,
+            request.preFilter,
+            parentEventID,
+            streamObservable,
+            eventBatchRouter
+        )
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -171,6 +192,14 @@ class CollectorService(
     }
 
     private fun CheckSequenceRuleRequest.getChainIdOrGenerate(): ChainID {
+        return if (hasChainId()) {
+            chainId
+        } else {
+            generateChainID()
+        }
+    }
+
+    private fun NoMessageCheckRequest.getChainIdOrGenerate(): ChainID {
         return if (hasChainId()) {
             chainId
         } else {
@@ -231,11 +260,11 @@ class CollectorService(
             val checkpoint = checkpointSubscriber.createCheckpoint()
             rootEvent.endTimestamp()
                 .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
-            checkpoint.asMap().forEach { (sessionKey: SessionKey, sequence: Long) ->
-                val messageID = sessionKey.toMessageID(sequence)
+            checkpoint.asMap().forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
+                val messageID = sessionKey.toMessageID(checkpointData.sequence)
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()
-                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '$sequence'")
+                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '${checkpointData.sequence}'")
                     .type("Checkpoint for session")
                     .messageID(messageID)
             }

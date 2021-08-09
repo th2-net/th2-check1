@@ -188,6 +188,7 @@ class TestChain: AbstractCheckTaskTest() {
         SESSION_ALIAS,
         Instant.now(),
         SessionKey(SESSION_ALIAS, FIRST),
+        null,
         1000,
         maxEventBatchContentSize,
         createMessageFilter(sequence),

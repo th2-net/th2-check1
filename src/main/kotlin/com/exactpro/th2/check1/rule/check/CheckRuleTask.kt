@@ -37,13 +37,14 @@ class CheckRuleTask(
     description: String?,
     startTime: Instant,
     sessionKey: SessionKey,
+    messageTimeout: Long? = null,
     timeout: Long,
     maxEventBatchContentSize: Int,
     private val protoMessageFilter: RootMessageFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(description, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+) : AbstractCheckTask(description, messageTimeout, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val messageFilter: SailfishFilter = SailfishFilter(
         converter.fromProtoFilter(protoMessageFilter.messageFilter, protoMessageFilter.messageType),

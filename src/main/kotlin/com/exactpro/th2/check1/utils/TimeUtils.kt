@@ -1,0 +1,35 @@
+/*
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.exactpro.th2.check1.utils
+
+import com.google.protobuf.Timestamp
+import java.time.Instant
+
+fun Timestamp.toInstant(): Instant = Instant.ofEpochSecond(seconds, nanos.toLong())
+fun Instant.toTimestamp(): Timestamp = Timestamp.newBuilder().setSeconds(epochSecond).setNanos(nano).build()
+
+operator fun Timestamp.compareTo(other: Timestamp): Int {
+    if (this.seconds < other.seconds)
+        return -1
+    if (this.seconds > other.seconds)
+        return 1
+    if (this.nanos < other.nanos)
+        return -1
+    if (this.nanos > other.nanos)
+        return 1
+    return 0
+}
+
+fun Timestamp.isBefore(other: Timestamp): Boolean = this < other
+fun Timestamp.isAfter(other: Timestamp): Boolean = this > other

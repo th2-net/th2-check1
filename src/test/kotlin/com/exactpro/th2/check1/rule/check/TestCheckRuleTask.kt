@@ -44,6 +44,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         SESSION_ALIAS,
         Instant.now(),
         SessionKey(SESSION_ALIAS, Direction.FIRST),
+        null,
         1000,
         maxEventBatchContentSize,
         messageFilter,

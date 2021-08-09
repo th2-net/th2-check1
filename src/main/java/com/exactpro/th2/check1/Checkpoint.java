@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,28 +17,29 @@ package com.exactpro.th2.check1;
 
 import com.exactpro.th2.common.grpc.Checkpoint.DirectionCheckpoint;
 import com.exactpro.th2.common.grpc.Direction;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import static com.datastax.driver.core.utils.UUIDs.timeBased;
-
+import com.google.protobuf.Timestamp;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.datastax.driver.core.utils.UUIDs.timeBased;
+
 public class Checkpoint {
 
     private final String id;
-    private final Map<SessionKey, Long> sessionKeyToSequence;
+    private final Map<SessionKey, CheckpointData> sessionKeyToCheckpointData;
 
-    private Checkpoint(String id, Map<SessionKey, Long> sessionKeyToSequence) {
+    private Checkpoint(String id, Map<SessionKey,  CheckpointData> sessionKeyToCheckpointData) {
         this.id = id;
-        this.sessionKeyToSequence = Map.copyOf(sessionKeyToSequence);
+        this.sessionKeyToCheckpointData = Map.copyOf(sessionKeyToCheckpointData);
     }
 
-    public Checkpoint(Map<SessionKey, Long> sessionKeyToSequence) {
-        this(timeBased().toString(), sessionKeyToSequence);
+    public Checkpoint(Map<SessionKey, CheckpointData> sessionKeyToCheckpointData) {
+        this(timeBased().toString(), sessionKeyToCheckpointData);
     }
 
     public String getId() {
@@ -46,20 +47,20 @@ public class Checkpoint {
     }
 
     public boolean contains(SessionKey sessionKey) {
-        return sessionKeyToSequence.containsKey(sessionKey);
+        return sessionKeyToCheckpointData.containsKey(sessionKey);
     }
 
-    public long getSequence(SessionKey sessionKey) {
-        return sessionKeyToSequence.get(sessionKey);
+    public CheckpointData getCheckpointData(SessionKey sessionKey) {
+        return sessionKeyToCheckpointData.get(sessionKey);
     }
 
     public com.exactpro.th2.common.grpc.Checkpoint convert() {
         Map<String, DirectionCheckpoint.Builder> intermediateMap = new HashMap<>();
 
-        for (Map.Entry<SessionKey, Long> entry : sessionKeyToSequence.entrySet()) {
+        for (Map.Entry<SessionKey, CheckpointData> entry : sessionKeyToCheckpointData.entrySet()) {
             SessionKey sessionKey = entry.getKey();
             intermediateMap.computeIfAbsent(sessionKey.getSessionAlias(), alias -> DirectionCheckpoint.newBuilder())
-                    .putDirectionToSequence(sessionKey.getDirection().getNumber(), entry.getValue());
+                    .putDirectionToCheckpointData(sessionKey.getDirection().getNumber(), CheckpointData.convert(entry.getValue()));
         }
 
         var checkpointBuilder = com.exactpro.th2.common.grpc.Checkpoint.newBuilder()
@@ -71,15 +72,15 @@ public class Checkpoint {
         return checkpointBuilder.build();
     }
 
-    public Map<SessionKey, Long> asMap() {
-        return Collections.unmodifiableMap(sessionKeyToSequence);
+    public Map<SessionKey, CheckpointData> asMap() {
+        return Collections.unmodifiableMap(sessionKeyToCheckpointData);
     }
 
     @Override
     public String toString() {
         return new ToStringBuilder(this)
                 .append("id", id)
-                .append("sessionKeyToSequence", sessionKeyToSequence)
+                .append("sessionKeyToSequence", sessionKeyToCheckpointData)
                 .toString();
     }
 
@@ -97,7 +98,7 @@ public class Checkpoint {
 
         return new EqualsBuilder()
                 .append(id, other.id)
-                .append(sessionKeyToSequence, other.sessionKeyToSequence)
+                .append(sessionKeyToCheckpointData, other.sessionKeyToCheckpointData)
                 .isEquals();
     }
 
@@ -105,19 +106,27 @@ public class Checkpoint {
     public int hashCode() {
         return new HashCodeBuilder(17, 37)
                 .append(id)
-                .append(sessionKeyToSequence)
+                .append(sessionKeyToCheckpointData)
                 .toHashCode();
     }
 
     public static Checkpoint convert(com.exactpro.th2.common.grpc.Checkpoint protoCheckpoint) {
-        Map<SessionKey, Long> sessionKeyToSequence = new HashMap<>();
+        Map<SessionKey, CheckpointData> sessionKeyToSequence = new HashMap<>();
         for (Map.Entry<String, DirectionCheckpoint> sessionAliasDirectionCheckpointEntry : protoCheckpoint.getSessionAliasToDirectionCheckpointMap().entrySet()) {
             String sessionAlias = sessionAliasDirectionCheckpointEntry.getKey();
             DirectionCheckpoint directionCheckpoint = sessionAliasDirectionCheckpointEntry.getValue();
-            for (Map.Entry<Integer, Long> directionSequenceEntry : directionCheckpoint.getDirectionToSequenceMap().entrySet()) {
-                SessionKey sessionKey = new SessionKey(sessionAlias, Direction.forNumber(directionSequenceEntry.getKey()));
-                sessionKeyToSequence.put(sessionKey, directionSequenceEntry.getValue());
-            }
+            if (directionCheckpoint.getDirectionToCheckpointDataCount() != 0) {
+                for (Map.Entry<Integer, com.exactpro.th2.common.grpc.Checkpoint.CheckpointData> directionSequenceEntry : directionCheckpoint.getDirectionToCheckpointDataMap().entrySet()) {
+                    SessionKey sessionKey = new SessionKey(sessionAlias, Direction.forNumber(directionSequenceEntry.getKey()));
+                    com.exactpro.th2.common.grpc.Checkpoint.CheckpointData checkpointData = directionSequenceEntry.getValue();
+                    sessionKeyToSequence.put(sessionKey, new CheckpointData(checkpointData.getSequence(), checkpointData.getTimestamp()));
+                }
+            } else {
+                for (Map.Entry<Integer, Long> directionSequenceEntry : directionCheckpoint.getDirectionToSequenceMap().entrySet()) {
+                    SessionKey sessionKey = new SessionKey(sessionAlias, Direction.forNumber(directionSequenceEntry.getKey()));
+                    sessionKeyToSequence.put(sessionKey, new CheckpointData(directionSequenceEntry.getValue(), Timestamp.getDefaultInstance()));
+                }
+            } 
         }
         return new Checkpoint(protoCheckpoint.getId(), sessionKeyToSequence);
     }

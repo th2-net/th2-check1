@@ -18,22 +18,17 @@ import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.AbstractSessionObserver
+import com.exactpro.th2.check1.CheckpointData
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
 import com.exactpro.th2.check1.util.VerificationUtil
+import com.exactpro.th2.check1.utils.toInstant
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.grpc.Checkpoint
-import com.exactpro.th2.common.grpc.EventBatch
-import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.grpc.MessageFilter
-import com.exactpro.th2.common.grpc.MessageMetadata
-import com.exactpro.th2.common.grpc.MetadataFilter
-import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
@@ -58,6 +53,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 abstract class AbstractCheckTask(
     val description: String?,
+    private val messageTimeout: Long? = null,
     private val timeout: Long,
     private val maxEventBatchContentSize: Int,
     submitTime: Instant,
@@ -106,6 +102,7 @@ abstract class AbstractCheckTask(
     private lateinit var endFuture: Disposable
 
     private var lastSequence = DEFAULT_SEQUENCE
+    private var checkpointTimestamp: Instant? = null
 
     override fun onStart() {
         super.onStart()
@@ -152,7 +149,7 @@ abstract class AbstractCheckTask(
                     } else {
                         legacy.executorService
                     }
-                checkTask.begin(legacy.lastSequence, executor)
+                checkTask.begin(legacy.lastSequence, legacy.checkpointTimestamp, executor)
              }
             LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
         } else {
@@ -164,11 +161,12 @@ abstract class AbstractCheckTask(
      * Observe a message sequence from the checkpoint.
      * Task subscribe to messages stream with its sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
-     * @param checkpoint message sequence from previous task.
+     * @param checkpoint message sequence and checkpoint timestamp from previous task.
      * @throws IllegalStateException when method is called more than once.
      */
     fun begin(checkpoint: Checkpoint? = null) {
-        begin(checkpoint?.getSequence(sessionKey) ?: DEFAULT_SEQUENCE)
+        val checkpointData = checkpoint?.getCheckpointData(sessionKey)
+        begin(checkpointData?.sequence ?: DEFAULT_SEQUENCE, checkpointData?.timestampAsInstant)
     }
 
     /**
@@ -207,12 +205,15 @@ abstract class AbstractCheckTask(
      * @param executorService executor to schedule pipeline execution.
      * @throws IllegalStateException when method is called more than once.
      */
-    private fun begin(sequence: Long = DEFAULT_SEQUENCE, executorService: ExecutorService = createExecutorService()) {
+    private fun begin(sequence: Long = DEFAULT_SEQUENCE, checkpointTimestamp: Instant? = null,
+                      executorService: ExecutorService = createExecutorService()) {
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
         this.lastSequence = sequence
+        if (checkpointTimestamp != null && messageTimeout != null)
+            this.checkpointTimestamp = checkpointTimestamp.plusMillis(messageTimeout)
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
 
@@ -235,8 +236,10 @@ abstract class AbstractCheckTask(
             .doOnNext {
                 handledMessageCounter++
 
-                with(it.metadata.id) {
-                    rootEvent.messageID(this)
+                with(it.metadata) {
+                    rootEvent.messageID(this.id)
+                    if (checkOnMessageTimeout(this.timestamp.toInstant()))
+                        checkComplete()
                 }
             }
             .mapToMessageContainer()
@@ -267,7 +270,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
-            sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
+            sequenceSubject.onSuccess(Legacy(executorService, lastSequence, checkpointTimestamp))
         }
     }
 
@@ -471,20 +474,29 @@ abstract class AbstractCheckTask(
             .flatMap(StreamContainer::bufferedMessages)
             .filter { message -> message.metadata.id.sequence > sequence }
 
-    private fun Checkpoint.getSequence(sessionKey: SessionKey): Long {
-        val sequence = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
-            ?.directionToSequenceMap?.get(sessionKey.direction.number)
+    private fun Checkpoint.getCheckpointData(sessionKey: SessionKey): CheckpointData {
+        val checkpointData = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
+            ?.directionToCheckpointDataMap?.get(sessionKey.direction.number)
 
-        if (sequence == null) {
-            if (LOGGER.isWarnEnabled) {
+        if (checkpointData == null) {
+            LOGGER.warn("Checkpoint '{}' doesn't contain checkpoint data for session '{}'", shortDebugString(this), sessionKey)
+            val sequence = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
+                ?.directionToSequenceMap?.get(sessionKey.direction.number)
+            if (sequence == null) {
                 LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionKey)
+                return CheckpointData(DEFAULT_SEQUENCE)
             }
-        } else {
-            LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionKey)
+            return CheckpointData(sequence)
         }
 
-        return sequence ?: DEFAULT_SEQUENCE
+        return CheckpointData.convert(checkpointData).apply {
+            LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionKey)
+        }
     }
 
-    private data class Legacy(val executorService: ExecutorService, val lastSequence: Long)
+    private fun checkOnMessageTimeout(timestamp: Instant): Boolean {
+        return checkpointTimestamp != null && (checkpointTimestamp!!.isAfter(timestamp) || checkpointTimestamp == timestamp)
+    }
+
+    private data class Legacy(val executorService: ExecutorService, val lastSequence: Long, val checkpointTimestamp: Instant?)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,17 +16,11 @@ import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
 import static com.google.protobuf.TextFormat.shortDebugString;
 
+import com.exactpro.th2.check1.grpc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.exactpro.th2.check1.grpc.ChainID;
 import com.exactpro.th2.check1.grpc.Check1Grpc.Check1ImplBase;
-import com.exactpro.th2.check1.grpc.CheckRuleRequest;
-import com.exactpro.th2.check1.grpc.CheckRuleResponse;
-import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest;
-import com.exactpro.th2.check1.grpc.CheckSequenceRuleResponse;
-import com.exactpro.th2.check1.grpc.CheckpointRequest;
-import com.exactpro.th2.check1.grpc.CheckpointResponse;
 import com.exactpro.th2.common.grpc.RequestStatus;
 
 import io.grpc.stub.StreamObserver;
@@ -132,6 +126,39 @@ public class Check1Handler extends Check1ImplBase {
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR)
                             .setMessage("Sequence rule rejected by internal process: " + e.getMessage())
                             .build())
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void submitNoMessageCheck(NoMessageCheckRequest request, StreamObserver<NoMessageCheckResponse> responseObserver) {
+        try {
+            logger.info("Submitting sequence rule for request '{}' started", shortDebugString(request));
+
+            NoMessageCheckResponse.Builder response = NoMessageCheckResponse.newBuilder();
+            try {
+                ChainID chainID = collectorService.verifyNoMessageCheck(request);
+                response.setChainId(chainID)
+                        .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
+            } catch (Exception e) {
+                if (logger.isErrorEnabled()) {
+                    logger.error("No message check rule task for request '" + shortDebugString(request) + "' isn't submitted", e);
+                }
+                RequestStatus status = RequestStatus.newBuilder()
+                        .setStatus(ERROR)
+                        .setMessage("No message check rule rejected by internal process: " + e.getMessage())
+                        .build();
+                response.setStatus(status);
+            }
+            responseObserver.onNext(response.build());
+            responseObserver.onCompleted();
+        } catch (Throwable e) {
+            if (logger.isErrorEnabled()) {
+                logger.error("NoMessageCheck failed. Request " + shortDebugString(request), e);
+            }
+            responseObserver.onNext(NoMessageCheckResponse.newBuilder()
+                    .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("NoMessageCheck failed. See the logs.").build())
                     .build());
             responseObserver.onCompleted();
         }

@@ -12,22 +12,22 @@
  */
 package com.exactpro.th2.check1;
 
-import java.util.Map;
-
+import com.exactpro.th2.common.grpc.Direction;
+import com.google.protobuf.Timestamp;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import com.exactpro.th2.common.grpc.Direction;
+import java.util.Map;
 
 public class CheckpointTest {
 
     @Test
     public void testConvertation() {
         var origCheckpoint = new Checkpoint(Map.of(
-                new SessionKey("A", Direction.FIRST), 1L,
-                new SessionKey("A", Direction.SECOND), 2L,
-                new SessionKey("B", Direction.FIRST), 3L,
-                new SessionKey("B", Direction.SECOND), 4L
+                new SessionKey("A", Direction.FIRST), generateCheckpointData(1L),
+                new SessionKey("A", Direction.SECOND), generateCheckpointData(2L),
+                new SessionKey("B", Direction.FIRST), generateCheckpointData(3L),
+                new SessionKey("B", Direction.SECOND), generateCheckpointData(4L)
         ));
 
         var protoCheckpoint = origCheckpoint.convert();
@@ -39,10 +39,18 @@ public class CheckpointTest {
 
     private Checkpoint generateCheckpoint() {
         return new Checkpoint(Map.of(
-                new SessionKey("A", Direction.FIRST), 1L,
-                new SessionKey("A", Direction.FIRST), 2L,
-                new SessionKey("B", Direction.SECOND), 3L,
-                new SessionKey("B", Direction.SECOND), 4L
+                new SessionKey("A", Direction.FIRST), generateCheckpointData(1L),
+                new SessionKey("A", Direction.FIRST), generateCheckpointData(2L),
+                new SessionKey("B", Direction.SECOND), generateCheckpointData(3L),
+                new SessionKey("B", Direction.SECOND), generateCheckpointData(4L)
         ));
+    }
+
+    private CheckpointData generateCheckpointData(Long sequence, Timestamp timestamp) {
+        return new CheckpointData(sequence, timestamp);
+    }
+    
+    private CheckpointData generateCheckpointData(Long sequence) {
+        return generateCheckpointData(sequence, Timestamp.getDefaultInstance());
     }
 }
