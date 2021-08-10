@@ -15,7 +15,6 @@
  */
 package com.exactpro.th2.check1.rule.sequence
 
-import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.CheckSequenceUtils
@@ -27,6 +26,8 @@ import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil
+import com.exactpro.th2.check1.utils.fromProtoPreFilter
+import com.exactpro.th2.check1.utils.toRootMessageFilter
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
@@ -35,12 +36,10 @@ import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.event.bean.builder.TableBuilder
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import java.time.Instant
@@ -239,23 +238,6 @@ class SequenceCheckRuleTask(
                 .build())
             .bodyData(sequenceTable.build())
     }
-
-    private fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter): IMessage =
-        fromProtoFilter(protoPreMessageFilter.messageFilter, PRE_FILTER_MESSAGE_NAME)
-
-    private fun PreFilter.toRootMessageFilter() = RootMessageFilter.newBuilder()
-        .setMessageType(PRE_FILTER_MESSAGE_NAME)
-        .setMessageFilter(toMessageFilter())
-        .also {
-            if (hasMetadataFilter()) {
-                it.metadataFilter = metadataFilter
-            }
-        }
-        .build()
-
-    private fun PreFilter.toMessageFilter() = MessageFilter.newBuilder()
-        .putAllFields(fieldsMap)
-        .build()
 
     companion object {
         const val PRE_FILTER_MESSAGE_NAME = "PreFilter"

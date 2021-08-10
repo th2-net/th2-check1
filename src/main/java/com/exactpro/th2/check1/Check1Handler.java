@@ -16,11 +16,20 @@ import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
 import static com.google.protobuf.TextFormat.shortDebugString;
 
-import com.exactpro.th2.check1.grpc.*;
+import com.exactpro.th2.common.message.MessageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.exactpro.th2.check1.grpc.ChainID;
+import com.exactpro.th2.check1.grpc.CheckpointResponse;
 import com.exactpro.th2.check1.grpc.Check1Grpc.Check1ImplBase;
+import com.exactpro.th2.check1.grpc.CheckRuleRequest;
+import com.exactpro.th2.check1.grpc.CheckRuleResponse;
+import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest;
+import com.exactpro.th2.check1.grpc.CheckSequenceRuleResponse;
+import com.exactpro.th2.check1.grpc.CheckpointRequest;
+import com.exactpro.th2.check1.grpc.NoMessageCheckResponse;
+import com.exactpro.th2.check1.grpc.NoMessageCheckRequest;
 import com.exactpro.th2.common.grpc.RequestStatus;
 
 import io.grpc.stub.StreamObserver;
@@ -134,7 +143,9 @@ public class Check1Handler extends Check1ImplBase {
     @Override
     public void submitNoMessageCheck(NoMessageCheckRequest request, StreamObserver<NoMessageCheckResponse> responseObserver) {
         try {
-            logger.info("Submitting sequence rule for request '{}' started", shortDebugString(request));
+            if (logger.isInfoEnabled()) {
+                logger.info("Submitting sequence rule for request '{}' started", MessageUtils.toJson(request));
+            }
 
             NoMessageCheckResponse.Builder response = NoMessageCheckResponse.newBuilder();
             try {
@@ -143,19 +154,20 @@ public class Check1Handler extends Check1ImplBase {
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
-                    logger.error("No message check rule task for request '" + shortDebugString(request) + "' isn't submitted", e);
+                    logger.error("No message check rule task for request '" + MessageUtils.toJson(request) + "' isn't submitted", e);
                 }
                 RequestStatus status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
                         .setMessage("No message check rule rejected by internal process: " + e.getMessage())
                         .build();
                 response.setStatus(status);
+            } finally {
+                responseObserver.onNext(response.build());
+                responseObserver.onCompleted();
             }
-            responseObserver.onNext(response.build());
-            responseObserver.onCompleted();
-        } catch (Throwable e) {
+        } catch (Exception e) {
             if (logger.isErrorEnabled()) {
-                logger.error("NoMessageCheck failed. Request " + shortDebugString(request), e);
+                logger.error("NoMessageCheck failed. Request " + MessageUtils.toJson(request), e);
             }
             responseObserver.onNext(NoMessageCheckResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("NoMessageCheck failed. See the logs.").build())

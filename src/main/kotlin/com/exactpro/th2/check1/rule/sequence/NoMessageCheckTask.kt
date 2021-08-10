@@ -13,7 +13,6 @@
 
 package com.exactpro.th2.check1.rule.sequence
 
-import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.grpc.PreFilter
@@ -21,17 +20,16 @@ import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
-import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.PRE_FILTER_MESSAGE_NAME
 import com.exactpro.th2.check1.util.VerificationUtil
+import com.exactpro.th2.check1.utils.fromProtoPreFilter
+import com.exactpro.th2.check1.utils.toRootMessageFilter
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
-import com.google.protobuf.TextFormat
 import io.reactivex.Observable
 import java.time.Instant
 
@@ -85,10 +83,10 @@ class NoMessageCheckTask(
     }
 
     override fun onNext(messageContainer: MessageContainer) {
-        LOGGER.debug(
-            "Received message with id: {}",
-            TextFormat.shortDebugString(messageContainer.protoMessage.metadata.id)
-        )
+        if (LOGGER.isDebugEnabled) {
+            LOGGER.debug("Received message with id: {}", messageContainer.protoMessage.metadata.id.toJson())
+        }
+
         val result = matchFilter(
             messageContainer,
             messagePreFilter,
@@ -109,26 +107,11 @@ class NoMessageCheckTask(
     override fun completeEvent(canceled: Boolean) {
         preFilterEvent.name("Prefilter: $preFilterMessagesCounter messages were filtered.")
 
-        if (extraMessagesCounter == 0)
+        if (extraMessagesCounter == 0) {
             resultEvent.status(Event.Status.PASSED).name("Check passed")
-        else
-            resultEvent.status(Event.Status.FAILED).name("Check failed: $extraMessagesCounter extra messages were found.")
-    }
-
-    private fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter): IMessage =
-        fromProtoFilter(protoPreMessageFilter.messageFilter, PRE_FILTER_MESSAGE_NAME)
-
-    private fun PreFilter.toRootMessageFilter() = RootMessageFilter.newBuilder()
-        .setMessageType(PRE_FILTER_MESSAGE_NAME)
-        .setMessageFilter(toMessageFilter())
-        .also {
-            if (hasMetadataFilter()) {
-                it.metadataFilter = metadataFilter
-            }
+        } else {
+            resultEvent.status(Event.Status.FAILED)
+                .name("Check failed: $extraMessagesCounter extra messages were found.")
         }
-        .build()
-
-    private fun PreFilter.toMessageFilter() = MessageFilter.newBuilder()
-        .putAllFields(fieldsMap)
-        .build()
+    }
 }

@@ -14,10 +14,6 @@
 package com.exactpro.th2.check1.utils
 
 import com.google.protobuf.Timestamp
-import java.time.Instant
-
-fun Timestamp.toInstant(): Instant = Instant.ofEpochSecond(seconds, nanos.toLong())
-fun Instant.toTimestamp(): Timestamp = Timestamp.newBuilder().setSeconds(epochSecond).setNanos(nano).build()
 
 operator fun Timestamp.compareTo(other: Timestamp): Int {
     if (this.seconds < other.seconds)

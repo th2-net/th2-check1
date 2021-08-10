@@ -13,15 +13,13 @@
 
 package com.exactpro.th2.check1;
 
-import com.exactpro.th2.check1.utils.TimeUtilsKt;
 import com.exactpro.th2.common.grpc.Checkpoint;
 import com.google.protobuf.Timestamp;
 
-import java.time.Instant;
 import java.util.Objects;
 
 public class CheckpointData {
-	private final Long sequence;
+	private final long sequence;
 	private final Timestamp timestamp;
 
 	public CheckpointData(Long sequence, Timestamp timestamp) {
@@ -29,20 +27,16 @@ public class CheckpointData {
 		this.timestamp = timestamp;
 	}
 
-	public CheckpointData(Long sequence) {
+	public CheckpointData(long sequence) {
 		this(sequence, null);
 	}
 
-	public Long getSequence() {
+	public long getSequence() {
 		return sequence;
 	}
 
 	public Timestamp getTimestamp() {
 		return timestamp;
-	}
-
-	public Instant getTimestampAsInstant() {
-		return TimeUtilsKt.toInstant(timestamp);
 	}
 
 	public static CheckpointData convert(com.exactpro.th2.common.grpc.Checkpoint.CheckpointData checkpointData) {
