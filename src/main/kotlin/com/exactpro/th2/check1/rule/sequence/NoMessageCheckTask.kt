@@ -95,7 +95,7 @@ class NoMessageCheckTask(
             matchNames = false,
             significant = false
         )
-        messageContainer.protoMessage.metadata.run {
+        messageContainer.protoMessage.metadata.apply {
             if (FilterUtils.allMatches(result, protoPreMessageFilter) { it.fullMatch }) {
                 preFilterMessagesCounter++
                 preFilterEvent.messageID(id)

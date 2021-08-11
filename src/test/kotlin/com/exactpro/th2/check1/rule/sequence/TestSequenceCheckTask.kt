@@ -368,7 +368,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             messageStream,
             true,
             filtersParam = messageFilters,
-            taskTimeout = TaskTimeout(500L, 5000L)
+            taskTimeout = TaskTimeout(5000L, 500L)
         ).begin(createCheckpoint(checkpointTimestamp))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
@@ -438,7 +438,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             messageStream,
             true,
             filtersParam = messageFilters,
-            taskTimeout = TaskTimeout(500L, 5000L)
+            taskTimeout = TaskTimeout(5000L, 500L)
         ).begin(createCheckpoint(checkpointTimestamp))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)

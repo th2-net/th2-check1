@@ -169,7 +169,7 @@ class TestChain: AbstractCheckTaskTest() {
             description = "Test",
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            taskTimeout = TaskTimeout(null, 1000L),
+            taskTimeout = TaskTimeout(1000L),
             maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),

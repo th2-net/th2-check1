@@ -15,7 +15,6 @@ package com.exactpro.th2.check1.utils
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.th2.check1.SessionKey
-import com.exactpro.th2.check1.entities.CheckpointData
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.common.grpc.Checkpoint
@@ -24,6 +23,9 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
+import com.exactpro.th2.check1.entities.Checkpoint as InternalCheckpoint
+import com.exactpro.th2.check1.entities.CheckpointData as InternalCheckpointData
+import com.exactpro.th2.common.grpc.Checkpoint.CheckpointData as CheckpointData
 
 fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter): IMessage =
     fromProtoFilter(protoPreMessageFilter.messageFilter, SequenceCheckRuleTask.PRE_FILTER_MESSAGE_NAME)
@@ -42,16 +44,16 @@ fun PreFilter.toMessageFilter(): MessageFilter = MessageFilter.newBuilder()
     .putAllFields(fieldsMap)
     .build()
 
-fun Checkpoint.CheckpointData.convert(): CheckpointData = CheckpointData(sequence, timestamp)
+fun CheckpointData.convert(): InternalCheckpointData = InternalCheckpointData(sequence, timestamp)
 
-fun CheckpointData.convert(): Checkpoint.CheckpointData {
-    val builder = Checkpoint.CheckpointData.newBuilder().setSequence(sequence)
+fun InternalCheckpointData.convert(): CheckpointData {
+    val builder = CheckpointData.newBuilder().setSequence(sequence)
     if (timestamp != null)
         builder.timestamp = timestamp
     return builder.build()
 }
 
-fun com.exactpro.th2.check1.entities.Checkpoint.convert(): Checkpoint {
+fun InternalCheckpoint.convert(): Checkpoint {
     val intermediateMap: MutableMap<String, DirectionCheckpoint.Builder> = HashMap()
     sessionKeyToCheckpointData.forEach { (sessionKey, checkpointData) ->
         intermediateMap.computeIfAbsent(sessionKey.sessionAlias) {
@@ -67,16 +69,16 @@ fun com.exactpro.th2.check1.entities.Checkpoint.convert(): Checkpoint {
     return checkpointBuilder.build()
 }
 
-fun Checkpoint.convert(): com.exactpro.th2.check1.entities.Checkpoint {
-    val sessionKeyToSequence: MutableMap<SessionKey, CheckpointData> = HashMap()
+fun Checkpoint.convert(): InternalCheckpoint {
+    val sessionKeyToSequence: MutableMap<SessionKey, InternalCheckpointData> = HashMap()
     sessionAliasToDirectionCheckpointMap.forEach { (sessionAlias, directionCheckpoint) ->
-        check(!(directionCheckpoint.directionToCheckpointDataCount != 0 && directionCheckpoint.directionToSequenceCount != 0)) {
+        check(!(directionCheckpoint.run { directionToCheckpointDataCount != 0 && directionToSequenceCount != 0 })) {
             "Session alias '${sessionAlias}' cannot contain both of these fields: 'direction to checkpoint data' and 'direction to sequence'. Please use 'direction to checkpoint data' instead"
         }
         if (directionCheckpoint.directionToCheckpointDataCount == 0) {
-            directionCheckpoint.directionToSequenceMap.forEach { (directionNumber, sequence) -> 
+            directionCheckpoint.directionToSequenceMap.forEach { (directionNumber, sequence) ->
                 val sessionKey = SessionKey(sessionAlias, Direction.forNumber(directionNumber))
-                sessionKeyToSequence[sessionKey] = CheckpointData(sequence, null)
+                sessionKeyToSequence[sessionKey] = InternalCheckpointData(sequence, null)
             }
         } else {
             directionCheckpoint.directionToCheckpointDataMap.forEach { (directionNumber, checkpointData) ->
@@ -86,5 +88,5 @@ fun Checkpoint.convert(): com.exactpro.th2.check1.entities.Checkpoint {
             }
         }
     }
-    return com.exactpro.th2.check1.entities.Checkpoint(id, sessionKeyToSequence)
+    return InternalCheckpoint(id, sessionKeyToSequence)
 }

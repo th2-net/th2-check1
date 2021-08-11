@@ -214,7 +214,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
             .build()
-        val task = checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(500, 1000))
+        val task = checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(1000, 500))
         task.begin(createCheckpoint(checkpointTimestamp))
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
@@ -243,7 +243,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
             .build()
-        val task = checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(500, 1000))
+        val task = checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(1000, 500))
         task.begin(createCheckpoint(checkpointTimestamp))
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)

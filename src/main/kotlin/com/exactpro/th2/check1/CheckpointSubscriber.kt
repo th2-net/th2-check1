@@ -25,7 +25,7 @@ class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
     }
 
     fun createCheckpoint(): Checkpoint = Checkpoint(
-        sessionSet.associateBy(
+        sessionKeyToCheckpointData = sessionSet.associateBy(
             { session -> session.sessionKey },
             { session ->
                 session.lastMessage.metadata.run {

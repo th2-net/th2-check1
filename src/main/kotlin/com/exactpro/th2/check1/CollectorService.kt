@@ -90,7 +90,7 @@ class CollectorService(
         val chainID = request.getChainIdOrGenerate()
 
         val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction),
-            TaskTimeout(request.messageTimeout, request.timeout), maxEventBatchContentSize,
+            TaskTimeout(request.timeout, request.messageTimeout), maxEventBatchContentSize,
             filter, parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
@@ -123,7 +123,7 @@ class CollectorService(
         }
         
         val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction),
-            TaskTimeout(request.messageTimeout, request.timeout), maxEventBatchContentSize, request.preFilter,
+            TaskTimeout(request.timeout, request.messageTimeout), maxEventBatchContentSize, request.preFilter,
             protoMessageFilters, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
@@ -146,7 +146,7 @@ class CollectorService(
             request.description,
             Instant.now(),
             SessionKey(sessionAlias, direction),
-            TaskTimeout(request.messageTimeout, request.timeout),
+            TaskTimeout(request.timeout, request.messageTimeout),
             maxEventBatchContentSize,
             request.preFilter,
             parentEventID,

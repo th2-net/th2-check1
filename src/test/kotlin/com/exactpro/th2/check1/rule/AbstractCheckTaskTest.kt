@@ -49,11 +49,11 @@ abstract class AbstractCheckTaskTest {
         alias: String = SESSION_ALIAS,
         type: String = MESSAGE_TYPE,
         direction: Direction = FIRST,
-        timestamp: Timestamp? = Timestamp.getDefaultInstance()
+        timestamp: Timestamp = Timestamp.getDefaultInstance()
     ): Message.Builder = Message.newBuilder().apply {
         metadataBuilder.apply {
             this.messageType = type
-            this.timestamp = timestamp ?: Timestamp.getDefaultInstance()
+            this.timestamp = timestamp
             idBuilder.apply {
                 this.sequence = sequence
                 this.direction = direction

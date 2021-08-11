@@ -26,6 +26,7 @@ import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
+import com.exactpro.th2.common.value.toValue
 import com.google.protobuf.Timestamp
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
@@ -41,13 +42,13 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val messageTimeout = 1500L
         val streams = createStreams(
             messages = createMessages(
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 500)),
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 1000)),
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 1300)),
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 1500)),
-                MessageData("B", createValue("2"), getMessageTimestamp(checkpointTimestamp, 1600)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1300)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1500)),
+                MessageData("B", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
                 // should be skipped because of message timeout
-                MessageData("B", createValue("2"), getMessageTimestamp(checkpointTimestamp, 1600))
+                MessageData("B", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1600))
             )
         )
 
@@ -56,7 +57,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             eventID,
             streams,
             createPreFilter("A", "1", FilterOperation.EQUAL),
-            TaskTimeout(messageTimeout, 5000)
+            TaskTimeout(5000, messageTimeout)
         )
         task.begin(createCheckpoint(checkpointTimestamp))
 
@@ -77,12 +78,12 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val messageTimeout = 1500L
         val streams = createStreams(
             messages = createMessages(
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 100)),
-                MessageData("B", createValue("2"), getMessageTimestamp(checkpointTimestamp, 500)),
-                MessageData("C", createValue("3"), getMessageTimestamp(checkpointTimestamp, 700)),
-                MessageData("D", createValue("4"), getMessageTimestamp(checkpointTimestamp, 1600)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
+                MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
+                MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 700)),
+                MessageData("D", "4".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
                 // should be skipped because of message timeout
-                MessageData("E", createValue("5"), getMessageTimestamp(checkpointTimestamp, 1700))
+                MessageData("E", "5".toValue(), getMessageTimestamp(checkpointTimestamp, 1700))
                 )
         )
 
@@ -91,7 +92,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             eventID,
             streams,
             createPreFilter("A", "1", FilterOperation.EQUAL),
-            TaskTimeout(messageTimeout, 5000)
+            TaskTimeout(5000, messageTimeout)
         )
         task.begin(createCheckpoint(checkpointTimestamp))
 
@@ -112,11 +113,11 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(
             messages = createMessages(
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 100)),
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 500)),
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 700)),
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 1000)),
-                MessageData("A", createValue("1"), getMessageTimestamp(checkpointTimestamp, 1300))
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 700)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1300))
             )
         )
 
@@ -149,18 +150,12 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         direction: Direction = Direction.FIRST
     ): List<Message> {
         var sequence = 1L;
-        val messages: MutableList<Message> = ArrayList()
-        messageData.forEach { data ->
-            messages.add(
-                constructMessage(sequence++, sessionAlias, messageType, direction, data.timestamp)
-                    .putFields(data.fieldName, data.value)
-                    .build()
-            )
+        return messageData.map { data ->
+            constructMessage(sequence++, sessionAlias, messageType, direction, data.timestamp)
+                .putFields(data.fieldName, data.value)
+                .build()
         }
-        return messages
     }
-
-    private fun createValue(value: String): Value = Value.newBuilder().setSimpleValue(value).build()
 
     private fun createPreFilter(fieldName: String, value: String, operation: FilterOperation): PreFilter =
         PreFilter.newBuilder()
@@ -171,7 +166,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
         preFilterParam: PreFilter,
-        taskTimeout: TaskTimeout = TaskTimeout(3500,5000L),
+        taskTimeout: TaskTimeout = TaskTimeout(5000L, 3500L),
         maxEventBatchContentSize: Int = 1024 * 1024
     ): NoMessageCheckTask {
         return NoMessageCheckTask(
@@ -187,5 +182,5 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         )
     }
 
-    data class MessageData(val fieldName: String, val value: Value, val timestamp: Timestamp?)
+    data class MessageData(val fieldName: String, val value: Value, val timestamp: Timestamp)
 }
