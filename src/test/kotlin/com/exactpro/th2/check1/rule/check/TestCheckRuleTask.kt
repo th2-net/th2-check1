@@ -23,7 +23,6 @@ import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.check1.util.toSimpleFilter
-import com.exactpro.th2.common.grpc.ComplexFilter
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
@@ -34,11 +33,18 @@ import com.exactpro.th2.common.grpc.FilterOperation.IN
 import com.exactpro.th2.common.grpc.FilterOperation.LESS
 import com.exactpro.th2.common.grpc.FilterOperation.LIKE
 import com.exactpro.th2.common.grpc.FilterOperation.MORE
+import com.exactpro.th2.common.grpc.FilterOperation.NOT_IN
+import com.exactpro.th2.common.grpc.FilterOperation.NOT_LESS
+import com.exactpro.th2.common.grpc.FilterOperation.NOT_LIKE
+import com.exactpro.th2.common.grpc.FilterOperation.NOT_MORE
+import com.exactpro.th2.common.grpc.FilterOperation.NOT_WILDCARD
+import com.exactpro.th2.common.grpc.FilterOperation.WILDCARD
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.grpc.SimpleList
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.value.toValue
@@ -213,8 +219,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMessageType(MESSAGE_TYPE)
             .setMessageFilter(MessageFilter.newBuilder()
                 .putFields("containFilter", ValueFilter.newBuilder()
-                    .setComplexFilter(ComplexFilter.newBuilder().apply {
-                        addAllComplexValues(listOf("A", "B", "C"))
+                    .setSimpleList(SimpleList.newBuilder().apply {
+                        addAllSimpleValues(listOf("A", "B", "C"))
                     })
                     .setOperation(IN)
                     .build())
@@ -236,8 +242,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMessageType(MESSAGE_TYPE)
             .setMessageFilter(MessageFilter.newBuilder()
                 .putFields("containFilter", ValueFilter.newBuilder()
-                    .setComplexFilter(ComplexFilter.newBuilder().apply {
-                        addAllComplexValues(listOf("A", "B", "C"))
+                    .setSimpleList(SimpleList.newBuilder().apply {
+                        addAllSimpleValues(listOf("A", "B", "C"))
                     })
                     .setOperation(IN)
                     .build())
@@ -254,6 +260,52 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     }
 
     @Test
+    internal fun valueWasNotContainedInNotContainFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("notContain", ValueFilter.newBuilder()
+                    .setSimpleList(SimpleList.newBuilder().apply {
+                        addAllSimpleValues(listOf("A", "B", "C"))
+                    })
+                    .setOperation(NOT_IN)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("notContain", "D".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("notContain").status)
+    }
+
+    @Test
+    internal fun valueWasContainedInNotContainFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("notContain", ValueFilter.newBuilder()
+                    .setSimpleList(SimpleList.newBuilder().apply {
+                        addAllSimpleValues(listOf("A", "B", "C"))
+                    })
+                    .setOperation(NOT_IN)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("notContain", "A".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("notContain").status)
+    }
+
+    @Test
     internal fun regExGreedyFilter() {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
             .setMessageType(MESSAGE_TYPE)
@@ -266,13 +318,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .build()
 
         val actual = message(MESSAGE_TYPE).apply {
-            putFields("regexFilter", "bbbb Abba Abbbbabbb".toValue())
+            putFields("regexFilter", "Abbbb Abba Abbbbabbba".toValue())
         }.build()
 
         val result = getResult(actual, filter)
 
         assertEquals(PASSED, result.getResult("regexFilter").status)
-        assertEquals("Abba Abbbba", result.getResult("regexFilter").expressionResult.description)
     }
 
     @Test
@@ -288,13 +339,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .build()
 
         val actual = message(MESSAGE_TYPE).apply {
-            putFields("regexFilter", "bbbb Abba Abbbbabbb".toValue())
+            putFields("regexFilter", "Abbbb Abba Abbbbabbba".toValue())
         }.build()
 
         val result = getResult(actual, filter)
 
         assertEquals(FAILED, result.getResult("regexFilter").status)
-        assertEquals("", result.getResult("regexFilter").expressionResult.description )
     }
 
     @Test
@@ -310,13 +360,33 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .build()
 
         val actual = message(MESSAGE_TYPE).apply {
-            putFields("regexFilter", "bbbb Abba Abbbbabbb".toValue())
+            putFields("regexFilter", "Abbbb Abba Abbbbabbba".toValue())
         }.build()
 
         val result = getResult(actual, filter)
 
         assertEquals(PASSED, result.getResult("regexFilter").status)
-        assertEquals("AbbaAbbbba", result.getResult("regexFilter").expressionResult.description)
+    }
+
+    @Test
+    internal fun notLikeFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("regexFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("A.+a")
+                    .setOperation(NOT_LIKE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("regexFilter", "Abbbb Abba Abbbbabbb".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("regexFilter").status)
     }
 
     @Test
@@ -325,19 +395,83 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMessageType(MESSAGE_TYPE)
             .setMessageFilter(MessageFilter.newBuilder()
                 .putFields("mathFilter", ValueFilter.newBuilder()
-                    .setSimpleFilter("10")
+                    .setSimpleFilter("10,1")
                     .setOperation(MORE)
                     .build())
                 .build())
             .build()
 
         val actual = message(MESSAGE_TYPE).apply {
-            putFields("mathFilter", "15".toValue())
+            putFields("mathFilter", "10,2".toValue())
         }.build()
 
         val result = getResult(actual, filter)
 
         assertEquals(PASSED, result.getResult("mathFilter").status)
+    }
+
+    @Test
+    internal fun mathNotMoreFilterPositive() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("16")
+                    .setOperation(NOT_MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "16".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("mathFilter").status)
+    }
+
+    @Test
+    internal fun mathNotMoreFilterEqual() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("16")
+                    .setOperation(NOT_MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "16".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("mathFilter").status)
+    }
+
+
+    @Test
+    internal fun mathNotMoreFilterNegative() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("15")
+                    .setOperation(NOT_MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "16".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("mathFilter").status)
     }
 
     @Test
@@ -353,7 +487,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .build()
 
         val actual = message(MESSAGE_TYPE).apply {
-            putFields("mathFilter", "15".toValue())
+            putFields("mathFilter", "10".toValue())
         }.build()
 
         val result = getResult(actual, filter)
@@ -361,6 +495,153 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertEquals(FAILED, result.getResult("mathFilter").status)
     }
 
+    @Test
+    internal fun mathNotLessFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("15")
+                    .setOperation(NOT_LESS)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "16".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("mathFilter").status)
+    }
+
+    @Test
+    internal fun mathNotLessFilterEqual() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("16")
+                    .setOperation(NOT_LESS)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "16".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("mathFilter").status)
+    }
+
+
+    @Test
+    internal fun mathNotLessFilterNegative() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("17")
+                    .setOperation(NOT_LESS)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "16".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("mathFilter").status)
+    }
+
+    @Test
+    internal fun wilcardFilterPossitive() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("wildcardFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("c.*")
+                    .setOperation(WILDCARD)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("wildcardFilter", "c.txt".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("wildcardFilter").status)
+    }
+
+    @Test
+    internal fun wilcardFilterNegative() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("wildcardFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("*.?")
+                    .setOperation(WILDCARD)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("wildcardFilter", "c.txt".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("wildcardFilter").status)
+    }
+
+    @Test
+    internal fun notWilcardFilterPossitive() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("wildcardFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("c.?")
+                    .setOperation(NOT_WILDCARD)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("wildcardFilter", "c.txt".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("wildcardFilter").status)
+    }
+
+    @Test
+    internal fun notWilcardFilterNegative() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("wildcardFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("c.****")
+                    .setOperation(NOT_WILDCARD)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("wildcardFilter", "c.txt".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("wildcardFilter").status)
+    }
     private fun getResult(actual: Message, filter: RootMessageFilter) :ComparisonResult {
         val container = VerificationUtil.toMetaContainer(filter.messageFilter, false)
         val settings = ComparatorSettings().apply {

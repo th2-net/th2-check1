@@ -66,7 +66,10 @@ public class VerificationEntryUtils {
             if ("#".equals(condition)) {
                 return FilterOperation.EMPTY.name();
             }
-            if ("IN".equals(condition)) {
+            if (condition.contains("NOT_IN_")) {
+                return FilterOperation.NOT_IN.name();
+            }
+            if (condition.contains("IN_")) {
                 return FilterOperation.IN.name();
             }
             if (">".equals(condition)) {
@@ -75,8 +78,23 @@ public class VerificationEntryUtils {
             if ("<".equals(condition)) {
                 return FilterOperation.LESS.name();
             }
+            if (">=".equals(condition)) {
+                return FilterOperation.NOT_LESS.name();
+            }
+            if ("<=".equals(condition)) {
+                return FilterOperation.NOT_MORE.name();
+            }
+            if (condition.contains("NOT_LIKE_")) {
+                return FilterOperation.NOT_LIKE.name();
+            }
             if (condition.contains("LIKE_")) {
                 return FilterOperation.LIKE.name();
+            }
+            if (condition.contains("NOT_WILDCARD_")) {
+                return FilterOperation.NOT_WILDCARD.name();
+            }
+            if (condition.contains("WILDCARD_")) {
+                return FilterOperation.WILDCARD.name();
             }
         }
         return FilterOperation.EQUAL.name();
