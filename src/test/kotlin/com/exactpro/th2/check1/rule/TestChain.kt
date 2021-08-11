@@ -14,6 +14,7 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
@@ -168,7 +169,7 @@ class TestChain: AbstractCheckTaskTest() {
             description = "Test",
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            timeout = 1000L,
+            taskTimeout = TaskTimeout(null, 1000L),
             maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),
@@ -188,8 +189,7 @@ class TestChain: AbstractCheckTaskTest() {
         SESSION_ALIAS,
         Instant.now(),
         SessionKey(SESSION_ALIAS, FIRST),
-        null,
-        1000,
+        TaskTimeout(1000L),
         maxEventBatchContentSize,
         createMessageFilter(sequence),
         parentEventID,

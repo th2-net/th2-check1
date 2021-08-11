@@ -13,6 +13,8 @@
 
 package com.exactpro.th2.check1
 
+import com.exactpro.th2.check1.entities.Checkpoint
+import com.exactpro.th2.check1.entities.CheckpointData
 import java.util.concurrent.ConcurrentHashMap
 
 class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
@@ -26,10 +28,9 @@ class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
         sessionSet.associateBy(
             { session -> session.sessionKey },
             { session ->
-                CheckpointData(
-                    session.lastMessage.metadata.id.sequence,
-                    session.lastMessage.metadata.timestamp
-                )
+                session.lastMessage.metadata.run {
+                    CheckpointData(id.sequence, timestamp)
+                }
             })
     )
 }

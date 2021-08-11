@@ -18,11 +18,14 @@ import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.AbstractSessionObserver
-import com.exactpro.th2.check1.CheckpointData
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.CheckpointData
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
 import com.exactpro.th2.check1.util.VerificationUtil
+import com.exactpro.th2.check1.utils.convert
+import com.exactpro.th2.check1.utils.getStatusType
 import com.exactpro.th2.check1.utils.isAfter
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -57,8 +60,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 abstract class AbstractCheckTask(
     val description: String?,
-    private val messageTimeout: Long? = null,
-    private val timeout: Long,
+    private val taskTimeout: TaskTimeout,
     private val maxEventBatchContentSize: Int,
     submitTime: Instant,
     protected val sessionKey: SessionKey,
@@ -214,13 +216,13 @@ abstract class AbstractCheckTask(
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
-        LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
+        LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, taskTimeout.timeout)
         this.lastSequence = sequence
-        this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, messageTimeout)
+        this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
 
-        endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
+        endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end("Timeout is exited") }
 
         messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
@@ -241,11 +243,9 @@ abstract class AbstractCheckTask(
 
                 with(it.metadata) {
                     rootEvent.messageID(this.id)
-                    if (checkOnMessageTimeout(this.timestamp)) {
-                        checkComplete()
-                    }
                 }
             }
+            .takeWhile { checkOnMessageTimeout(it.metadata.timestamp) }
             .mapToMessageContainer()
             .taskPipeline()
             .subscribe(this)
@@ -497,13 +497,13 @@ abstract class AbstractCheckTask(
             return CheckpointData(sequence)
         }
 
-        return CheckpointData.convert(checkpointData).apply {
+        return checkpointData.convert().apply {
             LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionKey)
         }
     }
 
     private fun checkOnMessageTimeout(timestamp: Timestamp): Boolean {
-        return checkpointTimeout != null && (checkpointTimeout!!.isAfter(timestamp) || checkpointTimeout == timestamp)
+        return checkpointTimeout == null || checkpointTimeout!!.isAfter(timestamp) || checkpointTimeout == timestamp
     }
 
     private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long?): Timestamp? =

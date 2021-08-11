@@ -17,13 +17,17 @@ import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Direction.FIRST
 import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.google.protobuf.Timestamp
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
+import java.time.Instant
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
@@ -40,9 +44,16 @@ abstract class AbstractCheckTaskTest {
         )
     }
 
-    fun constructMessage(sequence: Long = 0, alias: String = SESSION_ALIAS, type: String = MESSAGE_TYPE, direction: Direction = FIRST): Message.Builder = Message.newBuilder().apply {
+    fun constructMessage(
+        sequence: Long = 0,
+        alias: String = SESSION_ALIAS,
+        type: String = MESSAGE_TYPE,
+        direction: Direction = FIRST,
+        timestamp: Timestamp? = Timestamp.getDefaultInstance()
+    ): Message.Builder = Message.newBuilder().apply {
         metadataBuilder.apply {
-            messageType = type
+            this.messageType = type
+            this.timestamp = timestamp ?: Timestamp.getDefaultInstance()
             idBuilder.apply {
                 this.sequence = sequence
                 this.direction = direction
@@ -50,6 +61,29 @@ abstract class AbstractCheckTaskTest {
             }
         }
     }
+
+    protected fun createEvent(id: String): EventID {
+        return EventID.newBuilder().setId(id).build()
+    }
+
+    protected fun getMessageTimestamp(start: Instant, delta: Long): Timestamp =
+        start.plusMillis(delta).toTimestamp()
+
+    protected fun createCheckpoint(timestamp: Instant, sequence: Long = -1) : com.exactpro.th2.common.grpc.Checkpoint =
+        com.exactpro.th2.common.grpc.Checkpoint.newBuilder().apply {
+            putSessionAliasToDirectionCheckpoint(
+                SESSION_ALIAS,
+                com.exactpro.th2.common.grpc.Checkpoint.DirectionCheckpoint.newBuilder().apply {
+                    putDirectionToCheckpointData(
+                        FIRST.number,
+                        com.exactpro.th2.common.grpc.Checkpoint.CheckpointData.newBuilder().apply {
+                            this.sequence = sequence
+                            this.timestamp = timestamp.toTimestamp()
+                        }.build()
+                    )
+                }.build()
+            )
+        }.build()
 
     companion object {
         const val MESSAGE_TYPE = "TestMsg"

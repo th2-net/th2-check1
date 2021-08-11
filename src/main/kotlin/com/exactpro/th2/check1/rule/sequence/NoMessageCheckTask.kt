@@ -15,12 +15,14 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTask
-import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil
+import com.exactpro.th2.check1.utils.FilterUtils
+import com.exactpro.th2.check1.utils.FilterUtils.fullMatch
 import com.exactpro.th2.check1.utils.fromProtoPreFilter
 import com.exactpro.th2.check1.utils.toRootMessageFilter
 import com.exactpro.th2.common.event.Event
@@ -37,14 +39,13 @@ class NoMessageCheckTask(
     description: String?,
     startTime: Instant,
     sessionKey: SessionKey,
-    messageTimeout: Long? = null,
-    timeout: Long,
+    taskTimeout: TaskTimeout,
     maxEventBatchContentSize: Int,
     protoPreFilter: PreFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-    ) : AbstractCheckTask(description, messageTimeout, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+    ) : AbstractCheckTask(description, taskTimeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
@@ -94,13 +95,14 @@ class NoMessageCheckTask(
             matchNames = false,
             significant = false
         )
-        val comparisonContainer = ComparisonContainer(messageContainer, protoPreMessageFilter, result)
-        if (comparisonContainer.fullyMatches) {
-            preFilterMessagesCounter++
-            preFilterEvent.messageID(comparisonContainer.protoActual.metadata.id)
-        } else {
-            extraMessagesCounter++
-            resultEvent.messageID(comparisonContainer.protoActual.metadata.id)
+        messageContainer.protoMessage.metadata.run {
+            if (FilterUtils.allMatches(result, protoPreMessageFilter) { it.fullMatch }) {
+                preFilterMessagesCounter++
+                preFilterEvent.messageID(id)
+            } else {
+                extraMessagesCounter++
+                resultEvent.messageID(id)
+            }
         }
     }
 

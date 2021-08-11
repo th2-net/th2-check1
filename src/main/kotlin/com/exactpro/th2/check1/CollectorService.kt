@@ -13,6 +13,9 @@
 package com.exactpro.th2.check1
 
 import com.exactpro.th2.check1.configuration.Check1Configuration
+import com.exactpro.th2.check1.entities.Checkpoint
+import com.exactpro.th2.check1.entities.CheckpointData
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.*
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
@@ -87,7 +90,7 @@ class CollectorService(
         val chainID = request.getChainIdOrGenerate()
 
         val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction),
-            request.messageTimeout, request.timeout, maxEventBatchContentSize,
+            TaskTimeout(request.messageTimeout, request.timeout), maxEventBatchContentSize,
             filter, parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
@@ -120,8 +123,8 @@ class CollectorService(
         }
         
         val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction),
-            request.messageTimeout, request.timeout, maxEventBatchContentSize, request.preFilter, protoMessageFilters,
-            request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
+            TaskTimeout(request.messageTimeout, request.timeout), maxEventBatchContentSize, request.preFilter,
+            protoMessageFilters, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -143,8 +146,7 @@ class CollectorService(
             request.description,
             Instant.now(),
             SessionKey(sessionAlias, direction),
-            request.messageTimeout,
-            request.timeout,
+            TaskTimeout(request.messageTimeout, request.timeout),
             maxEventBatchContentSize,
             request.preFilter,
             parentEventID,
@@ -260,7 +262,7 @@ class CollectorService(
             val checkpoint = checkpointSubscriber.createCheckpoint()
             rootEvent.endTimestamp()
                 .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
-            checkpoint.asMap().forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
+            checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
                 val messageID = sessionKey.toMessageID(checkpointData.sequence)
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()

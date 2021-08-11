@@ -15,14 +15,17 @@ package com.exactpro.th2.check1.rule.check
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
+import com.exactpro.th2.common.grpc.EventStatus.FAILED
 import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.FilterOperation
+import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -39,13 +42,13 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         messageFilter: RootMessageFilter,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
-        maxEventBatchContentSize: Int = 1024 * 1024
+        maxEventBatchContentSize: Int = 1024 * 1024,
+        taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ) = CheckRuleTask(
         SESSION_ALIAS,
         Instant.now(),
         SessionKey(SESSION_ALIAS, Direction.FIRST),
-        null,
-        1000,
+        taskTimeout,
         maxEventBatchContentSize,
         messageFilter,
         parentEventID,
@@ -64,7 +67,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .build()
         ))
 
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createEvent("root")
         val filter = RootMessageFilter.newBuilder()
             .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
@@ -90,7 +93,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .build()
         ))
 
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createEvent("root")
         val filter = RootMessageFilter.newBuilder()
             .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
@@ -116,7 +119,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .build()
         ))
 
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createEvent("root")
         val filter = RootMessageFilter.newBuilder()
             .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
@@ -142,7 +145,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .build()
         ))
 
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createEvent("root")
         val filter = RootMessageFilter.newBuilder()
             .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
@@ -172,7 +175,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .build()
         ))
 
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createEvent("root")
         val filter = RootMessageFilter.newBuilder()
             .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
@@ -189,5 +192,63 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertNotNull(checkFailedEvent) {
             "No failed event $eventBatch"
         }
+    }
+
+    @Test
+    fun `success verification with message timeout`() {
+        val checkpointTimestamp = Instant.now()
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .setTimestamp(getMessageTimestamp(checkpointTimestamp, 500))
+                    .setId(MessageID.newBuilder().setSequence(1L))
+                    .build())
+                .build()
+        ))
+
+        val eventID = createEvent("root")
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMetadataFilter(MetadataFilter.newBuilder()
+                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
+            .build()
+        val task = checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(500, 1000))
+        task.begin(createCheckpoint(checkpointTimestamp))
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertEquals(4, eventList.size)
+        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
+    }
+
+    @Test
+    fun `failed verification with expired message timeout`() {
+        val checkpointTimestamp = Instant.now()
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .setTimestamp(getMessageTimestamp(checkpointTimestamp, 600))
+                    .setId(MessageID.newBuilder().setSequence(1L))
+                    .build())
+                .build()
+        ))
+
+        val eventID = createEvent("root")
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMetadataFilter(MetadataFilter.newBuilder()
+                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
+            .build()
+        val task = checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(500, 1000))
+        task.begin(createCheckpoint(checkpointTimestamp))
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertEquals(3, eventList.size)
+        assertEquals(2, eventList.filter { it.status == FAILED }.size)
     }
 }

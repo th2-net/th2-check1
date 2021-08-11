@@ -16,6 +16,7 @@ import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
 import static com.google.protobuf.TextFormat.shortDebugString;
 
+import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 import com.exactpro.th2.common.message.MessageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,7 @@ public class Check1Handler extends Check1ImplBase {
         try {
             var internalCheckpoint = collectorService.createCheckpoint(request);
             CheckpointResponse checkpointResponse = CheckpointResponse.newBuilder()
-                    .setCheckpoint(internalCheckpoint.convert())
+                    .setCheckpoint(ProtoMessageUtilsKt.convert(internalCheckpoint))
                     .build();
             if (logger.isDebugEnabled()) {
                 logger.debug("Created checkpoint internal '{}' proto '{}", internalCheckpoint, shortDebugString(checkpointResponse));
@@ -154,17 +155,15 @@ public class Check1Handler extends Check1ImplBase {
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
-                    logger.error("No message check rule task for request '" + MessageUtils.toJson(request) + "' isn't submitted", e);
+                    logger.error("No message check rule task for request '{}' isn't submitted", MessageUtils.toJson(request), e);
                 }
                 RequestStatus status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
                         .setMessage("No message check rule rejected by internal process: " + e.getMessage())
                         .build();
                 response.setStatus(status);
-            } finally {
-                responseObserver.onNext(response.build());
-                responseObserver.onCompleted();
             }
+            responseObserver.onNext(response.build());
         } catch (Exception e) {
             if (logger.isErrorEnabled()) {
                 logger.error("NoMessageCheck failed. Request " + MessageUtils.toJson(request), e);
@@ -172,6 +171,7 @@ public class Check1Handler extends Check1ImplBase {
             responseObserver.onNext(NoMessageCheckResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("NoMessageCheck failed. See the logs.").build())
                     .build());
+        } finally {
             responseObserver.onCompleted();
         }
     }

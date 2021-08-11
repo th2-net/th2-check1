@@ -14,8 +14,9 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparisonResult
-import com.exactpro.sf.comparison.ComparisonUtil
 import com.exactpro.sf.scriptrunner.StatusType
+import com.exactpro.th2.check1.utils.FilterUtils
+import com.exactpro.th2.check1.utils.FilterUtils.fullMatch
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.RootMessageFilter
 
@@ -37,7 +38,7 @@ class ComparisonContainer(
      * Otherwise, returns `true` only if [AggregatedFilterResult.messageResult] is not `null`
      */
     val matchesByKeys: Boolean
-        get() = result.allMatches { it != null }
+        get() = FilterUtils.allMatches(result, protoFilter) { it != null }
 
     /**
      * If [RootMessageFilter.hasMetadataFilter] for [protoFilter] is `true`
@@ -47,16 +48,7 @@ class ComparisonContainer(
      * and its aggregated status is not [StatusType.FAILED]
      */
     val fullyMatches: Boolean
-        get() = result.allMatches { it.fullMatch }
-
-    private fun AggregatedFilterResult.allMatches(test: (ComparisonResult?) -> Boolean): Boolean {
-        return test(messageResult) && (!protoFilter.hasMetadataFilter() || test(metadataResult))
-    }
-
-    companion object {
-        private val ComparisonResult?.fullMatch: Boolean
-            get() = this != null && getStatusType() != StatusType.FAILED
-    }
+        get() = FilterUtils.allMatches(result, protoFilter) { it.fullMatch }
 }
 
 class AggregatedFilterResult(
@@ -70,5 +62,3 @@ class AggregatedFilterResult(
         val EMPTY = AggregatedFilterResult(null, null)
     }
 }
-
-fun ComparisonResult.getStatusType(): StatusType = ComparisonUtil.getStatusType(this)

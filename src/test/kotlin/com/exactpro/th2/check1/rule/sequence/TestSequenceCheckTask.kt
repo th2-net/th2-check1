@@ -14,6 +14,7 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
@@ -107,7 +108,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesInCorrectOrder)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+        val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin()
 
@@ -168,7 +169,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesUnordered)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+        val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
@@ -228,7 +229,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+        val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder, filtersParam = messageFilters).begin()
 
@@ -294,7 +295,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+        val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, true, filtersParam = messageFilters).begin()
 
@@ -311,6 +312,148 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
             assertTrue("Some verifications are not success: $verifications") { verifications.all { it.status == EventStatus.SUCCESS } }
             assertEquals(listOf(1L, 2L, 3L), verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
+        }, {
+            assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
+        })
+    }
+
+    @Test
+    fun `check sequence of messages with the same value of key field and message timeout`() {
+        val checkpointTimestamp = Instant.now()
+        val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 100))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
+            constructMessage(2, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 200))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
+            constructMessage(3, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 300))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build()
+        )
+
+        val messageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putAllFields(
+                        mapOf(
+                            "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build(),
+                            "B" to ValueFilter.newBuilder().setSimpleFilter("AAA").build()
+                        )
+                    )
+            ).build()
+        val messageFilters: List<RootMessageFilter> = listOf(
+            RootMessageFilter.newBuilder(messageFilter).build(),
+            RootMessageFilter.newBuilder(messageFilter).build(),
+            RootMessageFilter.newBuilder(messageFilter).build()
+        )
+
+        val messages = Observable.fromIterable(messagesWithKeyFields)
+
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val parentEventID = createEvent(EventUtils.generateUUID())
+
+        sequenceCheckRuleTask(
+            parentEventID,
+            messageStream,
+            true,
+            filtersParam = messageFilters,
+            taskTimeout = TaskTimeout(500L, 5000L)
+        ).begin(createCheckpoint(checkpointTimestamp))
+
+        val batchRequest = awaitEventBatchRequest(1000L, 6)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
+
+        assertAll({
+            val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
+            assertEquals(3, rootEvent.attachedMessageIdsCount)
+            assertEquals(listOf(1L, 2L, 3L), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val checkedMessages = assertNotNull(eventsList.find { it.type == CHECK_MESSAGES_TYPE }, "Cannot find checkMessages event")
+            val verifications = eventsList.filter { it.parentId == checkedMessages.id }
+            assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
+            assertTrue("Some verifications are not success: $verifications") { verifications.all { it.status == EventStatus.SUCCESS } }
+            assertEquals(listOf(1L, 2L, 3L), verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
+        }, {
+            assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
+        })
+    }
+
+    @Test
+    fun `check sequence of messages with the same value of key field and expired message timeout`() {
+        val checkpointTimestamp = Instant.now()
+        val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 500))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
+            constructMessage(2, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 600))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
+            constructMessage(3, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 700))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build()
+        )
+
+        val messageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putAllFields(
+                        mapOf(
+                            "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build(),
+                            "B" to ValueFilter.newBuilder().setSimpleFilter("AAA").build()
+                        )
+                    )
+            ).build()
+        val messageFilters: List<RootMessageFilter> = listOf(
+            RootMessageFilter.newBuilder(messageFilter).build()
+        )
+
+        val messages = Observable.fromIterable(messagesWithKeyFields)
+
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val parentEventID = createEvent(EventUtils.generateUUID())
+
+        sequenceCheckRuleTask(
+            parentEventID,
+            messageStream,
+            true,
+            filtersParam = messageFilters,
+            taskTimeout = TaskTimeout(500L, 5000L)
+        ).begin(createCheckpoint(checkpointTimestamp))
+
+        val batchRequest = awaitEventBatchRequest(1000L, 6)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
+
+        assertAll({
+            val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
+            assertEquals(1, rootEvent.attachedMessageIdsCount)
+            assertEquals(listOf(1L), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val checkedMessages = assertNotNull(eventsList.find { it.type == CHECK_MESSAGES_TYPE }, "Cannot find checkMessages event")
+            val verifications = eventsList.filter { it.parentId == checkedMessages.id }
+            assertEquals(1, verifications.size, "Unexpected verifications count: $verifications")
+            assertTrue("Some verifications are not success: $verifications") { verifications.all { it.status == EventStatus.SUCCESS } }
+            assertEquals(listOf(1L), verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
         }, {
             assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
         })
@@ -342,7 +485,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+        val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
@@ -375,7 +518,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesUnordered)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+        val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
@@ -429,7 +572,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = EventID.newBuilder().setId(EventUtils.generateUUID()).build()
+        val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
@@ -462,13 +605,14 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         checkOrder: Boolean,
         preFilterParam: PreFilter = preFilter,
         filtersParam: List<RootMessageFilter> = protoMessageFilters,
-        maxEventBatchContentSize: Int = 1024 * 1024
+        maxEventBatchContentSize: Int = 1024 * 1024,
+        taskTimeout: TaskTimeout = TaskTimeout(5000L)
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
             description = "Test",
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, Direction.FIRST),
-            timeout = 5000L,
+            taskTimeout = taskTimeout,
             maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = filtersParam,

@@ -12,6 +12,9 @@
  */
 package com.exactpro.th2.check1;
 
+import com.exactpro.th2.check1.entities.Checkpoint;
+import com.exactpro.th2.check1.entities.CheckpointData;
+import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 import com.exactpro.th2.common.grpc.Direction;
 import com.google.protobuf.Timestamp;
 import org.junit.jupiter.api.Assertions;
@@ -30,9 +33,9 @@ public class CheckpointTest {
                 new SessionKey("B", Direction.SECOND), generateCheckpointData(4L)
         ));
 
-        var protoCheckpoint = origCheckpoint.convert();
+        var protoCheckpoint = ProtoMessageUtilsKt.convert(origCheckpoint);
 
-        var parsedCheckpoint = Checkpoint.convert(protoCheckpoint);
+        var parsedCheckpoint = ProtoMessageUtilsKt.convert(protoCheckpoint);
 
         Assertions.assertEquals(origCheckpoint, parsedCheckpoint);
     }
