@@ -112,7 +112,7 @@ spec:
 
 ### 3.6.2
 
-+ Added functional for 'IN', 'LIKE', 'MORE', 'LESS' FilterOperations 
++ Added functional for 'IN', 'LIKE', 'MORE', 'LESS', 'WILDCARD' FilterOperations and their negative versions
 
 ### 3.6.1
 
