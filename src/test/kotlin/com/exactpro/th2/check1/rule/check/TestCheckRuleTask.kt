@@ -53,6 +53,7 @@ import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.time.Instant
 import kotlin.test.assertEquals
 
@@ -395,7 +396,28 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMessageType(MESSAGE_TYPE)
             .setMessageFilter(MessageFilter.newBuilder()
                 .putFields("mathFilter", ValueFilter.newBuilder()
-                    .setSimpleFilter("10,1")
+                    .setSimpleFilter("10.1")
+                    .setOperation(MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "10.2".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("mathFilter").status)
+    }
+
+    @Test
+    internal fun mathMoreFilterWithError() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("1")
                     .setOperation(MORE)
                     .build())
                 .build())
@@ -407,7 +429,28 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val result = getResult(actual, filter)
 
-        assertEquals(PASSED, result.getResult("mathFilter").status)
+        assertEquals(FAILED, result.getResult("mathFilter").status)
+        assertEquals("Failed to parse value to Number. Value = 10,2", result.getResult("mathFilter").exceptionMessage)
+    }
+
+    @Test
+    internal fun mathMoreFilterException() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("mathFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("10,2")
+                    .setOperation(MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("mathFilter", "10,1".toValue())
+        }.build()
+
+        val exception = assertThrows<IllegalArgumentException> { getResult(actual, filter) }
+        assertEquals("Failed to parse value to Date. Value = 10,2", exception.message)
     }
 
     @Test
@@ -557,6 +600,111 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val result = getResult(actual, filter)
 
         assertEquals(FAILED, result.getResult("mathFilter").status)
+    }
+
+    @Test
+    internal fun dateTimeMoreFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("dateFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("2007-12-03T10:15:30")
+                    .setOperation(MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("dateFilter", "2007-12-03T10:15:31".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("dateFilter").status)
+    }
+
+    @Test
+    internal fun dateMoreFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("dateFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("2007-12-03")
+                    .setOperation(MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("dateFilter", "2007-12-04".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("dateFilter").status)
+    }
+
+    @Test
+    internal fun timeMoreFilter() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("dateFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("10:15:30")
+                    .setOperation(MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("dateFilter", "10:15:31".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(PASSED, result.getResult("dateFilter").status)
+    }
+
+    @Test
+    internal fun dateTimeMoreFilterException() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("dateFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("2007-12-03T10-15:30")
+                    .setOperation(MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("dateFilter", "2007-12-03T10:15:30".toValue())
+        }.build()
+
+        val exception = assertThrows<IllegalArgumentException> { getResult(actual, filter) }
+        assertEquals("Failed to parse value to Date. Value = 2007-12-03T10-15:30", exception.message)
+    }
+
+    @Test
+    internal fun dateTimeMoreFilterNegative() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("dateFilter", ValueFilter.newBuilder()
+                    .setSimpleFilter("2007-12-03T10:15:30")
+                    .setOperation(MORE)
+                    .build())
+                .build())
+            .build()
+
+        val actual = message(MESSAGE_TYPE).apply {
+            putFields("dateFilter", "2007-12-03T10-15-30".toValue())
+        }.build()
+
+        val result = getResult(actual, filter)
+
+        assertEquals(FAILED, result.getResult("dateFilter").status)
+        assertEquals("Failed to parse value to Date. Value = 2007-12-03T10-15-30", result.getResult("dateFilter").exceptionMessage)
     }
 
     @Test
