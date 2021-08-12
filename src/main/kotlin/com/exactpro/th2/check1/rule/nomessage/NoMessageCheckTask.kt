@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.check1.rule.sequence
+package com.exactpro.th2.check1.rule.nomessage
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
@@ -97,16 +97,16 @@ class NoMessageCheckTask(
         )
         messageContainer.protoMessage.metadata.apply {
             if (FilterUtils.allMatches(result, protoPreMessageFilter) { it.fullMatch }) {
-                preFilterMessagesCounter++
-                preFilterEvent.messageID(id)
-            } else {
                 extraMessagesCounter++
                 resultEvent.messageID(id)
+            } else {
+                preFilterMessagesCounter++
+                preFilterEvent.messageID(id)
             }
         }
     }
 
-    override fun completeEvent(canceled: Boolean) {
+    override fun completeEvent(taskState: State) {
         preFilterEvent.name("Prefilter: $preFilterMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
@@ -115,5 +115,7 @@ class NoMessageCheckTask(
             resultEvent.status(Event.Status.FAILED)
                 .name("Check failed: $extraMessagesCounter extra messages were found.")
         }
+
+        resultEvent.description("Task has been completed because: {$taskState}")
     }
 }

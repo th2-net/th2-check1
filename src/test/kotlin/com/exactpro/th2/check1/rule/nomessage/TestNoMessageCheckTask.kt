@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.check1.rule.sequence
+package com.exactpro.th2.check1.rule.nomessage
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
@@ -43,12 +43,12 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val streams = createStreams(
             messages = createMessages(
                 MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1300)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1500)),
-                MessageData("B", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
+                MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
+                MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 1300)),
+                MessageData("D", "4".toValue(), getMessageTimestamp(checkpointTimestamp, 1500)),
+                MessageData("E", "5".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
                 // should be skipped because of message timeout
-                MessageData("B", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1600))
+                MessageData("F", "6".toValue(), getMessageTimestamp(checkpointTimestamp, 1600))
             )
         )
 
@@ -56,7 +56,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val task = noMessageCheckTask(
             eventID,
             streams,
-            createPreFilter("A", "1", FilterOperation.EQUAL),
+            createPreFilter("E", "5", FilterOperation.EQUAL),
             TaskTimeout(5000, messageTimeout)
         )
         task.begin(createCheckpoint(checkpointTimestamp))
@@ -103,8 +103,8 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             val rootEvent = eventsList.first()
             assertEquals(rootEvent.status, EventStatus.FAILED, "Event status should be failed")
             assertTrue(rootEvent.attachedMessageIdsCount == 4)
-            assertTrue(eventsList[1].attachedMessageIdsCount == 1)
-            assertTrue(eventsList.last().attachedMessageIdsCount == 2)
+            assertTrue(eventsList[1].attachedMessageIdsCount == 2)
+            assertTrue(eventsList.last().attachedMessageIdsCount == 1)
         })
     }
 
@@ -125,7 +125,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val task = noMessageCheckTask(
             eventID,
             streams,
-            createPreFilter("A", "1", FilterOperation.EQUAL),
+            createPreFilter("B", "2", FilterOperation.EQUAL),
             TaskTimeout(2000)
         )
         task.begin(createCheckpoint(checkpointTimestamp))

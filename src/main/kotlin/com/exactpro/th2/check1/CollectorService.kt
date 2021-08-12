@@ -19,7 +19,7 @@ import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.*
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
-import com.exactpro.th2.check1.rule.sequence.NoMessageCheckTask
+import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils

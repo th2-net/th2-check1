@@ -100,8 +100,11 @@ abstract class AbstractCheckTask(
         CREATED,
         BEGIN,
         TIMEOUT,
-        COMPLETED,
-        PUBLISHED
+        MESSAGE_TIMEOUT,
+        TASK_COMPLETED,
+        STREAM_COMPLETED,
+        PUBLISHED,
+        ERROR
     }
 
     @Volatile
@@ -122,7 +125,7 @@ abstract class AbstractCheckTask(
 
         rootEvent.status(FAILED)
             .bodyData(EventUtils.createMessageBean(e.message))
-        end("Error ${e.message} received in message stream")
+        end(State.ERROR, "Error ${e.message} received in message stream")
     }
 
     /**
@@ -181,20 +184,30 @@ abstract class AbstractCheckTask(
     protected open fun onTimeout() {}
 
     /**
-     * Marks the task as successfully completed. If the task timeout had been exited and then the task was marked as successfully completed
-     * the task will be considered as successfully completed because it had actually found that it should
+     * Marks the task as successfully completed. If the task timeout, message timeout or stream had been exited and then
+     * the task was marked as successfully completed the task will be considered as successfully completed because
+     * it had actually found that it should
      */
     protected fun checkComplete() {
 
         LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionKey, lastSequence)
-        val prevValue = taskState.getAndSet(State.COMPLETED)
+        val prevValue = taskState.getAndSet(State.TASK_COMPLETED)
         dispose()
         endFuture.dispose()
 
-        if (prevValue == State.TIMEOUT) {
-            LOGGER.info("Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed", description, sessionKey)
-        } else {
-            LOGGER.debug("Task '{}' for session alias '{}' is completed normally", description, sessionKey)
+        when (prevValue) {
+            State.TIMEOUT -> {
+                LOGGER.info("Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed", description, sessionKey)
+            }
+            State.MESSAGE_TIMEOUT -> {
+                LOGGER.info("Task '{}' for session alias '{}' is completed right after message timeout exited. Consider it as completed", description, sessionKey)
+            }
+            State.STREAM_COMPLETED -> {
+                LOGGER.info("Task '{}' for session alias '{}' is completed right after the end of streaming messages. Consider it as completed", description, sessionKey)
+            }
+            else -> {
+                LOGGER.debug("Task '{}' for session alias '{}' is completed normally", description, sessionKey)
+            }
         }
     }
 
@@ -223,7 +236,7 @@ abstract class AbstractCheckTask(
         val scheduler = Schedulers.from(executorService)
 
         endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
-            .subscribe { _ -> end("Timeout is exited") }
+            .subscribe { _ -> end(State.TIMEOUT, "Timeout is exited") }
 
         messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
             .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
@@ -245,7 +258,7 @@ abstract class AbstractCheckTask(
                     rootEvent.messageID(this.id)
                 }
             }
-            .takeWhile { checkOnMessageTimeout(it.metadata.timestamp) }
+            .onMessageTimeout()
             .mapToMessageContainer()
             .taskPipeline()
             .subscribe(this)
@@ -255,7 +268,7 @@ abstract class AbstractCheckTask(
         try {
             val currentState = taskState.get()
             LOGGER.info("Finishes task '$description' in state $currentState")
-            if (currentState == State.TIMEOUT) {
+            if (currentState == State.TIMEOUT || currentState == State.MESSAGE_TIMEOUT || currentState == State.STREAM_COMPLETED) {
                 callOnTimeoutCallback()
             }
             publishEvent()
@@ -292,10 +305,11 @@ abstract class AbstractCheckTask(
      * Disposes the task when the timeout is over or the message stream is completed normally or with an exception.
      * Task unsubscribe from the message stream.
      *
+     * @param state of the stopped task
      * @param reason the cause why a task must be stopped
      */
-    private fun end(reason: String) {
-        if (taskState.compareAndSet(State.BEGIN, State.TIMEOUT)) {
+    private fun end(state: State, reason: String) {
+        if (taskState.compareAndSet(State.BEGIN, state)) {
             LOGGER.info("Stop task for session alias '{}' with sequence '{}' because: {}", sessionKey, lastSequence, reason)
             dispose()
             endFuture.dispose()
@@ -306,14 +320,14 @@ abstract class AbstractCheckTask(
 
     override fun onComplete() {
         super.onComplete()
-        end("Message stream is completed")
+        end(State.STREAM_COMPLETED, "Message stream is completed")
     }
 
     /**
      * Prepare the root event or children events for publication.
      * This method is invoked in [State.PUBLISHED] state.
      */
-    protected open fun completeEvent(canceled: Boolean) {}
+    protected open fun completeEvent(taskState: State) {}
 
     /**
      * Publishes the event to [eventBatchRouter].
@@ -321,7 +335,7 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            completeEvent(prevState == State.TIMEOUT)
+            completeEvent(prevState)
             _endTime = Instant.now()
 
             val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
@@ -505,6 +519,18 @@ abstract class AbstractCheckTask(
     private fun checkOnMessageTimeout(timestamp: Timestamp): Boolean {
         return checkpointTimeout == null || checkpointTimeout!!.isAfter(timestamp) || checkpointTimeout == timestamp
     }
+
+    /**
+     * Provides the ability to stop observing if a message timeout is set.
+     */
+    private fun Observable<Message>.onMessageTimeout() : Observable<Message> =
+        takeWhile {
+            checkOnMessageTimeout(it.metadata.timestamp).also { continueObservation ->
+                if (!continueObservation) {
+                    end(State.MESSAGE_TIMEOUT, "Expired message timeout")
+                }
+            }
+        }
 
     private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long?): Timestamp? =
         if (timestamp == null || messageTimeout == null) {

@@ -18,6 +18,7 @@ import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.common.grpc.Checkpoint
+import com.exactpro.th2.common.grpc.Checkpoint.CheckpointData
 import com.exactpro.th2.common.grpc.Checkpoint.DirectionCheckpoint
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.MessageFilter
@@ -25,7 +26,6 @@ import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.exactpro.th2.check1.entities.Checkpoint as InternalCheckpoint
 import com.exactpro.th2.check1.entities.CheckpointData as InternalCheckpointData
-import com.exactpro.th2.common.grpc.Checkpoint.CheckpointData as CheckpointData
 
 fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter): IMessage =
     fromProtoFilter(protoPreMessageFilter.messageFilter, SequenceCheckRuleTask.PRE_FILTER_MESSAGE_NAME)
