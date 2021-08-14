@@ -33,8 +33,10 @@ import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
 import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class TestChain: AbstractCheckTaskTest() {
 
@@ -71,9 +73,9 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `sequence rules - two succeed`() {
-        val streams = createStreams(messages = (1..4).map(::createMessage))
+        val streams = createStreams(messages = (0..4).map(::createMessage))
 
-        val task = sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { it.begin() }
+        val task = sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { it.begin(createCheckpoint(sequence = 0)) }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
         checkSequenceVerifySuccess(eventList, listOf(1, 2))
 
@@ -84,9 +86,9 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `sequence rules - full failed, succeed`() {
-        val streams = createStreams(messages = (1..2).map(::createMessage))
+        val streams = createStreams(messages = (0..2).map(::createMessage))
 
-        val task = sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { it.begin() }
+        val task = sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { it.begin(createCheckpoint(sequence = 0)) }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
         assertEquals(8, eventList.size)
         assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
@@ -99,9 +101,9 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `sequence rules - part failed, succeed`() {
-        val streams = createStreams(messages = (1..3).map(::createMessage))
+        val streams = createStreams(messages = (0..3).map(::createMessage))
 
-        val task = sequenceCheckRuleTask(listOf(1, 4), eventID, streams).also { it.begin() }
+        val task = sequenceCheckRuleTask(listOf(1, 4), eventID, streams).also { it.begin(createCheckpoint(sequence = 0)) }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
         assertEquals(9, eventList.size)
         assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
@@ -131,6 +133,43 @@ class TestChain: AbstractCheckTaskTest() {
         assertEquals(4 * 3, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(listOf(1L, 2L, 3L, 4L), eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList).map(MessageID::getSequence))
     }
+
+    @Test
+    fun `sequence rules - untrusted execution`() {
+        val checkpointTimestamp = Instant.now()
+        val streams = createStreams(messages = (1..5L).map {
+            constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                .putAllFields(
+                    mapOf(
+                        KEY_FIELD to "$KEY_FIELD$it".toValue(),
+                        NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
+                    )
+                ).build()
+        })
+
+        val task = sequenceCheckRuleTask(
+            listOf(1, 2),
+            eventID,
+            streams,
+            taskTimeout = TaskTimeout(2000L, 500)
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        var eventsList = awaitEventBatchAndGetEvents(2, 2)
+        assertAll({
+            val rootEvent = eventsList.first()
+            assertEquals(FAILED, rootEvent.status, "Event status should be failed")
+            assertTrue(rootEvent.attachedMessageIdsCount == 1)
+        })
+
+        sequenceCheckRuleTask(
+            listOf(3, 4),
+            eventID,
+            streams,
+            taskTimeout = TaskTimeout(2000L, 1500L)
+        ).also { task.subscribeNextTask(it) }
+        eventsList = awaitEventBatchAndGetEvents(4, 4)
+        assertEquals("The current check is untrusted because the start point of the check interval has been selected approximately", eventsList.last().name)
+    }
+
 
     private fun awaitEventBatchAndGetEvents(times: Int, last: Int): List<Event> =
         awaitEventBatchRequest(1000L, times).drop(times - last).flatMap(EventBatch::getEventsList)
@@ -163,13 +202,14 @@ class TestChain: AbstractCheckTaskTest() {
         messageStream: Observable<StreamContainer>,
         checkOrder: Boolean = true,
         preFilterParam: PreFilter = preFilter,
-        maxEventBatchContentSize: Int = 1024 * 1024
+        maxEventBatchContentSize: Int = 1024 * 1024,
+        taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
             description = "Test",
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            taskTimeout = TaskTimeout(1000L),
+            taskTimeout = taskTimeout,
             maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),

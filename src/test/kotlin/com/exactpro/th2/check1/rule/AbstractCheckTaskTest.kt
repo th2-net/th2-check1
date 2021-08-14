@@ -69,7 +69,7 @@ abstract class AbstractCheckTaskTest {
     protected fun getMessageTimestamp(start: Instant, delta: Long): Timestamp =
         start.plusMillis(delta).toTimestamp()
 
-    protected fun createCheckpoint(timestamp: Instant, sequence: Long = -1) : com.exactpro.th2.common.grpc.Checkpoint =
+    protected fun createCheckpoint(timestamp: Instant? = null, sequence: Long = -1) : com.exactpro.th2.common.grpc.Checkpoint =
         com.exactpro.th2.common.grpc.Checkpoint.newBuilder().apply {
             putSessionAliasToDirectionCheckpoint(
                 SESSION_ALIAS,
@@ -78,7 +78,9 @@ abstract class AbstractCheckTaskTest {
                         FIRST.number,
                         com.exactpro.th2.common.grpc.Checkpoint.CheckpointData.newBuilder().apply {
                             this.sequence = sequence
-                            this.timestamp = timestamp.toTimestamp()
+                            if (timestamp != null) {
+                                this.timestamp = timestamp.toTimestamp()
+                            }
                         }.build()
                     )
                 }.build()

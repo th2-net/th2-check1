@@ -78,6 +78,12 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     )
 
     private val messagesInCorrectOrder: List<Message> = listOf(
+        constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
+            .putAllFields(mapOf(
+                "A" to Value.newBuilder().setSimpleValue("1").build(),
+                "B" to Value.newBuilder().setSimpleValue("A").build()
+            ))
+            .build(),
         constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
             .putAllFields(mapOf(
                 "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -110,7 +116,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin()
+        sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin(createCheckpoint(sequence = 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -166,12 +172,11 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             set(indexesToSwitch.first, get(indexesToSwitch.second))
             set(indexesToSwitch.second, tmp)
         }
-        val messages = Observable.fromIterable(messagesUnordered)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesUnordered)
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
+        sequenceCheckRuleTask(parentEventID, messageStream, true).begin(createCheckpoint(sequence = 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -186,7 +191,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             assertEquals(3, passedVerifications.size, "Unexpected SUCCESS verifications count: $passedVerifications")
             assertTrue("Some verifications have more than one message attached") { passedVerifications.all { it.attachedMessageIdsCount == 1 } }
             // Ids in the result of the rule are in order by filters because the rule creates events related to verifications/filters in the source order.
-            assertEquals(messagesInCorrectOrder.map { it.metadata.id }, passedVerifications.map { it.getAttachedMessageIds(0) })
+            assertEquals(messagesInCorrectOrder.map { it.metadata.id }.filter { it.sequence > 0 }, passedVerifications.map { it.getAttachedMessageIds(0) })
         }, {
             assertCheckSequenceStatus(EventStatus.FAILED, eventsList)
         })
@@ -196,6 +201,12 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @MethodSource("checkOrderToSwitch")
     fun `check sequence should drop a message filter after match by key fields`(checkOrder: Boolean) {
         val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("AA").build(),
+                    "B" to Value.newBuilder().setSimpleValue("BB").build()
+                ))
+                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -231,7 +242,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, checkOrder, filtersParam = messageFilters).begin()
+        sequenceCheckRuleTask(parentEventID, messageStream, checkOrder, filtersParam = messageFilters).begin(createCheckpoint(sequence = 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -255,6 +266,12 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `check sequence of messages with the same value of key field`() {
         val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("AA").build(),
+                    "B" to Value.newBuilder().setSimpleValue("BB").build()
+                ))
+                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -297,7 +314,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, true, filtersParam = messageFilters).begin()
+        sequenceCheckRuleTask(parentEventID, messageStream, true, filtersParam = messageFilters).begin(createCheckpoint(sequence = 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -321,6 +338,12 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `check sequence of messages with the same value of key field and message timeout`() {
         val checkpointTimestamp = Instant.now()
         val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 100))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 100))
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -369,7 +392,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             true,
             filtersParam = messageFilters,
             taskTimeout = TaskTimeout(5000L, 500L)
-        ).begin(createCheckpoint(checkpointTimestamp))
+        ).begin(createCheckpoint(checkpointTimestamp, 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -393,6 +416,12 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `check sequence of messages with the same value of key field and expired message timeout`() {
         val checkpointTimestamp = Instant.now()
         val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 100))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 500))
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -428,9 +457,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             RootMessageFilter.newBuilder(messageFilter).build()
         )
 
-        val messages = Observable.fromIterable(messagesWithKeyFields)
-
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesWithKeyFields)
         val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(
@@ -439,7 +466,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             true,
             filtersParam = messageFilters,
             taskTimeout = TaskTimeout(5000L, 500L)
-        ).begin(createCheckpoint(checkpointTimestamp))
+        ).begin(createCheckpoint(checkpointTimestamp, 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -460,8 +487,78 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     }
 
     @Test
+    fun `check sequence of messages with message timeout and missed sequence`() {
+        val checkpointTimestamp = Instant.now()
+        val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 500))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build(),
+            constructMessage(2, SESSION_ALIAS, MESSAGE_TYPE, timestamp = getMessageTimestamp(checkpointTimestamp, 600))
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("42").build(),
+                    "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                ))
+                .build()
+        )
+
+        val messageFilter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putAllFields(
+                        mapOf(
+                            "A" to ValueFilter.newBuilder().setKey(true).setSimpleFilter("42").build(),
+                            "B" to ValueFilter.newBuilder().setSimpleFilter("AAA").build()
+                        )
+                    )
+            ).build()
+        val messageFilters: List<RootMessageFilter> = listOf(
+            RootMessageFilter.newBuilder(messageFilter).build()
+        )
+
+        val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesWithKeyFields)
+        val parentEventID = createEvent(EventUtils.generateUUID())
+
+        sequenceCheckRuleTask(
+            parentEventID,
+            messageStream,
+            true,
+            filtersParam = messageFilters,
+            taskTimeout = TaskTimeout(5000L, 500L)
+        ).begin(createCheckpoint(checkpointTimestamp, 0))
+
+        val batchRequest = awaitEventBatchRequest(1000L, 6)
+        val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
+
+        assertAll({
+            val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
+            assertEquals(1, rootEvent.attachedMessageIdsCount)
+            assertEquals(listOf(1L), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val checkedMessages = assertNotNull(eventsList.find { it.type == CHECK_MESSAGES_TYPE }, "Cannot find checkMessages event")
+            val verifications = eventsList.filter { it.parentId == checkedMessages.id }
+            assertEquals(1, verifications.size, "Unexpected verifications count: $verifications")
+            assertTrue("Some verifications are not success: $verifications") { verifications.all { it.status == EventStatus.SUCCESS } }
+            assertEquals(listOf(1L), verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
+        }, {
+            assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
+        }, {
+            assertEquals(EventStatus.FAILED, eventsList.last().status) // check event with missed start sequence
+        })
+    }
+
+    @Test
     fun `check ordering is not failed in case key fields are matches the order but the rest are not`() {
         val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("AA").build(),
+                    "B" to Value.newBuilder().setSimpleValue("BB").build()
+                ))
+                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -487,7 +584,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
+        sequenceCheckRuleTask(parentEventID, messageStream, true).begin(createCheckpoint(sequence = 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -515,12 +612,11 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             set(indexesToSwitch.first, get(indexesToSwitch.second))
             set(indexesToSwitch.second, tmp)
         }
-        val messages = Observable.fromIterable(messagesUnordered)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesUnordered)
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
+        sequenceCheckRuleTask(parentEventID, messageStream, false).begin(createCheckpoint(sequence = 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -538,6 +634,12 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `rules stops when all filters found match by key fields`() {
         val messagesWithKeyFields: List<Message> = listOf(
+            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
+                .putAllFields(mapOf(
+                    "A" to Value.newBuilder().setSimpleValue("AA").build(),
+                    "B" to Value.newBuilder().setSimpleValue("BB").build()
+                ))
+                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -574,7 +676,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
+        sequenceCheckRuleTask(parentEventID, messageStream, false).begin(createCheckpoint(sequence = 0))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -627,9 +729,9 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         @JvmStatic
         fun indexesToSwitch(): Stream<Arguments> {
             return Stream.of(
-                arguments(0 to 1),
-                arguments(0 to 2),
-                arguments(1 to 2)
+                arguments(1 to 2),
+                arguments(1 to 3),
+                arguments(2 to 3)
             )
         }
         @JvmStatic

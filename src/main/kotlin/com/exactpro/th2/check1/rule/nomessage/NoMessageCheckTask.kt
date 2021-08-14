@@ -116,6 +116,10 @@ class NoMessageCheckTask(
                 .name("Check failed: $extraMessagesCounter extra messages were found.")
         }
 
-        resultEvent.description("Task has been completed because: {$taskState}")
+        if (taskState == State.TIMEOUT || taskState == State.STREAM_COMPLETED) {
+            resultEvent.addSubEvent(
+                Event.start().name("Task has been completed because: ${taskState.name}").status(Event.Status.FAILED)
+            )
+        }
     }
 }

@@ -130,15 +130,16 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         )
         task.begin(createCheckpoint(checkpointTimestamp))
 
-        val eventBatch = awaitEventBatchRequest(1000L, 2)
+        val eventBatch = awaitEventBatchRequest(1000L, 4)
         val eventsList = eventBatch.flatMap(EventBatch::getEventsList)
 
         assertAll({
             val rootEvent = eventsList.first()
-            assertEquals(rootEvent.status, EventStatus.SUCCESS, "All events should be passed the by prefilter and message timeout")
+            assertEquals(rootEvent.status, EventStatus.FAILED, "Root event should be failed due to timeout")
             assertTrue(rootEvent.attachedMessageIdsCount == 5)
-            assertTrue(eventsList[1].attachedMessageIdsCount == 5)
-            assertTrue(eventsList.last().attachedMessageIdsCount == 0)
+            assertTrue(eventsList[1].attachedMessageIdsCount == 0)
+            assertTrue(eventsList[1].name == "Check passed", "All messages should be ignored due to prefilter")
+            assertTrue(eventsList[3].attachedMessageIdsCount == 5)
         })
     }
 
