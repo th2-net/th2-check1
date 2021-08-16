@@ -48,9 +48,9 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `simple rules - two succeed`() {
-        val streams = createStreams(messages = (0..3).map(::createMessage))
+        val streams = createStreams(messages = (1..3).map(::createMessage))
 
-        val task = checkRuleTask(1, eventID, streams).also { it.begin(createCheckpoint(sequence = 0)) }
+        val task = checkRuleTask(1, eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(2, 2)
         checkSimpleVerifySuccess(eventList, 1)
 
@@ -61,9 +61,9 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `simple rules - failed, succeed`() {
-        val streams = createStreams(messages = (0..3).map(::createMessage))
+        val streams = createStreams(messages = (1..3).map(::createMessage))
 
-        val task = checkRuleTask(4, eventID, streams).also { it.begin(createCheckpoint(sequence = 0)) }
+        val task = checkRuleTask(4, eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(2, 2)
         checkSimpleVerifyFailure(eventList)
 
@@ -74,9 +74,9 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `sequence rules - two succeed`() {
-        val streams = createStreams(messages = (0..4).map(::createMessage))
+        val streams = createStreams(messages = (1..4).map(::createMessage))
 
-        val task = sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { it.begin(createCheckpoint(sequence = 0)) }
+        val task = sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
         checkSequenceVerifySuccess(eventList, listOf(1, 2))
 
@@ -87,9 +87,9 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `sequence rules - full failed, succeed`() {
-        val streams = createStreams(messages = (0..2).map(::createMessage))
+        val streams = createStreams(messages = (1..2).map(::createMessage))
 
-        val task = sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { it.begin(createCheckpoint(sequence = 0)) }
+        val task = sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
         assertEquals(8, eventList.size)
         assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
@@ -102,9 +102,9 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `sequence rules - part failed, succeed`() {
-        val streams = createStreams(messages = (0..3).map(::createMessage))
+        val streams = createStreams(messages = (1..3).map(::createMessage))
 
-        val task = sequenceCheckRuleTask(listOf(1, 4), eventID, streams).also { it.begin(createCheckpoint(sequence = 0)) }
+        val task = sequenceCheckRuleTask(listOf(1, 4), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
         assertEquals(9, eventList.size)
         assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
@@ -117,7 +117,7 @@ class TestChain: AbstractCheckTaskTest() {
 
     @Test
     fun `make long chain before begin`() {
-        val streams = createStreams(messages = (0..4).map(::createMessage))
+        val streams = createStreams(messages = (1..4).map(::createMessage))
 
         val task = checkRuleTask(1, eventID, streams).also { one ->
             one.subscribeNextTask(checkRuleTask(2, eventID, streams).also { two ->
@@ -127,7 +127,7 @@ class TestChain: AbstractCheckTaskTest() {
             })
         }
 
-        task.begin(createCheckpoint(sequence = 0))
+        task.begin()
 
         val eventList = awaitEventBatchRequest(1000L, 4 * 2).flatMap(EventBatch::getEventsList)
         assertEquals(4 * 3, eventList.size)
@@ -167,8 +167,8 @@ class TestChain: AbstractCheckTaskTest() {
             streams,
             taskTimeout = TaskTimeout(2000L, 1500L)
         ).also { task.subscribeNextTask(it) }
-        eventsList = awaitEventBatchAndGetEvents(6, 2)
-        assertEquals("The current check is untrusted because the start point of the check interval has been selected approximately", eventsList.last().name)
+        eventsList = awaitEventBatchAndGetEvents(10, 6)
+        assertEquals(UNTRUSTED_EXECUTION_EVENT_NAME, eventsList.last().name)
     }
 
     @Test
@@ -203,8 +203,8 @@ class TestChain: AbstractCheckTaskTest() {
             taskTimeout = TaskTimeout(2000L, 1500L),
             preFilterParam = createPreFilter("E", "5", FilterOperation.EQUAL)
         ).also { task.subscribeNextTask(it) }
-        eventsList = awaitEventBatchAndGetEvents(4, 4)
-        assertEquals("The current check is untrusted because the start point of the check interval has been selected approximately", eventsList.last().name)
+        eventsList = awaitEventBatchAndGetEvents(6, 4)
+        assertEquals(UNTRUSTED_EXECUTION_EVENT_NAME, eventsList.last().name)
     }
 
     @Test
@@ -348,5 +348,6 @@ class TestChain: AbstractCheckTaskTest() {
     companion object {
         private const val KEY_FIELD = "key"
         private const val NOT_KEY_FIELD = "not_key"
+        private const val UNTRUSTED_EXECUTION_EVENT_NAME: String = "The current check is untrusted because the start point of the check interval has been selected approximately"
     }
 }

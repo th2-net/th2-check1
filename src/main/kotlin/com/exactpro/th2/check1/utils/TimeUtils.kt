@@ -15,17 +15,8 @@ package com.exactpro.th2.check1.utils
 
 import com.google.protobuf.Timestamp
 
-operator fun Timestamp.compareTo(other: Timestamp): Int {
-    if (this.seconds < other.seconds)
-        return -1
-    if (this.seconds > other.seconds)
-        return 1
-    if (this.nanos < other.nanos)
-        return -1
-    if (this.nanos > other.nanos)
-        return 1
-    return 0
-}
+private val timestampComparator = Comparator.comparingLong(Timestamp::getSeconds).thenComparingInt(Timestamp::getNanos)
+operator fun Timestamp.compareTo(other: Timestamp): Int = timestampComparator.compare(this, other)
 
 fun Timestamp.isBefore(other: Timestamp): Boolean = this < other
 fun Timestamp.isAfter(other: Timestamp): Boolean = this > other

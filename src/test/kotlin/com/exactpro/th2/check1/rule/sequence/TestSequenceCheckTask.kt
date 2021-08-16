@@ -78,12 +78,6 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     )
 
     private val messagesInCorrectOrder: List<Message> = listOf(
-        constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
-            .putAllFields(mapOf(
-                "A" to Value.newBuilder().setSimpleValue("1").build(),
-                "B" to Value.newBuilder().setSimpleValue("A").build()
-            ))
-            .build(),
         constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
             .putAllFields(mapOf(
                 "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -116,7 +110,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin(createCheckpoint(sequence = 0))
+        sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -176,7 +170,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesUnordered)
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, true).begin(createCheckpoint(sequence = 0))
+        sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -191,7 +185,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             assertEquals(3, passedVerifications.size, "Unexpected SUCCESS verifications count: $passedVerifications")
             assertTrue("Some verifications have more than one message attached") { passedVerifications.all { it.attachedMessageIdsCount == 1 } }
             // Ids in the result of the rule are in order by filters because the rule creates events related to verifications/filters in the source order.
-            assertEquals(messagesInCorrectOrder.map { it.metadata.id }.filter { it.sequence > 0 }, passedVerifications.map { it.getAttachedMessageIds(0) })
+            assertEquals(messagesInCorrectOrder.map { it.metadata.id }, passedVerifications.map { it.getAttachedMessageIds(0) })
         }, {
             assertCheckSequenceStatus(EventStatus.FAILED, eventsList)
         })
@@ -201,12 +195,6 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @MethodSource("checkOrderToSwitch")
     fun `check sequence should drop a message filter after match by key fields`(checkOrder: Boolean) {
         val messagesWithKeyFields: List<Message> = listOf(
-            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
-                .putAllFields(mapOf(
-                    "A" to Value.newBuilder().setSimpleValue("AA").build(),
-                    "B" to Value.newBuilder().setSimpleValue("BB").build()
-                ))
-                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -242,7 +230,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, checkOrder, filtersParam = messageFilters).begin(createCheckpoint(sequence = 0))
+        sequenceCheckRuleTask(parentEventID, messageStream, checkOrder, filtersParam = messageFilters).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -266,12 +254,6 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `check sequence of messages with the same value of key field`() {
         val messagesWithKeyFields: List<Message> = listOf(
-            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
-                .putAllFields(mapOf(
-                    "A" to Value.newBuilder().setSimpleValue("AA").build(),
-                    "B" to Value.newBuilder().setSimpleValue("BB").build()
-                ))
-                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -314,7 +296,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, true, filtersParam = messageFilters).begin(createCheckpoint(sequence = 0))
+        sequenceCheckRuleTask(parentEventID, messageStream, true, filtersParam = messageFilters).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -553,12 +535,6 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `check ordering is not failed in case key fields are matches the order but the rest are not`() {
         val messagesWithKeyFields: List<Message> = listOf(
-            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
-                .putAllFields(mapOf(
-                    "A" to Value.newBuilder().setSimpleValue("AA").build(),
-                    "B" to Value.newBuilder().setSimpleValue("BB").build()
-                ))
-                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -584,7 +560,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, true).begin(createCheckpoint(sequence = 0))
+        sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -616,7 +592,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesUnordered)
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, false).begin(createCheckpoint(sequence = 0))
+        sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -634,12 +610,6 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `rules stops when all filters found match by key fields`() {
         val messagesWithKeyFields: List<Message> = listOf(
-            constructMessage(0, SESSION_ALIAS, MESSAGE_TYPE)
-                .putAllFields(mapOf(
-                    "A" to Value.newBuilder().setSimpleValue("AA").build(),
-                    "B" to Value.newBuilder().setSimpleValue("BB").build()
-                ))
-                .build(),
             constructMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(mapOf(
                     "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -676,7 +646,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
-        sequenceCheckRuleTask(parentEventID, messageStream, false).begin(createCheckpoint(sequence = 0))
+        sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -729,9 +699,9 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         @JvmStatic
         fun indexesToSwitch(): Stream<Arguments> {
             return Stream.of(
-                arguments(1 to 2),
-                arguments(1 to 3),
-                arguments(2 to 3)
+                arguments(0 to 1),
+                arguments(0 to 2),
+                arguments(1 to 2)
             )
         }
         @JvmStatic

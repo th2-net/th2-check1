@@ -92,7 +92,7 @@ abstract class AbstractCheckTask(
     private val hasNextTask = AtomicBoolean(false)
     private val taskState = AtomicReference(State.CREATED)
     @Volatile
-    private var executionState = State.STREAM_COMPLETED
+    private var streamCompletedState = State.STREAM_COMPLETED
 
     /**
      * Used for observe messages in one thread.
@@ -249,10 +249,7 @@ abstract class AbstractCheckTask(
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' and task timeout '{}'", sessionKey, sequence, taskTimeout)
         this.lastSequence = sequence
         this.executorService = executorService
-        if (untrusted && !isIgnoreUntrustedFlag()) {
-            doOnUntrustedExecution()
-            return
-        }
+        this.untrusted = untrusted
         this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
         val scheduler = Schedulers.from(executorService)
 
@@ -308,8 +305,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
-            val untrustedForFutureTask = !bufferContainsStartMessage && !hasMessagesInTimeoutInterval
-            sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, untrustedForFutureTask)))
+            sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }
     }
 
@@ -342,7 +338,7 @@ abstract class AbstractCheckTask(
 
     override fun onComplete() {
         super.onComplete()
-        end(executionState, "Message stream is completed")
+        end(streamCompletedState, "Message stream is completed")
     }
 
     /**
@@ -357,9 +353,8 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            if (!untrusted || isIgnoreUntrustedFlag()) {
-                doOnCompleteEvent(prevState)
-            }
+            completeEvent(prevState)
+            doAfterCompleteEvent()
             _endTime = Instant.now()
 
             val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
@@ -382,16 +377,24 @@ abstract class AbstractCheckTask(
         }
     }
 
-    private fun doOnCompleteEvent(previousState: State) {
-        completeEvent(previousState)
-
-        if (!bufferContainsStartMessage) {
+    private fun doAfterCompleteEvent() {
+        if (untrusted && !isIgnoreUntrustedFlag()) {
+            fillUntrustedExecutionEvent()
+        } else if (!bufferContainsStartMessage) {
             if (hasMessagesInTimeoutInterval) {
                 fillEmptyStarMessageEvent()
             } else {
                 fillMissedStartMessageAndMessagesInIntervalEvent()
             }
         }
+    }
+
+    private fun fillUntrustedExecutionEvent() {
+        rootEvent.addSubEvent(
+            Event.start()
+                .name("The current check is untrusted because the start point of the check interval has been selected approximately")
+                .status(FAILED)
+        )
     }
 
     private fun fillMissedStartMessageAndMessagesInIntervalEvent() {
@@ -449,21 +452,6 @@ abstract class AbstractCheckTask(
         } else {
             AggregatedFilterResult.EMPTY
         }
-    }
-
-    /**
-     * This method is called before the completion of the task if the untrusted flag is set or [isIgnoreUntrustedFlag] override and returns true.
-     * If the task has the untrusted flag, then [onComplete] will not be called.
-     */
-    protected open fun doOnUntrustedExecution() {
-        rootEvent.addSubEvent(
-            Event.start()
-                .name("The current check is untrusted because the start point of the check interval has been selected approximately")
-                .status(FAILED)
-        )
-        this.untrusted = true
-        taskState.set(State.ERROR)
-        taskFinished()
     }
 
     protected open fun isIgnoreUntrustedFlag(): Boolean = false
@@ -563,7 +551,7 @@ abstract class AbstractCheckTask(
         filter { streamContainer -> streamContainer.sessionKey == sessionKey }
             .flatMap(StreamContainer::bufferedMessages)
             .filter { message ->
-                if (message.metadata.id.sequence == sequence) {
+                if (message.metadata.id.sequence == sequence || sequence == DEFAULT_SEQUENCE) {
                     bufferContainsStartMessage = true
                 }
                 message.metadata.id.sequence > sequence
@@ -605,7 +593,7 @@ abstract class AbstractCheckTask(
             checkOnMessageTimeout(it.metadata.timestamp).also { continueObservation ->
                 hasMessagesInTimeoutInterval = hasMessagesInTimeoutInterval or continueObservation
                 if (!continueObservation) {
-                    executionState = State.MESSAGE_TIMEOUT
+                    streamCompletedState = State.MESSAGE_TIMEOUT
                 }
             }
         }
