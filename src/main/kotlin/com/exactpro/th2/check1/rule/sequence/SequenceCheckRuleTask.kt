@@ -185,18 +185,9 @@ class SequenceCheckRuleTask(
 
     override fun completeEvent(taskState: State) {
         preFilterEvent.name("Pre-filtering (filtered ${preFilteringResults.size} / processed $handledMessageCounter) messages")
-        fillEvents {
-            fillSequenceEvent()
-            fillCheckMessagesEvent()
-        }
-    }
 
-    override fun doOnUntrustedExecution() {
-        rootEvent.addSubEvent(
-            Event.start()
-                .name("The current check is untrusted because the start point of the check interval has been selected approximately")
-                .status(FAILED)
-        )
+        fillSequenceEvent()
+        fillCheckMessagesEvent()
     }
 
     /**
@@ -246,33 +237,6 @@ class SequenceCheckRuleTask(
                     else "")
                 .build())
             .bodyData(sequenceTable.build())
-    }
-
-    private fun fillMissedStartMessageAndMessagesInIntervalEvent() {
-        rootEvent.addSubEvent(
-            Event.start()
-                .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval")
-                .status(FAILED)
-        )
-    }
-
-    private fun fillEmptyStarMessageEvent() {
-        rootEvent.addSubEvent(
-            Event.start()
-                .name("Buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' doesn't contain starting message, but contains several messages in the requested check interval")
-                .status(FAILED)
-        )
-    }
-
-    private fun fillEvents(commonEvents: () -> Unit) {
-        if (!bufferContainsStartMessage && !hasMessagesInTimeoutInterval) {
-            fillMissedStartMessageAndMessagesInIntervalEvent()
-        } else if (!bufferContainsStartMessage) {
-            commonEvents()
-            fillEmptyStarMessageEvent()
-        } else {
-            commonEvents()
-        }
     }
 
     companion object {

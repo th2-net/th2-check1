@@ -93,4 +93,6 @@ class CheckRuleTask(
             .type("Check failed")
             .status(FAILED)
     }
+
+    override fun isIgnoreUntrustedFlag(): Boolean = true
 }

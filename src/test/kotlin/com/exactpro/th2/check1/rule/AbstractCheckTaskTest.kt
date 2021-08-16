@@ -14,11 +14,14 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Direction.FIRST
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.google.protobuf.Timestamp
@@ -86,6 +89,11 @@ abstract class AbstractCheckTaskTest {
                 }.build()
             )
         }.build()
+
+    protected fun createPreFilter(fieldName: String, value: String, operation: FilterOperation): PreFilter =
+        PreFilter.newBuilder()
+            .putFields(fieldName, ValueFilter.newBuilder().setSimpleFilter(value).setKey(true).setOperation(operation).build())
+            .build()
 
     companion object {
         const val MESSAGE_TYPE = "TestMsg"

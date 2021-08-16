@@ -123,10 +123,8 @@ abstract class AbstractCheckTask(
     private var checkpointTimeout: Timestamp? = null
     private var lastMessageTimestamp: Timestamp? = null
     private var untrusted: Boolean = false
-    protected var hasMessagesInTimeoutInterval: Boolean = false
-        private set
-    protected var bufferContainsStartMessage: Boolean = false
-        private set
+    private var hasMessagesInTimeoutInterval: Boolean = false
+    private var bufferContainsStartMessage: Boolean = false
 
     override fun onStart() {
         super.onStart()
@@ -251,12 +249,8 @@ abstract class AbstractCheckTask(
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' and task timeout '{}'", sessionKey, sequence, taskTimeout)
         this.lastSequence = sequence
         this.executorService = executorService
-        if (untrusted) {
-            doOnUntrustedExecution().also {
-                this.untrusted = untrusted
-                taskState.set(State.ERROR)
-                taskFinished()
-            }
+        if (untrusted && !isIgnoreUntrustedFlag()) {
+            doOnUntrustedExecution()
             return
         }
         this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
@@ -363,8 +357,8 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            if (!untrusted) {
-                completeEvent(prevState)
+            if (!untrusted || isIgnoreUntrustedFlag()) {
+                doOnCompleteEvent(prevState)
             }
             _endTime = Instant.now()
 
@@ -386,6 +380,34 @@ abstract class AbstractCheckTask(
         } else {
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
         }
+    }
+
+    private fun doOnCompleteEvent(previousState: State) {
+        completeEvent(previousState)
+
+        if (!bufferContainsStartMessage) {
+            if (hasMessagesInTimeoutInterval) {
+                fillEmptyStarMessageEvent()
+            } else {
+                fillMissedStartMessageAndMessagesInIntervalEvent()
+            }
+        }
+    }
+
+    private fun fillMissedStartMessageAndMessagesInIntervalEvent() {
+        rootEvent.addSubEvent(
+            Event.start()
+                .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval")
+                .status(FAILED)
+        )
+    }
+
+    private fun fillEmptyStarMessageEvent() {
+        rootEvent.addSubEvent(
+            Event.start()
+                .name("Buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' doesn't contain starting message, but contains several messages in the requested check interval")
+                .status(FAILED)
+        )
     }
 
     protected fun matchFilter(
@@ -430,10 +452,21 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * This method is called before the completion of the task if the untrusted flag is set.
+     * This method is called before the completion of the task if the untrusted flag is set or [isIgnoreUntrustedFlag] override and returns true.
      * If the task has the untrusted flag, then [onComplete] will not be called.
      */
-    protected open fun doOnUntrustedExecution() {}
+    protected open fun doOnUntrustedExecution() {
+        rootEvent.addSubEvent(
+            Event.start()
+                .name("The current check is untrusted because the start point of the check interval has been selected approximately")
+                .status(FAILED)
+        )
+        this.untrusted = true
+        taskState.set(State.ERROR)
+        taskFinished()
+    }
+
+    protected open fun isIgnoreUntrustedFlag(): Boolean = false
 
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE

@@ -63,6 +63,14 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
+                    .setId(MessageID.newBuilder().setSequence(0L))
+                    .build())
+                .build(),
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .setId(MessageID.newBuilder().setSequence(1L))
                     .build())
                 .build()
         ))
@@ -74,7 +82,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
             .build()
         val task = checkTask(filter, eventID, streams)
-        task.begin()
+        task.begin(createCheckpoint(sequence = 0))
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
@@ -115,6 +123,14 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
+                    .setId(MessageID.newBuilder().setSequence(0L))
+                    .build())
+                .build(),
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .setId(MessageID.newBuilder().setSequence(1L))
                     .build())
                 .build()
         ))
@@ -126,7 +142,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
             .build()
         val task = checkTask(filter, eventID, streams, 200)
-        task.begin()
+        task.begin(createCheckpoint(sequence = 0L))
 
         val eventBatches = awaitEventBatchRequest(1000L, 3)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
@@ -141,6 +157,14 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
+                    .setId(MessageID.newBuilder().setSequence(0L))
+                    .build())
+                .build(),
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .setId(MessageID.newBuilder().setSequence(1L))
                     .build())
                 .build()
         ))
@@ -152,7 +176,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
             .build()
         val task = checkTask(filter, eventID, streams)
-        task.begin()
+        task.begin(createCheckpoint(sequence = 0L))
 
         val eventBatch = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatch.flatMap(EventBatch::getEventsList)
@@ -203,6 +227,14 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
                     .setTimestamp(getMessageTimestamp(checkpointTimestamp, 500))
+                    .setId(MessageID.newBuilder().setSequence(0L))
+                    .build())
+                .build(),
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .setTimestamp(getMessageTimestamp(checkpointTimestamp, 500))
                     .setId(MessageID.newBuilder().setSequence(1L))
                     .build())
                 .build()
@@ -215,7 +247,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
             .build()
         val task = checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(1000, 500))
-        task.begin(createCheckpoint(checkpointTimestamp))
+        task.begin(createCheckpoint(checkpointTimestamp, 0))
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
@@ -224,9 +256,47 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     }
 
     @Test
+    fun `success verification, but failed event because missed start message`() {
+        val checkpointTimestamp = Instant.now()
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .setTimestamp(getMessageTimestamp(checkpointTimestamp, 500))
+                    .setId(MessageID.newBuilder().setSequence(1L))
+                    .build())
+                .build()
+        ))
+
+        val eventID = createEvent("root")
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMetadataFilter(MetadataFilter.newBuilder()
+                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
+            .build()
+        val task = checkTask(filter, eventID, streams)
+        task.begin()
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertEquals(5, eventList.size)
+        assertEquals(2, eventList.filter { it.status == SUCCESS && it.type == "Verification" }.size)
+        assertEquals(FAILED, eventList.last().status)
+    }
+
+    @Test
     fun `failed verification with expired message timeout`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .setTimestamp(getMessageTimestamp(checkpointTimestamp, 600))
+                    .setId(MessageID.newBuilder().setSequence(0L))
+                    .build())
+                .build(),
             message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
@@ -244,7 +314,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
             .build()
         val task = checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(1000, 500))
-        task.begin(createCheckpoint(checkpointTimestamp))
+        task.begin(createCheckpoint(checkpointTimestamp, 0))
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)

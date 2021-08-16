@@ -42,6 +42,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val messageTimeout = 1500L
         val streams = createStreams(
             messages = createMessages(
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
                 MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
                 MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
                 MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 1300)),
@@ -59,7 +60,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             createPreFilter("E", "5", FilterOperation.EQUAL),
             TaskTimeout(5000, messageTimeout)
         )
-        task.begin(createCheckpoint(checkpointTimestamp))
+        task.begin(createCheckpoint(checkpointTimestamp, 1))
 
         val eventBatch = awaitEventBatchRequest(1000L, 2)
         val eventsList = eventBatch.flatMap(EventBatch::getEventsList)
@@ -78,6 +79,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val messageTimeout = 1500L
         val streams = createStreams(
             messages = createMessages(
+                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 50)),
                 MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
                 MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
                 MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 700)),
@@ -94,7 +96,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             createPreFilter("A", "1", FilterOperation.EQUAL),
             TaskTimeout(5000, messageTimeout)
         )
-        task.begin(createCheckpoint(checkpointTimestamp))
+        task.begin(createCheckpoint(checkpointTimestamp, 1))
 
         val eventBatch = awaitEventBatchRequest(1000L, 2)
         val eventsList = eventBatch.flatMap(EventBatch::getEventsList)
@@ -157,11 +159,6 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
                 .build()
         }
     }
-
-    private fun createPreFilter(fieldName: String, value: String, operation: FilterOperation): PreFilter =
-        PreFilter.newBuilder()
-            .putFields(fieldName, ValueFilter.newBuilder().setSimpleFilter(value).setKey(true).setOperation(operation).build())
-            .build()
 
     private fun noMessageCheckTask(
         parentEventID: EventID,
