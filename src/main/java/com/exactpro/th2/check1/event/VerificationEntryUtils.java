@@ -56,10 +56,10 @@ public class VerificationEntryUtils {
 
     private static String resolveOperation(ComparisonResult result) {
         Object expected = result.getExpected();
-        if (expected instanceof IOperationFilter) {
-            return ((IOperationFilter)expected).getOperation().name();
-        }
         if (expected instanceof IFilter) {
+            if (expected instanceof IOperationFilter) {
+                return ((IOperationFilter)expected).getOperation().name();
+            }
             String condition = ((IFilter)expected).getCondition();
             if (condition.contains("!=")) {
                 return FilterOperation.NOT_EQUAL.name();
