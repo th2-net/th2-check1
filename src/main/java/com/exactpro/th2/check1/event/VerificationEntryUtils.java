@@ -16,7 +16,6 @@
 package com.exactpro.th2.check1.event;
 
 import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -28,7 +27,7 @@ import com.exactpro.sf.scriptrunner.StatusType;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
 import com.exactpro.th2.common.grpc.FilterOperation;
-import com.exactpro.th2.sailfish.utils.IOperationFilter;
+import com.exactpro.th2.sailfish.utils.filter.IOperationFilter;
 
 public class VerificationEntryUtils {
 
