@@ -1,4 +1,4 @@
-# th2 check1 (3.6.1)
+# th2 check1 (3.7.0)
 
 ## Overview
 
@@ -109,6 +109,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.7.0
+
++ Added functional for 'IN', 'LIKE', 'MORE', 'LESS', 'WILDCARD' FilterOperations and their negative versions
 
 ### 3.6.1
 
