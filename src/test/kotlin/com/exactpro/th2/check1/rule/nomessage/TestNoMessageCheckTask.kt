@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -67,8 +67,15 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
 
         assertAll({
             assertTrue(eventsList.all { it.status == EventStatus.SUCCESS }, "Has messages outside the prefilter")
-            assertTrue(eventsList.first().attachedMessageIdsCount == 5)
-            assertTrue(eventsList[1].attachedMessageIdsCount == 4)
+        }, {
+            val rootEvent = eventsList.first()
+            assertTrue(rootEvent.attachedMessageIdsCount == 5)
+            assertEquals((2..6L).toList(), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val prefilteredEvent = eventsList[1]
+            assertTrue(prefilteredEvent.attachedMessageIdsCount == 4)
+            assertEquals((2..5L).toList(), prefilteredEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
             assertTrue(eventsList.last().attachedMessageIdsCount == 0)
         })
     }
@@ -105,8 +112,15 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             val rootEvent = eventsList.first()
             assertEquals(rootEvent.status, EventStatus.FAILED, "Event status should be failed")
             assertTrue(rootEvent.attachedMessageIdsCount == 4)
-            assertTrue(eventsList[1].attachedMessageIdsCount == 2)
-            assertTrue(eventsList.last().attachedMessageIdsCount == 1)
+            assertEquals((2..5L).toList(), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val prefilteredEvent = eventsList[1]
+            assertTrue(prefilteredEvent.attachedMessageIdsCount == 2)
+            assertEquals(listOf(3L, 4L), prefilteredEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val unexpectedMessagesEvent = eventsList.last()
+            assertTrue(unexpectedMessagesEvent.attachedMessageIdsCount == 1)
+            assertEquals(listOf(2L), unexpectedMessagesEvent.attachedMessageIdsList.map { it.sequence })
         })
     }
 
@@ -139,9 +153,16 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             val rootEvent = eventsList.first()
             assertEquals(rootEvent.status, EventStatus.FAILED, "Root event should be failed due to timeout")
             assertTrue(rootEvent.attachedMessageIdsCount == 5)
-            assertTrue(eventsList[1].attachedMessageIdsCount == 0)
-            assertTrue(eventsList[1].name == "Check passed", "All messages should be ignored due to prefilter")
-            assertTrue(eventsList[3].attachedMessageIdsCount == 5)
+            assertEquals((1..5L).toList(), rootEvent.attachedMessageIdsList.map { it.sequence })
+        }, {
+            val prefilteredEvent = eventsList[1]
+            assertTrue(prefilteredEvent.attachedMessageIdsCount == 0)
+            assertEquals(emptyList(), prefilteredEvent.attachedMessageIdsList.map { it.sequence })
+            assertTrue(prefilteredEvent.name == "Check passed", "All messages should be ignored due to prefilter")
+        }, {
+            val unexpectedMessagesEvent = eventsList[3]
+            assertTrue(unexpectedMessagesEvent.attachedMessageIdsCount == 5)
+            assertEquals((1L..5L).toList(), unexpectedMessagesEvent.attachedMessageIdsList.map { it.sequence })
         })
     }
 

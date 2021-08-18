@@ -172,7 +172,7 @@ abstract class AbstractCheckTask(
                         legacy.executorService
                     }
                 legacy.sequenceData.apply {
-                    checkTask.begin(this.lastSequence, this.lastMessageTimestamp, executor, this.untrusted)
+                    checkTask.begin(lastSequence, lastMessageTimestamp, executor, untrusted)
                 }
              }
             LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
@@ -251,6 +251,7 @@ abstract class AbstractCheckTask(
         this.executorService = executorService
         this.untrusted = untrusted
         this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
+        this.bufferContainsStartMessage = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
 
         endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
@@ -378,11 +379,11 @@ abstract class AbstractCheckTask(
     }
 
     private fun doAfterCompleteEvent() {
-        if (untrusted && !isIgnoreUntrustedFlag()) {
+        if (untrusted) {
             fillUntrustedExecutionEvent()
         } else if (!bufferContainsStartMessage) {
             if (hasMessagesInTimeoutInterval) {
-                fillEmptyStarMessageEvent()
+                fillEmptyStartMessageEvent()
             } else {
                 fillMissedStartMessageAndMessagesInIntervalEvent()
             }
@@ -394,6 +395,7 @@ abstract class AbstractCheckTask(
             Event.start()
                 .name("The current check is untrusted because the start point of the check interval has been selected approximately")
                 .status(FAILED)
+                .type("untrustedExecution")
         )
     }
 
@@ -402,14 +404,16 @@ abstract class AbstractCheckTask(
             Event.start()
                 .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval")
                 .status(FAILED)
+                .type("missedMessagesInInterval")
         )
     }
 
-    private fun fillEmptyStarMessageEvent() {
+    private fun fillEmptyStartMessageEvent() {
         rootEvent.addSubEvent(
             Event.start()
                 .name("Buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' doesn't contain starting message, but contains several messages in the requested check interval")
                 .status(FAILED)
+                .type("missedStartMessage")
         )
     }
 
@@ -453,8 +457,6 @@ abstract class AbstractCheckTask(
             AggregatedFilterResult.EMPTY
         }
     }
-
-    protected open fun isIgnoreUntrustedFlag(): Boolean = false
 
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
@@ -551,7 +553,7 @@ abstract class AbstractCheckTask(
         filter { streamContainer -> streamContainer.sessionKey == sessionKey }
             .flatMap(StreamContainer::bufferedMessages)
             .filter { message ->
-                if (message.metadata.id.sequence == sequence || sequence == DEFAULT_SEQUENCE) {
+                if (message.metadata.id.sequence == sequence) {
                     bufferContainsStartMessage = true
                 }
                 message.metadata.id.sequence > sequence
