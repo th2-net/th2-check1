@@ -16,7 +16,6 @@
 package com.exactpro.th2.check1.event;
 
 import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -28,6 +27,7 @@ import com.exactpro.sf.scriptrunner.StatusType;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
 import com.exactpro.th2.common.grpc.FilterOperation;
+import com.exactpro.th2.sailfish.utils.filter.IOperationFilter;
 
 public class VerificationEntryUtils {
 
@@ -56,6 +56,9 @@ public class VerificationEntryUtils {
     private static String resolveOperation(ComparisonResult result) {
         Object expected = result.getExpected();
         if (expected instanceof IFilter) {
+            if (expected instanceof IOperationFilter) {
+                return ((IOperationFilter)expected).getOperation().name();
+            }
             String condition = ((IFilter)expected).getCondition();
             if (condition.contains("!=")) {
                 return FilterOperation.NOT_EQUAL.name();

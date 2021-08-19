@@ -166,8 +166,8 @@ signing {
 dependencies {
     api platform('com.exactpro.th2:bom:3.0.0')
     implementation 'com.exactpro.th2:grpc-check1:3.3.0'
-    implementation 'com.exactpro.th2:common:3.21.1'
-    implementation 'com.exactpro.th2:sailfish-utils:3.4.0'
+    implementation 'com.exactpro.th2:common:3.23.0'
+    implementation 'com.exactpro.th2:sailfish-utils:3.7.0'
     implementation "org.slf4j:slf4j-log4j12"
     implementation "org.slf4j:slf4j-api"
 
