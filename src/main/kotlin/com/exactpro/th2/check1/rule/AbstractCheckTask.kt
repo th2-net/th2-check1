@@ -600,12 +600,14 @@ abstract class AbstractCheckTask(
             }
         }
 
-    private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long?): Timestamp? =
-        if (timestamp == null || messageTimeout == null) {
-            null
-        } else {
-            Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
+    private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long?): Timestamp? {
+        if (timestamp != null && messageTimeout != null) {
+            return Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
+        } else if (timestamp == null && messageTimeout != null){
+            LOGGER.warn("Checkpoint timeout cannot be calculated because the message timeout is set, but the message timestamp is empty")
         }
+        return null
+    }
 
     private data class Legacy(val executorService: ExecutorService, val sequenceData: SequenceData)
     private data class SequenceData(val lastSequence: Long, val lastMessageTimestamp: Timestamp?, val untrusted: Boolean)

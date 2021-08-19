@@ -24,8 +24,11 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
+import mu.KotlinLogging
 import com.exactpro.th2.check1.entities.Checkpoint as InternalCheckpoint
 import com.exactpro.th2.check1.entities.CheckpointData as InternalCheckpointData
+
+val LOGGER = KotlinLogging.logger {}
 
 fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter): IMessage =
     fromProtoFilter(protoPreMessageFilter.messageFilter, SequenceCheckRuleTask.PRE_FILTER_MESSAGE_NAME)
@@ -58,11 +61,16 @@ fun InternalCheckpoint.convert(): Checkpoint {
     sessionKeyToCheckpointData.forEach { (sessionKey, checkpointData) ->
         intermediateMap.computeIfAbsent(sessionKey.sessionAlias) {
             DirectionCheckpoint.newBuilder()
-        }.putDirectionToCheckpointData(sessionKey.direction.number, checkpointData.convert())
+        }.apply {
+            sessionKey.direction.number.run {
+                putDirectionToCheckpointData(this, checkpointData.convert())
+                putDirectionToSequence(this, checkpointData.sequence)
+            }
+        }
     }
 
     val checkpointBuilder = Checkpoint.newBuilder().setId(id)
-    intermediateMap.forEach { (sessionAlias, directionCheckpoint) -> 
+    intermediateMap.forEach { (sessionAlias, directionCheckpoint) ->
         checkpointBuilder.putSessionAliasToDirectionCheckpoint(sessionAlias, directionCheckpoint.build())
     }
 
@@ -72,8 +80,8 @@ fun InternalCheckpoint.convert(): Checkpoint {
 fun Checkpoint.convert(): InternalCheckpoint {
     val sessionKeyToSequence: MutableMap<SessionKey, InternalCheckpointData> = HashMap()
     sessionAliasToDirectionCheckpointMap.forEach { (sessionAlias, directionCheckpoint) ->
-        check(!(directionCheckpoint.run { directionToCheckpointDataCount != 0 && directionToSequenceCount != 0 })) {
-            "Session alias '${sessionAlias}' cannot contain both of these fields: 'direction to checkpoint data' and 'direction to sequence'. Please use 'direction to checkpoint data' instead"
+        if (directionCheckpoint.run { directionToCheckpointDataCount != 0 && directionToSequenceCount != 0 }) {
+            LOGGER.warn("Session alias '{}' contains both of these fields: 'direction to checkpoint data' and 'direction to sequence'. Please use 'direction to checkpoint data' instead", sessionAlias)
         }
         if (directionCheckpoint.directionToCheckpointDataCount == 0) {
             directionCheckpoint.directionToSequenceMap.forEach { (directionNumber, sequence) ->
