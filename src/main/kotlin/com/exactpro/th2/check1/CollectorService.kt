@@ -141,10 +141,14 @@ class CollectorService(
 
     private fun MessageFilter.toRootMessageFilter(): RootMessageFilter {
         return RootMessageFilter.newBuilder()
-                .setMessageType(this.messageType)
-                .setComparisonSettings(this.comparisonSettings.toRootComparisonSettings())
-                .setMessageFilter(this)
-                .build()
+            .setMessageType(this.messageType).also {
+                if (this.messageType.isNotEmpty()) {
+                    logger.warn("Message filter contains message type '${this.messageType}'")
+                }
+            }
+            .setComparisonSettings(this.comparisonSettings.toRootComparisonSettings())
+            .setMessageFilter(this)
+            .build()
     }
 
     private fun ComparisonSettings.toRootComparisonSettings(): RootComparisonSettings {
