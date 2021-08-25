@@ -14,7 +14,6 @@ package com.exactpro.th2.check1;
 
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
-import static com.google.protobuf.TextFormat.shortDebugString;
 
 import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 import com.exactpro.th2.common.message.MessageUtils;
@@ -52,17 +51,17 @@ public class Check1Handler extends Check1ImplBase {
                     .setCheckpoint(ProtoMessageUtilsKt.convert(internalCheckpoint))
                     .build();
             if (logger.isDebugEnabled()) {
-                logger.debug("Created checkpoint internal '{}' proto '{}", internalCheckpoint, shortDebugString(checkpointResponse));
+                logger.debug("Created checkpoint internal '{}' proto '{}", internalCheckpoint, MessageUtils.toJson(checkpointResponse));
             }
             responseObserver.onNext(checkpointResponse);
-            responseObserver.onCompleted();
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             if (logger.isErrorEnabled()) {
-                logger.error("CheckRule failed. Request " + shortDebugString(request), e);
+                logger.error("CheckRule failed. Request " + MessageUtils.toJson(request), e);
             }
             responseObserver.onNext(CheckpointResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("Create checkpoint failed. See the logs.").build())
                     .build());
+        } finally {
             responseObserver.onCompleted();
         }
     }
@@ -71,7 +70,7 @@ public class Check1Handler extends Check1ImplBase {
     public void submitCheckRule(CheckRuleRequest request, StreamObserver<CheckRuleResponse> responseObserver) {
         try {
             if (logger.isInfoEnabled()) {
-                logger.info("Submit CheckRule request: " + shortDebugString(request));
+                logger.info("Submit CheckRule request: " + MessageUtils.toJson(request));
             }
 
             CheckRuleResponse.Builder response = CheckRuleResponse.newBuilder();
@@ -81,7 +80,7 @@ public class Check1Handler extends Check1ImplBase {
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
-                    logger.error("CheckRule failed in CollectorService. Request " + shortDebugString(request), e);
+                    logger.error("CheckRule failed in CollectorService. Request " + MessageUtils.toJson(request), e);
                 }
                 RequestStatus status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
@@ -90,14 +89,14 @@ public class Check1Handler extends Check1ImplBase {
                 response.setStatus(status);
             }
             responseObserver.onNext(response.build());
-            responseObserver.onCompleted();
-        } catch (Throwable e) {
+        } catch (Exception e) {
             if (logger.isErrorEnabled()) {
-                logger.error("CheckRule failed. Request " + shortDebugString(request), e);
+                logger.error("CheckRule failed. Request " + MessageUtils.toJson(request), e);
             }
             responseObserver.onNext(CheckRuleResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("CheckRule failed. See the logs.").build())
                     .build());
+        } finally {
             responseObserver.onCompleted();
         }
     }
@@ -108,7 +107,7 @@ public class Check1Handler extends Check1ImplBase {
             CheckSequenceRuleResponse.Builder response = CheckSequenceRuleResponse.newBuilder();
             try {
                 if (logger.isInfoEnabled()) {
-                    logger.info("Submitting sequence rule for request '" + shortDebugString(request) + "' started");
+                    logger.info("Submitting sequence rule for request '" + MessageUtils.toJson(request) + "' started");
                 }
                 ChainID chainID = collectorService.verifyCheckSequenceRule(request);
                 if (logger.isInfoEnabled()) {
@@ -118,7 +117,7 @@ public class Check1Handler extends Check1ImplBase {
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
-                    logger.error("Submitting sequence rule for request '" + shortDebugString(request) + "' failed", e);
+                    logger.error("Submitting sequence rule for request '" + MessageUtils.toJson(request) + "' failed", e);
                 }
                 RequestStatus status = RequestStatus.newBuilder()
                         .setStatus(ERROR)
@@ -127,16 +126,16 @@ public class Check1Handler extends Check1ImplBase {
                 response.setStatus(status);
             }
             responseObserver.onNext(response.build());
-            responseObserver.onCompleted();
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             if (logger.isErrorEnabled()) {
-                logger.error("Sequence rule task for request '" + shortDebugString(request) + "' isn't submitted", e);
+                logger.error("Sequence rule task for request '" + MessageUtils.toJson(request) + "' isn't submitted", e);
             }
             responseObserver.onNext(CheckSequenceRuleResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR)
                             .setMessage("Sequence rule rejected by internal process: " + e.getMessage())
                             .build())
                     .build());
+        } finally {
             responseObserver.onCompleted();
         }
     }
@@ -145,7 +144,7 @@ public class Check1Handler extends Check1ImplBase {
     public void submitNoMessageCheck(NoMessageCheckRequest request, StreamObserver<NoMessageCheckResponse> responseObserver) {
         try {
             if (logger.isInfoEnabled()) {
-                logger.info("Submitting sequence rule for request '{}' started", MessageUtils.toJson(request));
+                logger.info("Submitting no message check rule for request '{}' started", MessageUtils.toJson(request));
             }
 
             NoMessageCheckResponse.Builder response = NoMessageCheckResponse.newBuilder();
@@ -166,10 +165,10 @@ public class Check1Handler extends Check1ImplBase {
             responseObserver.onNext(response.build());
         } catch (Exception e) {
             if (logger.isErrorEnabled()) {
-                logger.error("NoMessageCheck failed. Request " + MessageUtils.toJson(request), e);
+                logger.error("No message check rule failed. Request " + MessageUtils.toJson(request), e);
             }
             responseObserver.onNext(NoMessageCheckResponse.newBuilder()
-                    .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("NoMessageCheck failed. See the logs.").build())
+                    .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("No message check rule failed. See the logs.").build())
                     .build());
         } finally {
             responseObserver.onCompleted();

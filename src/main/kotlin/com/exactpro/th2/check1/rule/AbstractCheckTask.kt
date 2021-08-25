@@ -601,10 +601,12 @@ abstract class AbstractCheckTask(
         }
 
     private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long?): Timestamp? {
-        if (timestamp != null && messageTimeout != null) {
-            return Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
-        } else if (timestamp == null && messageTimeout != null){
-            LOGGER.warn("Checkpoint timeout cannot be calculated because the message timeout is set, but the message timestamp is empty")
+        if (messageTimeout != null) {
+            if (timestamp != null) {
+                return Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
+            } else {
+                LOGGER.warn("Checkpoint timeout cannot be calculated because the message timeout is set, but the message timestamp is empty")
+            }
         }
         return null
     }
