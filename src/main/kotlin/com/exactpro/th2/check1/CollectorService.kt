@@ -50,6 +50,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
+import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 
 class CollectorService(
     private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: Check1Configuration
@@ -90,10 +91,7 @@ class CollectorService(
         check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
         val sessionAlias: String = request.connectivityId.sessionAlias
         val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-        if (request.messageTimeout != 0L) {
-            check(request.hasCheckpoint()) { "Request doesn't contain a checkpoint" }
-            checkCheckpoint(request.checkpoint, sessionKey)
-        }
+        checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
 
         check(request.kindCase != CheckRuleRequest.KindCase.KIND_NOT_SET) {
             "Either old filter or root filter must be set"
@@ -125,10 +123,7 @@ class CollectorService(
         check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
         val sessionAlias: String = request.connectivityId.sessionAlias
         val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-        if (request.messageTimeout != 0L) {
-            check(request.hasCheckpoint()) { "Request doesn't contain a checkpoint" }
-            checkCheckpoint(request.checkpoint, sessionKey)
-        }
+        checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
 
         check((request.messageFiltersList.isEmpty() && request.rootMessageFiltersList.isNotEmpty())
                 || (request.messageFiltersList.isNotEmpty() && request.rootMessageFiltersList.isEmpty())) {
@@ -161,10 +156,8 @@ class CollectorService(
         check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
         val sessionAlias: String = request.connectivityId.sessionAlias
         val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-        if (request.messageTimeout != 0L) {
-            check(request.hasCheckpoint()) { "Request doesn't contain a checkpoint" }
-            checkCheckpoint(request.checkpoint, sessionKey)
-        }
+        checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
+
         val chainID = request.getChainIdOrGenerate()
 
         val task = NoMessageCheckTask(
@@ -207,7 +200,7 @@ class CollectorService(
 
     private fun AbstractCheckTask.addToChainOrBegin(
             value: AbstractCheckTask?,
-            checkpoint: com.exactpro.th2.common.grpc.Checkpoint
+            checkpoint: GrpcCheckpoint
     ): Unit = value?.subscribeNextTask(this) ?: begin(checkpoint)
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
@@ -331,8 +324,9 @@ class CollectorService(
         .setDirection(direction)
         .build()
 
-    private fun checkCheckpoint(checkpoint: com.exactpro.th2.common.grpc.Checkpoint, sessionKey: SessionKey) {
-        sessionKey.apply {
+    private fun checkCheckpoint(checkpoint: GrpcCheckpoint, sessionKey: SessionKey) {
+        check(checkpoint !== GrpcCheckpoint.getDefaultInstance()) { "Request doesn't contain a checkpoint" }
+        with(sessionKey) {
             val directionCheckpoint = checkpoint.sessionAliasToDirectionCheckpointMap[sessionAlias]
             check(directionCheckpoint != null) { "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'" }
             val checkpointData = directionCheckpoint.directionToCheckpointDataMap[direction.number]
@@ -341,6 +335,14 @@ class CollectorService(
                 check(sequence != 0L) { "The checkpoint data has incorrect sequence number '$sequence'" }
                 check(this.hasTimestamp()) { "The checkpoint data doesn't contain timestamp" }
             }
+        }
+    }
+
+    private fun checkMessageTimeout(messageTimeout: Long, checkpointCheckAction: () -> Unit){
+        if (messageTimeout != 0L) {
+            checkpointCheckAction()
+        } else if (messageTimeout < 0) {
+            throw IllegalStateException("Message timeout cannot be negative")
         }
     }
 }

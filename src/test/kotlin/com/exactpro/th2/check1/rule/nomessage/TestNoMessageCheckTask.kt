@@ -122,6 +122,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             assertNotNull(prefilteredEvent, "Missed pre filtering event")
             assertTrue(prefilteredEvent.attachedMessageIdsCount == 1)
             val verificationEvents = eventsList.filter { it.type == "Verification" }
+            assertEquals(1, verificationEvents.size)
             assertTrue(verificationEvents.all { it.parentId == prefilteredEvent.id })
             assertEquals(listOf(2L), prefilteredEvent.attachedMessageIdsList.map { it.sequence })
         }, {
