@@ -89,6 +89,11 @@ class CollectorService(
         val parentEventID: EventID = request.parentEventId
         check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
         val sessionAlias: String = request.connectivityId.sessionAlias
+        val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
+        if (request.messageTimeout != 0L) {
+            check(request.hasCheckpoint()) { "Request doesn't contain a checkpoint" }
+            checkCheckpoint(request.checkpoint, sessionKey)
+        }
 
         check(request.kindCase != CheckRuleRequest.KindCase.KIND_NOT_SET) {
             "Either old filter or root filter must be set"
@@ -98,11 +103,10 @@ class CollectorService(
         } else {
             request.filter.toRootMessageFilter()
         }
-        val direction = directionOrDefault(request.direction)
 
         val chainID = request.getChainIdOrGenerate()
 
-        val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction),
+        val task = CheckRuleTask(request.description, Instant.now(), sessionKey,
             TaskTimeout(request.timeout, request.messageTimeout), maxEventBatchContentSize,
             filter, parentEventID, streamObservable, eventBatchRouter)
 
@@ -120,7 +124,11 @@ class CollectorService(
         val parentEventID: EventID = request.parentEventId
         check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
         val sessionAlias: String = request.connectivityId.sessionAlias
-        val direction = directionOrDefault(request.direction)
+        val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
+        if (request.messageTimeout != 0L) {
+            check(request.hasCheckpoint()) { "Request doesn't contain a checkpoint" }
+            checkCheckpoint(request.checkpoint, sessionKey)
+        }
 
         check((request.messageFiltersList.isEmpty() && request.rootMessageFiltersList.isNotEmpty())
                 || (request.messageFiltersList.isNotEmpty() && request.rootMessageFiltersList.isEmpty())) {
@@ -135,7 +143,7 @@ class CollectorService(
             request.messageFiltersList.map { it.toRootMessageFilter() }
         }
         
-        val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction),
+        val task = SequenceCheckRuleTask(request.description, Instant.now(), sessionKey,
             TaskTimeout(request.timeout, request.messageTimeout), maxEventBatchContentSize, request.preFilter,
             protoMessageFilters, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
 
@@ -152,13 +160,17 @@ class CollectorService(
         val parentEventID: EventID = request.parentEventId
         check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
         val sessionAlias: String = request.connectivityId.sessionAlias
-        val direction = directionOrDefault(request.direction)
+        val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
+        if (request.messageTimeout != 0L) {
+            check(request.hasCheckpoint()) { "Request doesn't contain a checkpoint" }
+            checkCheckpoint(request.checkpoint, sessionKey)
+        }
         val chainID = request.getChainIdOrGenerate()
 
         val task = NoMessageCheckTask(
             request.description,
             Instant.now(),
-            SessionKey(sessionAlias, direction),
+            sessionKey,
             TaskTimeout(request.timeout, request.messageTimeout),
             maxEventBatchContentSize,
             request.preFilter,
@@ -318,4 +330,17 @@ class CollectorService(
         .setSequence(sequence)
         .setDirection(direction)
         .build()
+
+    private fun checkCheckpoint(checkpoint: com.exactpro.th2.common.grpc.Checkpoint, sessionKey: SessionKey) {
+        sessionKey.apply {
+            val directionCheckpoint = checkpoint.sessionAliasToDirectionCheckpointMap[sessionAlias]
+            check(directionCheckpoint != null) { "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'" }
+            val checkpointData = directionCheckpoint.directionToCheckpointDataMap[direction.number]
+            check(checkpointData != null) { "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'" }
+            checkpointData.apply {
+                check(sequence != 0L) { "The checkpoint data has incorrect sequence number '$sequence'" }
+                check(this.hasTimestamp()) { "The checkpoint data doesn't contain timestamp" }
+            }
+        }
+    }
 }

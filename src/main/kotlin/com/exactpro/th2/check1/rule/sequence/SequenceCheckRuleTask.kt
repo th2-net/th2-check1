@@ -39,6 +39,7 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -132,7 +133,7 @@ class SequenceCheckRuleTask(
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
         map { messageContainer -> // Compare the message with pre-filter
             if (LOGGER.isDebugEnabled) {
-                LOGGER.debug("Pre-filtering message with id: {}", shortDebugString(messageContainer.protoMessage.metadata.id))
+                LOGGER.debug("Pre-filtering message with id: {}", messageContainer.protoMessage.metadata.id.toJson())
             }
             val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false, significant = false)
             ComparisonContainer(messageContainer, protoPreMessageFilter, result)

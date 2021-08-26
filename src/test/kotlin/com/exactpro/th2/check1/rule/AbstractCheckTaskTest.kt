@@ -15,8 +15,10 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.grpc.PreFilter
+import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Direction.FIRST
+import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.FilterOperation
@@ -72,7 +74,7 @@ abstract class AbstractCheckTaskTest {
     protected fun getMessageTimestamp(start: Instant, delta: Long): Timestamp =
         start.plusMillis(delta).toTimestamp()
 
-    protected fun createCheckpoint(timestamp: Instant? = null, sequence: Long = -1) : com.exactpro.th2.common.grpc.Checkpoint =
+    protected fun createCheckpoint(timestamp: Instant? = null, sequence: Long = -1) : Checkpoint =
         com.exactpro.th2.common.grpc.Checkpoint.newBuilder().apply {
             putSessionAliasToDirectionCheckpoint(
                 SESSION_ALIAS,
@@ -94,6 +96,9 @@ abstract class AbstractCheckTaskTest {
         PreFilter.newBuilder()
             .putFields(fieldName, ValueFilter.newBuilder().setSimpleFilter(value).setKey(true).setOperation(operation).build())
             .build()
+
+    protected fun List<Event>.findEventByType(eventType: String): Event? =
+        this.find { it.type == eventType }
 
     companion object {
         const val MESSAGE_TYPE = "TestMsg"

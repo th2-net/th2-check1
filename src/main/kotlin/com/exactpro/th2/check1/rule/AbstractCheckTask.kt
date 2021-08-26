@@ -125,6 +125,7 @@ abstract class AbstractCheckTask(
     private var untrusted: Boolean = false
     private var hasMessagesInTimeoutInterval: Boolean = false
     private var bufferContainsStartMessage: Boolean = false
+    private var isDefaultSequence: Boolean = false
 
     override fun onStart() {
         super.onStart()
@@ -251,7 +252,7 @@ abstract class AbstractCheckTask(
         this.executorService = executorService
         this.untrusted = untrusted
         this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
-        this.bufferContainsStartMessage = sequence == DEFAULT_SEQUENCE
+        this.isDefaultSequence = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
 
         endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
@@ -381,7 +382,7 @@ abstract class AbstractCheckTask(
     private fun doAfterCompleteEvent() {
         if (untrusted) {
             fillUntrustedExecutionEvent()
-        } else if (!bufferContainsStartMessage) {
+        } else if (!isDefaultSequence && !bufferContainsStartMessage) {
             if (hasMessagesInTimeoutInterval) {
                 fillEmptyStartMessageEvent()
             } else {
@@ -402,7 +403,7 @@ abstract class AbstractCheckTask(
     private fun fillMissedStartMessageAndMessagesInIntervalEvent() {
         rootEvent.addSubEvent(
             Event.start()
-                .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval")
+                .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval with sequence '$lastSequence' and checkpoint timestamp '$checkpointTimeout'")
                 .status(FAILED)
                 .type("missedMessagesInInterval")
         )
@@ -600,16 +601,13 @@ abstract class AbstractCheckTask(
             }
         }
 
-    private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long?): Timestamp? {
-        if (messageTimeout != null) {
-            if (timestamp != null) {
-                return Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
-            } else {
-                LOGGER.warn("Checkpoint timeout cannot be calculated because the message timeout is set, but the message timestamp is empty")
-            }
+    private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long?): Timestamp? =
+        if (timestamp != null && messageTimeout != null) {
+            Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
+        } else {
+            null
         }
-        return null
-    }
+
 
     private data class Legacy(val executorService: ExecutorService, val sequenceData: SequenceData)
     private data class SequenceData(val lastSequence: Long, val lastMessageTimestamp: Timestamp?, val untrusted: Boolean)

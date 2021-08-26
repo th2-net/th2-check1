@@ -18,6 +18,7 @@ import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTask
+import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil
@@ -63,7 +64,6 @@ class NoMessageCheckTask(
     private lateinit var preFilterEvent: Event
     private lateinit var resultEvent: Event
 
-    private var preFilterMessagesCounter: Int = 0
     private var extraMessagesCounter: Int = 0
 
     init {
@@ -83,31 +83,31 @@ class NoMessageCheckTask(
         rootEvent.addSubEvent(resultEvent)
     }
 
-    override fun onNext(messageContainer: MessageContainer) {
-        if (LOGGER.isDebugEnabled) {
-            LOGGER.debug("Received message with id: {}", messageContainer.protoMessage.metadata.id.toJson())
-        }
-
-        val result = matchFilter(
-            messageContainer,
-            messagePreFilter,
-            metadataPreFilter,
-            matchNames = false,
-            significant = false
-        )
-        messageContainer.protoMessage.metadata.apply {
-            if (FilterUtils.allMatches(result, protoPreMessageFilter) { it.fullMatch }) {
-                extraMessagesCounter++
-                resultEvent.messageID(id)
-            } else {
-                preFilterMessagesCounter++
-                preFilterEvent.messageID(id)
+    override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
+        map { messageContainer -> // Compare the message with pre-filter
+            if (LOGGER.isDebugEnabled) {
+                LOGGER.debug("Pre-filtering message with id: {}", messageContainer.protoMessage.metadata.id.toJson())
             }
+            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false)
+            ComparisonContainer(messageContainer, protoPreMessageFilter, result)
+        }.filter { preFilterContainer -> // Filter  check result of pre-filter
+            preFilterContainer.fullyMatches
+        }.doOnNext { preFilterContainer -> // Update pre-filter state
+            with(preFilterContainer) {
+                preFilterEvent.appendEventsWithVerification(preFilterContainer)
+                preFilterEvent.messageID(protoActual.metadata.id)
+            }
+        }.map(ComparisonContainer::messageContainer)
+
+    override fun onNext(messageContainer: MessageContainer) {
+        messageContainer.protoMessage.metadata.apply {
+            extraMessagesCounter++
+            resultEvent.messageID(id)
         }
     }
 
     override fun completeEvent(taskState: State) {
-        preFilterEvent.name("Prefilter: $preFilterMessagesCounter messages were filtered.")
+        preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
             resultEvent.status(Event.Status.PASSED).name("Check passed")
