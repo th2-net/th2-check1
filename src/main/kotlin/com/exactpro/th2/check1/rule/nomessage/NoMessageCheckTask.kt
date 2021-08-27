@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -22,8 +22,6 @@ import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil
-import com.exactpro.th2.check1.utils.FilterUtils
-import com.exactpro.th2.check1.utils.FilterUtils.fullMatch
 import com.exactpro.th2.check1.utils.fromProtoPreFilter
 import com.exactpro.th2.check1.utils.toRootMessageFilter
 import com.exactpro.th2.common.event.Event
@@ -46,7 +44,7 @@ class NoMessageCheckTask(
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-    ) : AbstractCheckTask(description, taskTimeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+) : AbstractCheckTask(description, taskTimeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
@@ -83,6 +81,7 @@ class NoMessageCheckTask(
         rootEvent.addSubEvent(resultEvent)
     }
 
+    //TODO: Need to extract logic from here and from the SequenceCheck rule to some utility class and try to optimize that logic
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
         map { messageContainer -> // Compare the message with pre-filter
             if (LOGGER.isDebugEnabled) {

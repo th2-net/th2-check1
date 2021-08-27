@@ -403,7 +403,7 @@ abstract class AbstractCheckTask(
     private fun fillMissedStartMessageAndMessagesInIntervalEvent() {
         rootEvent.addSubEvent(
             Event.start()
-                .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval with sequence '$lastSequence' and checkpoint timestamp '$checkpointTimeout'")
+                .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval with sequence '$lastSequence' and checkpoint timestamp '${checkpointTimeout?.toJson()}'")
                 .status(FAILED)
                 .type("missedMessagesInInterval")
         )

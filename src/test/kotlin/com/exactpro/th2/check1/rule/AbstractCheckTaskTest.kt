@@ -75,13 +75,13 @@ abstract class AbstractCheckTaskTest {
         start.plusMillis(delta).toTimestamp()
 
     protected fun createCheckpoint(timestamp: Instant? = null, sequence: Long = -1) : Checkpoint =
-        com.exactpro.th2.common.grpc.Checkpoint.newBuilder().apply {
+        Checkpoint.newBuilder().apply {
             putSessionAliasToDirectionCheckpoint(
                 SESSION_ALIAS,
-                com.exactpro.th2.common.grpc.Checkpoint.DirectionCheckpoint.newBuilder().apply {
+                Checkpoint.DirectionCheckpoint.newBuilder().apply {
                     putDirectionToCheckpointData(
                         FIRST.number,
-                        com.exactpro.th2.common.grpc.Checkpoint.CheckpointData.newBuilder().apply {
+                        Checkpoint.CheckpointData.newBuilder().apply {
                             this.sequence = sequence
                             if (timestamp != null) {
                                 this.timestamp = timestamp.toTimestamp()

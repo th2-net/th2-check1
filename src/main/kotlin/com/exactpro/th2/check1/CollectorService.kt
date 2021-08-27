@@ -331,18 +331,17 @@ class CollectorService(
             check(directionCheckpoint != null) { "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'" }
             val checkpointData = directionCheckpoint.directionToCheckpointDataMap[direction.number]
             check(checkpointData != null) { "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'" }
-            checkpointData.apply {
-                check(sequence != 0L) { "The checkpoint data has incorrect sequence number '$sequence'" }
+            with(checkpointData) {
+                check(sequence > 0L) { "The checkpoint data has incorrect sequence number '$sequence'" }
                 check(this.hasTimestamp()) { "The checkpoint data doesn't contain timestamp" }
             }
         }
     }
 
-    private fun checkMessageTimeout(messageTimeout: Long, checkpointCheckAction: () -> Unit){
-        if (messageTimeout != 0L) {
-            checkpointCheckAction()
-        } else if (messageTimeout < 0) {
-            throw IllegalStateException("Message timeout cannot be negative")
+    private fun checkMessageTimeout(messageTimeout: Long, checkpointCheckAction: () -> Unit) {
+        when {
+            messageTimeout > 0 -> checkpointCheckAction()
+            messageTimeout < 0 -> error("Message timeout cannot be negative")
         }
     }
 }
