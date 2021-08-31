@@ -17,6 +17,7 @@ import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
+import com.exactpro.th2.check1.metrics.MemoryVolumeMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
@@ -65,12 +66,15 @@ class CollectorService(
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
     private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
 
+    private val memoryVolumeMetric: MemoryVolumeMetric = MemoryVolumeMetric(configuration)
+
     init {
         val limitSize = configuration.messageCacheSize
         mqSubject = PublishSubject.create()
 
         subscriberMonitor = subscribe(MessageListener { _: String, batch: MessageBatch -> mqSubject.onNext(batch) })
         streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
+            .doOnNext { memoryVolumeMetric.processMessage(it) }
             .groupBy { message -> message.metadata.id.run { SessionKey(connectionId.sessionAlias, direction) } }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
             .replay().apply { connect() }
@@ -261,6 +265,7 @@ class CollectorService(
             logger.error("Close subscriber failure", e)
         }
         mqSubject.onComplete()
+        memoryVolumeMetric.close()
     }
 
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {

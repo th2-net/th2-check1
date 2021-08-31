@@ -1,4 +1,4 @@
-# th2 check1 (3.7.0)
+# th2 check1 (3.8.0)
 
 ## Overview
 
@@ -67,7 +67,8 @@ This block describes the configuration for check1.
   "message-cache-size": 1000,
   "cleanup-older-than": 60,
   "cleanup-time-unit": "SECONDS",
-  "max-event-batch-content-size": "1048576"
+  "max-event-batch-content-size": "1048576",
+  "message-size-collection-timeout": 60
 }
 ```
 
@@ -109,6 +110,11 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.8.0
+
++ Added memory volume metric for cache monitoring
+
 
 ### 3.7.0
 
