@@ -14,9 +14,10 @@
 package com.exactpro.th2.check1.metrics
 
 import com.exactpro.th2.check1.configuration.Check1Configuration
+import com.exactpro.th2.check1.utils.dec
+import com.exactpro.th2.check1.utils.inc
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.toJson
-import com.exactpro.th2.common.metrics.AbstractMetric
 import io.prometheus.client.Gauge
 import io.reactivex.Observable
 import io.reactivex.disposables.Disposable
@@ -27,37 +28,43 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
-class MemoryVolumeMetric(configuration: Check1Configuration) : AbstractMetric(), AutoCloseable {
+object BufferMetric : AutoCloseable {
+    private val logger = KotlinLogging.logger {}
 
-    private val lastReceivedMessageMetricTask: Disposable = Observable.interval(configuration.messageSizeCollectionTimeout, TimeUnit.MINUTES)
-            .subscribe {
-                lastReceivedMessagesMetric.set(lastReceivedMessages.average())
-                lastReceivedMessages.clear()
-            }
+    private val lastReceivedMessagesMetric: Gauge = Gauge
+            .build("th2_average_size_of_parsed_messages_by_timeout", "Average size of parsed messages received by timeout")
+            .register()
+    private val actualBufferCount: Gauge = Gauge
+            .build("th2_actual_cache_number", "The actual number of caches")
+            .register()
+    private val actualBufferSize: Gauge = Gauge
+            .build("th2_actual_cache_size", "The actual size of the cache")
+            .register()
+
+    private lateinit var lastReceivedMessageMetricTask: Disposable
     private val lastReceivedMessages: Queue<Long> = ConcurrentLinkedQueue<Long>()
     private val actualBufferMessages: Queue<Long> = LinkedBlockingQueue<Long>()
-    private val maxBufferSize = configuration.messageCacheSize
+    private var maxBufferSize: Int = -1
 
+
+    fun configure(configuration: Check1Configuration) {
+        this.maxBufferSize = configuration.messageCacheSize
+        this.lastReceivedMessageMetricTask = createObservableInterval(configuration.messageSizeCollectionTimeout)
+    }
 
     fun processMessage(message: Message) {
         if (actualBufferMessages.size >= maxBufferSize) {
             val messageSize = actualBufferMessages.poll()
             actualBufferCount.dec()
-            actualBufferSize.dec(messageSize.toDouble())
+            actualBufferSize.dec(messageSize)
         }
 
         val calculatedMessageSize = calculateMessageSize(message)
         actualBufferCount.inc()
-        actualBufferSize.inc(calculatedMessageSize.toDouble())
+        actualBufferSize.inc(calculatedMessageSize)
         actualBufferMessages.add(calculatedMessageSize)
 
         lastReceivedMessages.add(calculatedMessageSize)
-    }
-
-    override fun onValueChange(value: Boolean) {
-        lastReceivedMessagesMetric.set(if (value) 1.0 else 0.0)
-        actualBufferCount.set(if (value) 1.0 else 0.0)
-        actualBufferSize.set(if (value) 1.0 else 0.0)
     }
 
     override fun close() {
@@ -72,16 +79,10 @@ class MemoryVolumeMetric(configuration: Check1Configuration) : AbstractMetric(),
         return parsedInstance.totalSize()
     }
 
-    companion object {
-        private val logger = KotlinLogging.logger {}
-        private val lastReceivedMessagesMetric: Gauge = Gauge
-                .build("th2_average_size_of_parsed_messages_by_timeout", "Average size of parsed messages received by timeout")
-                .register()
-        private val actualBufferCount: Gauge = Gauge
-                .build("th2_actual_cache_number", "The actual number of caches")
-                .register()
-        private val actualBufferSize: Gauge = Gauge
-                .build("th2_actual_cache_size", "The actual size of the cache")
-                .register()
-    }
+    private fun createObservableInterval(messageSizeCollectionTimeout: Long) =
+            Observable.interval(messageSizeCollectionTimeout, TimeUnit.MINUTES)
+                    .subscribe {
+                        lastReceivedMessagesMetric.set(lastReceivedMessages.average())
+                        lastReceivedMessages.clear()
+                    }
 }

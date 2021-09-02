@@ -179,9 +179,7 @@ dependencies {
 
     // metrics
     implementation 'io.prometheus:simpleclient'
-    implementation 'io.prometheus:simpleclient_hotspot'
-    implementation 'io.prometheus:simpleclient_httpserver'
-    compileOnly 'org.openjdk.jol:jol-core:0.16'
+    implementation 'org.openjdk.jol:jol-core:0.16'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'

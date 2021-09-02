@@ -14,6 +14,8 @@
 package com.exactpro.th2.check1.metrics
 
 import com.exactpro.th2.check1.rule.AbstractCheckTask
+import com.exactpro.th2.check1.utils.dec
+import com.exactpro.th2.check1.utils.inc
 import io.prometheus.client.Gauge
 import mu.KotlinLogging
 import org.openjdk.jol.info.GraphLayout
@@ -43,7 +45,4 @@ object RuleMetric {
         ACTIVE_TASK_COUNTER.dec()
         activeRules.remove(rule)?.also { ACTIVE_TASK_MEMORY_SIZE.dec(it) }
     }
-
-    private fun Gauge.inc(value: Long) = this.inc(value.toDouble())
-    private fun Gauge.dec(value: Long) = this.dec(value.toDouble())
 }
