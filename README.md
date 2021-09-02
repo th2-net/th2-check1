@@ -1,4 +1,4 @@
-# th2 check1 (3.7.0)
+# th2 check1 (3.7.1)
 
 ## Overview
 
@@ -109,6 +109,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.7.1
+
++ Added check for positive timeout
 
 ### 3.7.0
 

@@ -31,6 +31,10 @@ import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.lang.IllegalArgumentException
 import java.time.Instant
 import kotlin.test.assertEquals
 
@@ -39,12 +43,13 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         messageFilter: RootMessageFilter,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
-        maxEventBatchContentSize: Int = 1024 * 1024
+        maxEventBatchContentSize: Int = 1024 * 1024,
+        timeout: Long = 1000
     ) = CheckRuleTask(
         SESSION_ALIAS,
         Instant.now(),
         SessionKey(SESSION_ALIAS, Direction.FIRST),
-        1000,
+        timeout,
         maxEventBatchContentSize,
         messageFilter,
         parentEventID,
@@ -189,4 +194,30 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             "No failed event $eventBatch"
         }
     }
+
+    @ParameterizedTest(name = "timeout = {0}")
+    @ValueSource(longs = [0, -1])
+    fun `handle error if the timeout is zero or negative`(timeout: Long) {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                        .mergeMetadata(MessageMetadata.newBuilder()
+                                .putProperties("keyProp", "42")
+                                .putProperties("notKeyProp", "2")
+                                .build())
+                        .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+        val filter = RootMessageFilter.newBuilder()
+                .setMessageType(MESSAGE_TYPE)
+                .setMetadataFilter(MetadataFilter.newBuilder()
+                        .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
+                .build()
+
+        val exception = assertThrows<IllegalArgumentException>("Task cannot be created due to invalid timeout") {
+            checkTask(filter, eventID, streams, timeout = timeout)
+        }
+        assertEquals("'timeout' should be set or be greater than zero, actual: $timeout", exception.message)
+    }
+
 }
