@@ -18,3 +18,6 @@ import io.prometheus.client.Gauge
 
 fun Gauge.inc(value: Long) = this.inc(value.toDouble())
 fun Gauge.dec(value: Long) = this.dec(value.toDouble())
+
+fun Gauge.Child.inc(value: Long) = this.inc(value.toDouble())
+fun Gauge.Child.dec(value: Long) = this.dec(value.toDouble())

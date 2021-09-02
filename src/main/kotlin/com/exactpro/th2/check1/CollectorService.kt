@@ -74,8 +74,11 @@ class CollectorService(
 
         subscriberMonitor = subscribe(MessageListener { _: String, batch: MessageBatch -> mqSubject.onNext(batch) })
         streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
-            .doOnNext { BufferMetric.processMessage(it) }
-            .groupBy { message -> message.metadata.id.run { SessionKey(connectionId.sessionAlias, direction) } }
+                .groupBy { message ->
+                    message.metadata.id.run {
+                        SessionKey(connectionId.sessionAlias, direction)
+                    }.also { BufferMetric.processMessage(it, message) }
+                }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
             .replay().apply { connect() }
 
