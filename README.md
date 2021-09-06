@@ -1,4 +1,4 @@
-# th2 check1 (3.7.0)
+# th2 check1 (3.7.1)
 
 ## Overview
 
@@ -109,6 +109,11 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.7.1
+
++ Migrated common version from `3.23.0` to `3.25.0`
++ Improved message filter table view
 
 ### 3.7.0
 
