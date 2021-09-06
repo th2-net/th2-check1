@@ -46,7 +46,7 @@ class CheckRuleTask(
 ) : AbstractCheckTask(description, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val messageFilter: SailfishFilter = SailfishFilter(
-        converter.fromProtoFilter(protoMessageFilter.messageFilter, protoMessageFilter.messageType),
+        converter.fromProtoPreFilter(protoMessageFilter),
         protoMessageFilter.toCompareSettings()
     )
     private val metadataFilter: SailfishFilter? = protoMessageFilter.metadataFilterOrNull()?.let {
@@ -54,12 +54,6 @@ class CheckRuleTask(
             converter.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
-    }
-
-    init {
-        rootEvent
-            .name("Check rule $sessionKey")
-            .type("Check rule")
     }
 
     override fun onStart() {
@@ -92,4 +86,8 @@ class CheckRuleTask(
             .type("Check failed")
             .status(FAILED)
     }
+
+    override fun name(): String = "Check rule $sessionKey"
+
+    override fun type(): String = "Check rule"
 }

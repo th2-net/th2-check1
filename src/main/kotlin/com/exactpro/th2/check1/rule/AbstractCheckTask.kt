@@ -13,6 +13,7 @@
 
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
@@ -26,6 +27,7 @@ import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
 import com.exactpro.th2.common.event.EventUtils
+import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
@@ -50,6 +52,7 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import java.util.regex.PatternSyntaxException
 
 /**
  * Implements common logic for check task.
@@ -76,8 +79,12 @@ abstract class AbstractCheckTask(
     protected var handledMessageCounter: Long = 0
 
     protected val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
-    protected val rootEvent: Event = Event.from(submitTime)
-        .description(description)
+    protected val rootEvent: Event by lazy {
+        Event.from(submitTime)
+                .name(name())
+                .type(type())
+                .description(description)
+    }
 
     private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
@@ -99,6 +106,7 @@ abstract class AbstractCheckTask(
         BEGIN,
         TIMEOUT,
         COMPLETED,
+        INTERNAL_ERROR,
         PUBLISHED
     }
 
@@ -198,6 +206,9 @@ abstract class AbstractCheckTask(
      * Provides a feature to define custom filter for observe.
      */
     protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
+
+    protected abstract fun name(): String
+    protected abstract fun type(): String
 
     /**
      * Observe a message sequence from the previous task.
@@ -314,7 +325,9 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            completeEvent(prevState == State.TIMEOUT)
+            if (prevState != State.INTERNAL_ERROR) {
+                completeEvent(prevState == State.TIMEOUT)
+            }
             _endTime = Instant.now()
 
             val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
@@ -456,6 +469,22 @@ abstract class AbstractCheckTask(
         if (protoFilter.hasMetadataFilter()) {
             addSubEventWithSamePeriod()
                 .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.result.metadataResult!!)
+        }
+    }
+
+    protected fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter,
+                                                              messageName: String = protoPreMessageFilter.messageType): IMessage {
+        try {
+            return fromProtoFilter(protoPreMessageFilter.messageFilter, messageName)
+        } catch (e: PatternSyntaxException) {
+            rootEvent.addSubEventWithSamePeriod()
+                    .name("An error occurred while converting message filter. Invalid regex operation")
+                    .type("invalidRegexOperation")
+                    .bodyData(MessageBuilder().text(e.message).build())
+                    .status(FAILED)
+            taskState.set(State.INTERNAL_ERROR)
+            publishEvent()
+            throw e
         }
     }
 
