@@ -108,6 +108,16 @@ spec:
         - "parsed"
 ```
 
+## Prometheus metrics
+The Check1 component uses Prometheus metrics to observe the actual state of the application
+* `th2_check1_actual_cache_number` - actual number of messages in caches
+* `th2_check1_actual_cache_size` - actual size of the messages in caches
+* `th2_check1_active_tasks_count` - number of currently active rules in execution
+
+The `th2_check1_actual_cache_size` and `th2_check1_active_tasks_count` metrics separate messages with two labels:
+* `session_alias` - session alias of received message
+* `direction` - direction of received message
+
 ## Release Notes
 
 ### 3.8.0

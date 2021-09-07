@@ -32,11 +32,11 @@ object BufferMetric {
     private val logger = KotlinLogging.logger {}
 
     private val actualBufferCountMetric: Gauge = Gauge
-            .build("th2_check1_actual_cache_number", "The actual number of caches")
+            .build("th2_check1_actual_cache_number", "The actual number of messages in caches")
             .labelNames(DEFAULT_SESSION_ALIAS_LABEL_NAME, DEFAULT_DIRECTION_LABEL_NAME)
             .register()
     private val actualBufferSizeMetric: Gauge = Gauge
-            .build("th2_check1_actual_cache_size", "The actual size of the cache")
+            .build("th2_check1_actual_cache_size", "The actual size of messages in caches")
             .labelNames(DEFAULT_SESSION_ALIAS_LABEL_NAME, DEFAULT_DIRECTION_LABEL_NAME)
             .register()
 

@@ -21,6 +21,7 @@ import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
+import com.exactpro.th2.check1.metrics.RuleMetric
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -38,7 +39,6 @@ import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
-import io.prometheus.client.Gauge
 import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.disposables.Disposable
@@ -213,7 +213,7 @@ abstract class AbstractCheckTask(
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
-        ACTIVE_TASK_COUNTER.inc()
+        RuleMetric.incrementActiveRule()
         this.lastSequence = sequence
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
@@ -269,7 +269,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
-            ACTIVE_TASK_COUNTER.dec()
+            RuleMetric.decrementActiveRule()
             sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
         }
     }
@@ -381,7 +381,6 @@ abstract class AbstractCheckTask(
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
-        private val ACTIVE_TASK_COUNTER = Gauge.build("th2_check1_active_tasks_count", "Current active tasks count in execution").register()
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
