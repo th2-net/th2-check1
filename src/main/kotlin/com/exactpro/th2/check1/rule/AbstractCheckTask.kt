@@ -35,7 +35,7 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
-import com.exactpro.th2.common.message.toTreeTable
+import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -449,7 +449,7 @@ abstract class AbstractCheckTask(
             .name("Message filter")
             .type("Filter")
             .status(FAILED)
-            .bodyData(rootMessageFilter.toTreeTable())
+            .bodyData(rootMessageFilter.toReadableBodyCollection())
     }
 
     protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {

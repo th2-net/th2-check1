@@ -115,6 +115,10 @@ spec:
 
 + Added memory volume metric for cache monitoring
 
+### 3.7.1
+
++ Migrated common version from `3.23.0` to `3.25.0`
++ Improved message filter table view
 
 ### 3.7.0
 
