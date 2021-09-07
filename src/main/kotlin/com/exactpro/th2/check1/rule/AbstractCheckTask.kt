@@ -21,7 +21,6 @@ import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
-import com.exactpro.th2.check1.metrics.RuleMetric
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -39,6 +38,7 @@ import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
+import io.prometheus.client.Gauge
 import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.disposables.Disposable
@@ -213,7 +213,7 @@ abstract class AbstractCheckTask(
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
-        RuleMetric.incrementActiveRule(this)
+        ACTIVE_TASK_COUNTER.inc()
         this.lastSequence = sequence
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
@@ -269,7 +269,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
-            RuleMetric.decrementActiveRule(this)
+            ACTIVE_TASK_COUNTER.dec()
             sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
         }
     }
@@ -381,6 +381,7 @@ abstract class AbstractCheckTask(
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
+        private val ACTIVE_TASK_COUNTER = Gauge.build("th2_check1_active_tasks_count", "Current active tasks count in execution").register()
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
@@ -487,28 +488,6 @@ abstract class AbstractCheckTask(
         }
 
         return sequence ?: DEFAULT_SEQUENCE
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as AbstractCheckTask
-
-        if (description != other.description) return false
-        if (timeout != other.timeout) return false
-        if (sessionKey != other.sessionKey) return false
-        if (parentEventID != other.parentEventID) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = description?.hashCode() ?: 0
-        result = 31 * result + timeout.hashCode()
-        result = 31 * result + sessionKey.hashCode()
-        result = 31 * result + parentEventID.hashCode()
-        return result
     }
 
     private data class Legacy(val executorService: ExecutorService, val lastSequence: Long)

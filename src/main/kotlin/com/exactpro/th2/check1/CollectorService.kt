@@ -268,7 +268,6 @@ class CollectorService(
             logger.error("Close subscriber failure", e)
         }
         mqSubject.onComplete()
-        BufferMetric.close()
     }
 
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {

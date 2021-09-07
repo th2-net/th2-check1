@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.check1.utils
+package com.exactpro.th2.check1.metrics.utils
 
 import io.prometheus.client.Gauge
 

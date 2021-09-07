@@ -15,29 +15,22 @@ package com.exactpro.th2.check1.metrics
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.configuration.Check1Configuration
-import com.exactpro.th2.check1.utils.dec
-import com.exactpro.th2.check1.utils.inc
+import com.exactpro.th2.check1.metrics.utils.dec
+import com.exactpro.th2.check1.metrics.utils.inc
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.metrics.DEFAULT_DIRECTION_LABEL_NAME
 import com.exactpro.th2.common.metrics.DEFAULT_SESSION_ALIAS_LABEL_NAME
 import io.prometheus.client.Gauge
-import io.reactivex.Observable
-import io.reactivex.disposables.Disposable
 import mu.KotlinLogging
 import org.openjdk.jol.info.GraphLayout
 import java.util.Queue
 import java.util.LinkedList
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.TimeUnit
 
-object BufferMetric : AutoCloseable {
+object BufferMetric {
     private val logger = KotlinLogging.logger {}
 
-    private val averageReceivedMessagesSizeMetric: Gauge = Gauge
-            .build("th2_check1_average_size_of_parsed_messages_by_timeout", "Average size of parsed messages received by timeout")
-            .register()
     private val actualBufferCountMetric: Gauge = Gauge
             .build("th2_check1_actual_cache_number", "The actual number of caches")
             .labelNames(DEFAULT_SESSION_ALIAS_LABEL_NAME, DEFAULT_DIRECTION_LABEL_NAME)
@@ -46,18 +39,12 @@ object BufferMetric : AutoCloseable {
             .build("th2_check1_actual_cache_size", "The actual size of the cache")
             .labelNames(DEFAULT_SESSION_ALIAS_LABEL_NAME, DEFAULT_DIRECTION_LABEL_NAME)
             .register()
-    private val requiredCacheMemorySizeMetric: Gauge = Gauge
-            .build("th2_check1_required_cache_memory_size", "Required cache memory size without active cache size")
-            .register()
 
-    private lateinit var lastReceivedMessageMetricTask: Disposable
-    private val lastReceivedMessages: Queue<Long> = ConcurrentLinkedQueue<Long>()
-    private val bufferMessagesSizeBySessionKey: MutableMap<SessionKey, LinkedList<Long>> = ConcurrentHashMap()
+    private val bufferMessagesSizeBySessionKey: MutableMap<SessionKey, Queue<Long>> = ConcurrentHashMap()
     private var maxBufferSize: Int = -1
 
     fun configure(configuration: Check1Configuration) {
         this.maxBufferSize = configuration.messageCacheSize
-        this.lastReceivedMessageMetricTask = createObservableInterval(configuration.messageSizeCollectionTimeout)
     }
 
     fun processMessage(sessionKey: SessionKey, message: Message) {
@@ -79,13 +66,6 @@ object BufferMetric : AutoCloseable {
 
             return@compute bufferedMessageSize
         }
-
-        lastReceivedMessages.add(calculatedMessageSize)
-        requiredCacheMemorySizeMetric.set(calculateRequiredMemory())
-    }
-
-    override fun close() {
-        lastReceivedMessageMetricTask.dispose()
     }
 
     private fun calculateMessageSize(message: Message): Long {
@@ -94,21 +74,6 @@ object BufferMetric : AutoCloseable {
             logger.trace("Foot print for message with id: '{}'\n{}", message.metadata.id.toJson(), parsedInstance.toFootprint())
         }
         return parsedInstance.totalSize()
-    }
-
-    private fun createObservableInterval(messageSizeCollectionTimeout: Long) =
-            Observable.interval(messageSizeCollectionTimeout, TimeUnit.MINUTES)
-                    .subscribe {
-                        averageReceivedMessagesSizeMetric.set(lastReceivedMessages.average())
-                        lastReceivedMessages.clear()
-                    }
-
-    private fun calculateRequiredMemory(): Double {
-        return bufferMessagesSizeBySessionKey.values.sumByDouble {
-            val averageMessageSize = it.average()
-            val leftBufferCapacity = maxBufferSize - it.size
-            return averageMessageSize * leftBufferCapacity
-        }
     }
 
     private fun incrementStats(messageSize: Long, labels: Array<String>) {
