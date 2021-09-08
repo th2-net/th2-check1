@@ -18,6 +18,7 @@ import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_SEQUENCE_TYPE
+import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Event
@@ -27,18 +28,24 @@ import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
+import com.exactpro.th2.common.grpc.MessageMetadata
+import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
+import com.exactpro.th2.common.message.message
+import com.exactpro.th2.common.message.messageFilter
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
+import java.util.regex.PatternSyntaxException
 import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -448,6 +455,66 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             assertEquals(listOf(1L, 3L, 4L), verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
         }, {
             assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because the actual comparisons count equals to expected
+        })
+    }
+
+    @Test
+    fun `failed rule creation due to invalid regex operation in the pre filter`() {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                        .mergeMetadata(MessageMetadata.newBuilder()
+                                .putProperties("keyProp", "42")
+                                .putProperties("notKeyProp", "2")
+                                .build())
+                        .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+
+        val preFilter = PreFilter.newBuilder()
+                .putFields("keyProp", ValueFilter.newBuilder().setSimpleFilter(".[").setKey(true).setOperation(FilterOperation.LIKE).build())
+                .build()
+
+        assertThrows<PatternSyntaxException> {
+            sequenceCheckRuleTask(parentEventID = eventID, messageStream = streams, preFilterParam = preFilter, checkOrder = false)
+        }
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertAll({
+            assertEquals(2, eventList.size)
+            assertEquals(1, eventList.filter { it.type == "invalidRegexOperation" }.size)
+        })
+    }
+
+    @Test
+    fun `failed rule creation due to invalid regex operation in the message filter`() {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                        .mergeMetadata(MessageMetadata.newBuilder()
+                                .putProperties("keyProp", "42")
+                                .putProperties("notKeyProp", "2")
+                                .build())
+                        .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+        val filter = RootMessageFilter.newBuilder()
+                .setMessageType(MESSAGE_TYPE)
+                .setMetadataFilter(MetadataFilter.newBuilder()
+                        .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
+                .setMessageFilter(messageFilter().putFields("keyProp", ValueFilter.newBuilder().setOperation(FilterOperation.LIKE).setSimpleFilter(".[").build()))
+                .build()
+
+        assertThrows<PatternSyntaxException> {
+            sequenceCheckRuleTask(parentEventID = eventID, messageStream = streams, filtersParam = listOf(filter), checkOrder = false)
+        }
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertAll({
+            assertEquals(2, eventList.size)
+            assertEquals(1, eventList.filter { it.type == "invalidRegexOperation" }.size)
         })
     }
 
