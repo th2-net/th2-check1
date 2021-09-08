@@ -1,4 +1,4 @@
-# th2 check1 (3.7.1)
+# th2 check1 (3.7.2)
 
 ## Overview
 
@@ -110,9 +110,14 @@ spec:
 
 ## Release Notes
 
+### 3.7.2
+
++ Added exception handling for regex operation in the message filter and pre filter
+
 ### 3.7.1
 
-+ Added exception handling for regex operation in the message filter
++ Migrated common version from `3.23.0` to `3.25.0`
++ Improved message filter table view
 
 ### 3.7.0
 
