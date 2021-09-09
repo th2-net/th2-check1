@@ -171,17 +171,9 @@ abstract class AbstractCheckTask(
     }
 
     /**
-     * Shutdown the executor that is used to perform this task in case it doesn't have a next task
-     * @return true if the task doesn't have a next task, otherwise it will return false
+     * Returns `true` if the rule has a continuation (the rule that should start after the current on is finished)
      */
-    fun tryShutdownExecutor(): Boolean {
-        if (hasNextTask.get()) {
-            LOGGER.warn("Cannot shutdown executor for task '$description' that has a connected task")
-            return false
-        }
-        executorService.shutdown()
-        return true
-    }
+    fun hasNextRule(): Boolean = hasNextTask.get()
 
     /**
      * Registers a task as the next task in the continuous verification chain. Its [begin] method will be called
@@ -195,14 +187,8 @@ abstract class AbstractCheckTask(
         if (hasNextTask.compareAndSet(false, true)) {
             onChainedTaskSubscription()
             sequenceSubject.subscribe { legacy ->
-                val executor = if (legacy.executorService.isShutdown) {
-                    LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
-                    createExecutorService()
-                } else {
-                    legacy.executorService
-                }
                 legacy.sequenceData.apply {
-                    checkTask.begin(lastSequence, lastMessageTimestamp, executor, PreviousExecutionData(untrusted, completed))
+                    checkTask.begin(lastSequence, lastMessageTimestamp, executorService, PreviousExecutionData(untrusted, completed))
                 }
             }
             LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
@@ -213,14 +199,14 @@ abstract class AbstractCheckTask(
 
     /**
      * Observe a message sequence from the checkpoint.
-     * Task subscribe to messages stream with its sequence after call.
+     * Task subscribe to message's stream with its sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param checkpoint message sequence and checkpoint timestamp from previous task.
      * @throws IllegalStateException when method is called more than once.
      */
-    fun begin(checkpoint: Checkpoint? = null) {
+    fun begin(checkpoint: Checkpoint? = null, executorService: ExecutorService = createExecutorService()) {
         val checkpointData = checkpoint?.getCheckpointData(sessionKey)
-        begin(checkpointData?.sequence ?: DEFAULT_SEQUENCE, checkpointData?.timestamp)
+        begin(checkpointData?.sequence ?: DEFAULT_SEQUENCE, checkpointData?.timestamp, executorService)
     }
 
     /**
@@ -279,7 +265,7 @@ abstract class AbstractCheckTask(
 
     /**
      * Observe a message sequence from the previous task.
-     * Task subscribe to messages stream with sequence after call.
+     * Task subscribe to message's stream with sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param sequence message sequence from the previous task.
      * @param checkpointTimestamp checkpoint timestamp from the previous task
@@ -291,7 +277,7 @@ abstract class AbstractCheckTask(
     private fun begin(
         sequence: Long = DEFAULT_SEQUENCE,
         checkpointTimestamp: Timestamp? = null,
-        executorService: ExecutorService = createExecutorService(),
+        executorService: ExecutorService,
         previousExecutionData: PreviousExecutionData = PreviousExecutionData.DEFAULT
     ) {
         configureRootEvent()

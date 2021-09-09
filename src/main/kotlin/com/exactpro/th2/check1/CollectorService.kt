@@ -19,8 +19,8 @@ import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
-import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
+import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.common.event.Event
@@ -34,15 +34,18 @@ import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.fasterxml.jackson.core.JsonProcessingException
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
-import org.slf4j.LoggerFactory
-import java.io.IOException
+import mu.KotlinLogging
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.TimeUnit
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 import com.exactpro.th2.check1.utils.toMessageID
 import com.exactpro.th2.common.message.toJson
@@ -53,7 +56,7 @@ class CollectorService(
     private val configuration: Check1Configuration,
 ) {
 
-    private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
+    private val logger = KotlinLogging.logger(javaClass.name + '@' + hashCode())
 
     /**
      * Queue name to subscriber. Messages with different connectivity can be transferred with one queue.
@@ -67,7 +70,9 @@ class CollectorService(
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
     private val defaultAutoSilenceCheck: Boolean = configuration.isAutoSilenceCheckAfterSequenceRule
-
+    private val commonRuleExecutor: ExecutorService = Executors.newSingleThreadExecutor(
+        ThreadFactoryBuilder().setNameFormat("rule-executor-%d").build()
+    )
     private var ruleFactory: RuleFactory
 
     init {
@@ -143,7 +148,7 @@ class CollectorService(
         } else {
             checkpoint
         }
-        value?.subscribeNextTask(this) ?: begin(realCheckpoint)
+        value?.subscribeNextTask(this) ?: begin(realCheckpoint, commonRuleExecutor)
     }
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
@@ -178,13 +183,13 @@ class CollectorService(
             val endTime = task.endTime
             when {
                 !olderThan(now, delta, unit, endTime) -> false
-                task.tryShutdownExecutor() -> {
-                    logger.info("Removed task ${task.description} ($endTime) from tasks map")
-                    true
-                }
                 else -> {
-                    logger.warn("Task ${task.description} can't be removed because it has a continuation")
-                    false
+                    !task.hasNextRule().also { canBeRemoved ->
+                        when {
+                            canBeRemoved -> logger.info("Removed task ${task.description} ($endTime) from tasks map")
+                            else -> logger.warn("Task ${task.description} can't be removed because it has a continuation")
+                        }
+                    }
                 }
             }
         }
@@ -197,10 +202,7 @@ class CollectorService(
     private fun sendEvents(parentEventID: EventID, event: Event) {
         logger.debug("Sending event thee id '{}' parent id '{}'", event.id, parentEventID)
 
-        val batch = EventBatch.newBuilder()
-            .setParentEventId(parentEventID)
-            .addAllEvents(event.toListProto(parentEventID))
-            .build()
+        val batch = event.toBatchProto(parentEventID)
 
         ForkJoinPool.commonPool().execute {
             try {
@@ -222,12 +224,22 @@ class CollectorService(
     }
 
     fun close() {
-        try {
-            subscriberMonitor.unsubscribe()
-        } catch (e: IOException) {
-            logger.error("Close subscriber failure", e)
+        runCatching(subscriberMonitor::unsubscribe).onFailure {
+            logger.error(it) { "Close subscriber failure" }
         }
         mqSubject.onComplete()
+        runCatching {
+            commonRuleExecutor.shutdown()
+            val timeout: Long = 10
+            val unit = TimeUnit.SECONDS
+            if (!commonRuleExecutor.awaitTermination(timeout, unit)) {
+                logger.warn { "Cannot shutdown executor during ${unit.toMillis(timeout)} ms. Force shutdown" }
+                val remainingTasks = commonRuleExecutor.shutdownNow()
+                logger.warn { "Tasks left: ${remainingTasks.size}" }
+            }
+        }.onFailure {
+            logger.error(it) { "Cannot shutdown common task executor" }
+        }
     }
 
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
