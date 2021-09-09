@@ -126,6 +126,8 @@ abstract class AbstractCheckTask(
     private var hasMessagesInTimeoutInterval: Boolean = false
     private var bufferContainsStartMessage: Boolean = false
     private var isDefaultSequence: Boolean = false
+    protected var isCheckpointLastReceivedMessage = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
+        private set
 
     override fun onStart() {
         super.onStart()
@@ -255,7 +257,7 @@ abstract class AbstractCheckTask(
         this.isDefaultSequence = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
 
-        endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
+        endFuture = Single.timer(taskTimeout.getOrCalculateMessageTimeout(), MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end(State.TIMEOUT, "Timeout is exited") }
 
         messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
@@ -607,6 +609,18 @@ abstract class AbstractCheckTask(
         } else {
             null
         }
+
+    private fun TaskTimeout.getOrCalculateMessageTimeout(): Long {
+        if (this.timeout > 0L) {
+            return timeout
+        }
+        require(messageTimeout != null && messageTimeout > 0) {
+            "Timeout cannot be calculated because 'timeout' and 'message timeout' is not set"
+        }
+        return messageTimeout.also {
+            LOGGER.info("Rule `timeout` is not specified, used `message timeout` instead")
+        }
+    }
 
 
     private data class Legacy(val executorService: ExecutorService, val sequenceData: SequenceData)

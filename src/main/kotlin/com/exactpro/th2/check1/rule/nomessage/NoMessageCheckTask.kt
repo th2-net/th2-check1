@@ -116,9 +116,13 @@ class NoMessageCheckTask(
         }
 
         if (taskState == State.TIMEOUT || taskState == State.STREAM_COMPLETED) {
-            resultEvent.addSubEvent(
-                Event.start().name("Task has been completed because: ${taskState.name}").status(Event.Status.FAILED)
-            )
+            val executionStopEvent = Event.start()
+                    .name("Task has been completed because: ${taskState.name}")
+                    .type("noMessageCheckExecutionStop")
+            if (taskState != State.TIMEOUT || !isCheckpointLastReceivedMessage) {
+                executionStopEvent.status(Event.Status.FAILED)
+            }
+            resultEvent.addSubEvent(executionStopEvent)
         }
     }
 }
