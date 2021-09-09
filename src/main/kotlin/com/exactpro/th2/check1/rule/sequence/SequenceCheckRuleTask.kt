@@ -40,7 +40,7 @@ import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toJson
-import com.exactpro.th2.common.message.toTreeTable
+import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
@@ -125,7 +125,7 @@ class SequenceCheckRuleTask(
 
         preFilterEvent = Event.start()
             .type("preFiltering")
-            .bodyData(protoPreMessageFilter.toTreeTable())
+            .bodyData(protoPreMessageFilter.toReadableBodyCollection())
 
         rootEvent.addSubEvent(preFilterEvent)
     }

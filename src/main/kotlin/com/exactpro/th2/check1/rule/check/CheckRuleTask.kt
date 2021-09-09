@@ -26,7 +26,7 @@ import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.RootMessageFilter
-import com.exactpro.th2.common.message.toTreeTable
+import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import io.reactivex.Observable
 import java.time.Instant
@@ -70,7 +70,7 @@ class CheckRuleTask(
             .endTimestamp()
             .name("Message filter")
             .type("Filter")
-            .bodyData(protoMessageFilter.toTreeTable())
+            .bodyData(protoMessageFilter.toReadableBodyCollection())
 
         rootEvent.addSubEvent(subEvent)
 
