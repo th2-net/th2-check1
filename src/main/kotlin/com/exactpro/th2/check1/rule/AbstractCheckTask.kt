@@ -386,7 +386,10 @@ abstract class AbstractCheckTask(
     protected fun RootMessageFilter.toCompareSettings(): ComparatorSettings =
         ComparatorSettings().also {
             it.metaContainer = VerificationUtil.toMetaContainer(this.messageFilter, false)
-            it.ignoredFields = this.comparisonSettings.ignoreFieldsList.toSet()
+            with(this.comparisonSettings) {
+                it.ignoredFields = this.ignoreFieldsList.toSet()
+                it.isCheckGroupsOrder = this.checkRepeatingGroupOrder
+            }
         }
 
     protected fun MessageFilter.toCompareSettings(): ComparatorSettings =

@@ -1,4 +1,4 @@
-# th2 check1 (3.7.1)
+# th2 check1 (3.7.2)
 
 ## Overview
 
@@ -109,6 +109,10 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.7.2
+
++ Added support to verify the order of repeating groups using the `check_repeating_group_order` flag in `RootComparisonSettings`
 
 ### 3.7.1
 

@@ -22,15 +22,27 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
+import com.exactpro.th2.common.grpc.EventStatus.FAILED
 import com.exactpro.th2.common.grpc.FilterOperation
+import com.exactpro.th2.common.grpc.ListValueFilter
+import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
+import com.exactpro.th2.common.grpc.RootComparisonSettings
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
+import com.exactpro.th2.common.value.add
+import com.exactpro.th2.common.value.listValue
+import com.exactpro.th2.common.value.toValue
+import com.exactpro.th2.common.value.toValueFilter
 import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
 import kotlin.test.assertEquals
 
@@ -188,5 +200,67 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertNotNull(checkFailedEvent) {
             "No failed event $eventBatch"
         }
+    }
+
+    @ParameterizedTest(name = "checkRepeatingGroupOrder = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `verify the order of repeating groups`(checkRepeatingGroupOrder: Boolean) {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                        .putFields("legs", listValue()
+                                .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                                        .putAllFields(mapOf(
+                                                "A" to "1".toValue(), "B" to "2".toValue()
+                                        )))
+                                .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                                        .putAllFields(mapOf(
+                                                "C" to "3".toValue(), "D" to "4".toValue()
+                                        ))).toValue())
+                        .build()
+        ))
+        val messageFilterForCheckOrder: RootMessageFilter = RootMessageFilter.newBuilder()
+                .setComparisonSettings(RootComparisonSettings.newBuilder().setCheckRepeatingGroupOrder(checkRepeatingGroupOrder).build())
+                .setMessageType(MESSAGE_TYPE)
+                .setMessageFilter(MessageFilter.newBuilder()
+                        .putFields("legs", ValueFilter.newBuilder()
+                                .setListFilter(ListValueFilter.newBuilder().apply {
+                                    addValues(ValueFilter.newBuilder()
+                                            .setMessageFilter(MessageFilter.newBuilder()
+                                                    .putAllFields(mapOf(
+                                                            "C" to "3".toValueFilter(),
+                                                            "D" to "4".toValueFilter()
+                                                    )).build())
+                                            .build())
+                                    addValues(ValueFilter.newBuilder()
+                                            .setMessageFilter(MessageFilter.newBuilder()
+                                                    .putAllFields(mapOf(
+                                                            "A" to "1".toValueFilter(),
+                                                            "B" to "2".toValueFilter()
+                                                    )).build())
+                                            .build())
+                                }).build())
+                        .build())
+                .build()
+        val eventID = EventID.newBuilder().setId("root").build()
+
+        val task = checkTask(messageFilterForCheckOrder, eventID, streams)
+        task.begin()
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertAll({
+            assertEquals(3, eventList.size)
+        }, {
+            val verificationEvents = eventList.filter { it.type == "Verification" }
+            assertEquals(1, verificationEvents.size)
+
+            val eventStatus: EventStatus = if (checkRepeatingGroupOrder) {
+                FAILED
+            } else {
+                SUCCESS
+            }
+
+            assertTrue(verificationEvents.all { it.status == eventStatus})
+        })
     }
 }
