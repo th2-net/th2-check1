@@ -112,7 +112,7 @@ spec:
 
 ### 3.7.2
 
-+ Added reporting in the log about the message type in the message filter
++ Added check for required message type in the message filter
 
 ### 3.7.1
 
