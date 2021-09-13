@@ -206,7 +206,34 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
                     TaskTimeout(0)
             ).begin(createCheckpoint(checkpointTimestamp, 1))
         }
-        assertEquals("Timeout cannot be calculated because 'timeout' and 'message timeout' is not set", exception.message)
+        assertEquals("Timeout cannot be calculated because 'timeout' and 'message timeout' is not specified or negative", exception.message)
+    }
+
+    @Test
+    fun `rule cannot be create because specified timeout less than message timeout`() {
+        val checkpointTimestamp = Instant.now()
+        val streams = createStreams(
+                messages = createMessages(
+                        MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
+                        MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
+                        MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
+                        MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 1300)),
+                        MessageData("D", "4".toValue(), getMessageTimestamp(checkpointTimestamp, 1500)),
+                        MessageData("E", "5".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
+                        // should be skipped because of message timeout
+                        MessageData("F", "6".toValue(), getMessageTimestamp(checkpointTimestamp, 1600))
+                )
+        )
+
+        val exception = assertThrows<IllegalArgumentException> {
+            noMessageCheckTask(
+                    createEvent("root"),
+                    streams,
+                    createPreFilter("E", "5", FilterOperation.EQUAL),
+                    TaskTimeout(1000, 5000)
+            ).begin(createCheckpoint(checkpointTimestamp, 1))
+        }
+        assertEquals("The 'timeout' should be greater than the 'message timeout'", exception.message)
     }
 
 

@@ -13,4 +13,4 @@
 
 package com.exactpro.th2.check1.entities
 
-data class TaskTimeout(val timeout: Long, val messageTimeout: Long? = null)
+data class TaskTimeout(val timeout: Long, val messageTimeout: Long = 0)

@@ -119,7 +119,7 @@ class NoMessageCheckTask(
             val executionStopEvent = Event.start()
                     .name("Task has been completed because: ${taskState.name}")
                     .type("noMessageCheckExecutionStop")
-            if (taskState != State.TIMEOUT || !isCheckpointLastReceivedMessage) {
+            if (taskState != State.TIMEOUT || !isCheckpointLastReceivedMessage()) {
                 executionStopEvent.status(Event.Status.FAILED)
             }
             resultEvent.addSubEvent(executionStopEvent)

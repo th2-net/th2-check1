@@ -41,6 +41,7 @@ import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.message.toJson
+import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
@@ -126,8 +127,6 @@ abstract class AbstractCheckTask(
     private var hasMessagesInTimeoutInterval: Boolean = false
     private var bufferContainsStartMessage: Boolean = false
     private var isDefaultSequence: Boolean = false
-    protected var isCheckpointLastReceivedMessage = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
-        private set
 
     override fun onStart() {
         super.onStart()
@@ -257,7 +256,7 @@ abstract class AbstractCheckTask(
         this.isDefaultSequence = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
 
-        endFuture = Single.timer(taskTimeout.getOrCalculateMessageTimeout(), MILLISECONDS, Schedulers.computation())
+        endFuture = Single.timer(taskTimeout.getOrCalculateTimeout(checkpointTimestamp), MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end(State.TIMEOUT, "Timeout is exited") }
 
         messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
@@ -350,6 +349,8 @@ abstract class AbstractCheckTask(
      * This method is invoked in [State.PUBLISHED] state.
      */
     protected open fun completeEvent(taskState: State) {}
+
+    protected fun isCheckpointLastReceivedMessage(): Boolean = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
 
     /**
      * Publishes the event to [eventBatchRouter].
@@ -463,6 +464,7 @@ abstract class AbstractCheckTask(
 
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
+        const val DEFAULT_TASK_TIMEOUT = 3000L
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
     }
 
@@ -603,22 +605,33 @@ abstract class AbstractCheckTask(
             }
         }
 
-    private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long?): Timestamp? =
-        if (timestamp != null && messageTimeout != null) {
+    private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long): Timestamp? =
+        if (timestamp != null && messageTimeout > 0) {
             Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
         } else {
             null
         }
 
-    private fun TaskTimeout.getOrCalculateMessageTimeout(): Long {
-        if (this.timeout > 0L) {
+    private fun TaskTimeout.getOrCalculateTimeout(checkpointTimestamp: Timestamp?): Long {
+        if (timeout > 0L) {
+            if (messageTimeout > 0L) {
+                require(timeout > messageTimeout) { "The 'timeout' should be greater than the 'message timeout'" }
+            }
             return timeout
         }
-        require(messageTimeout != null && messageTimeout > 0) {
-            "Timeout cannot be calculated because 'timeout' and 'message timeout' is not set"
+        require(messageTimeout > 0) {
+            "Timeout cannot be calculated because 'timeout' and 'message timeout' is not specified or negative"
         }
-        return messageTimeout.also {
-            LOGGER.info("Rule `timeout` is not specified, used `message timeout` instead")
+        checkNotNull(checkpointTimestamp) { "Timeout cannot be calculated because 'checkpoint timestamp' is not specified" }
+        val timestampDiff = Timestamps.between(Instant.now().toTimestamp(), checkpointTimestamp)
+        val durationDiff = Durations.subtract(Durations.fromMillis(timeout), timestampDiff)
+        val newTimeout = Durations.toMillis(durationDiff)
+        return if (newTimeout < 0) {
+            DEFAULT_TASK_TIMEOUT
+        } else if (newTimeout < 1000L) {
+            1000L
+        } else {
+            newTimeout
         }
     }
 
