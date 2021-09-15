@@ -388,7 +388,7 @@ abstract class AbstractCheckTask(
             it.metaContainer = VerificationUtil.toMetaContainer(this.messageFilter, false)
             with(this.comparisonSettings) {
                 it.ignoredFields = this.ignoreFieldsList.toSet()
-                it.isCheckGroupsOrder = this.checkRepeatingGroupOrder
+                it.isKeepResultGroupOrder = true
             }
         }
 

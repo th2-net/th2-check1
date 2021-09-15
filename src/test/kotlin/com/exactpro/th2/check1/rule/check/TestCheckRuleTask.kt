@@ -42,8 +42,10 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import java.time.Instant
+import java.util.stream.Stream
 import kotlin.test.assertEquals
 
 internal class TestCheckRuleTask : AbstractCheckTaskTest() {
@@ -202,9 +204,9 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         }
     }
 
-    @ParameterizedTest(name = "checkRepeatingGroupOrder = {0}")
-    @ValueSource(booleans = [true, false])
-    fun `verify the order of repeating groups`(checkRepeatingGroupOrder: Boolean) {
+    @ParameterizedTest(name = "keepRepeatingGroupResult = {0}")
+    @MethodSource("resultByFilter")
+    fun `check that the order is kept in repeating groups`(resultByFilter: Pair<EventStatus, Map<String, ValueFilter>>) {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
                 message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                         .putFields("legs", listValue()
@@ -215,36 +217,26 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                                 .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                                         .putAllFields(mapOf(
                                                 "C" to "3".toValue(), "D" to "4".toValue()
-                                        ))).toValue())
+                                        )))
+                                .toValue())
                         .build()
         ))
         val messageFilterForCheckOrder: RootMessageFilter = RootMessageFilter.newBuilder()
-                .setComparisonSettings(RootComparisonSettings.newBuilder().setCheckRepeatingGroupOrder(checkRepeatingGroupOrder).build())
+                .setComparisonSettings(RootComparisonSettings.newBuilder().build())
                 .setMessageType(MESSAGE_TYPE)
                 .setMessageFilter(MessageFilter.newBuilder()
                         .putFields("legs", ValueFilter.newBuilder()
                                 .setListFilter(ListValueFilter.newBuilder().apply {
                                     addValues(ValueFilter.newBuilder()
                                             .setMessageFilter(MessageFilter.newBuilder()
-                                                    .putAllFields(mapOf(
-                                                            "C" to "3".toValueFilter(),
-                                                            "D" to "4".toValueFilter()
-                                                    )).build())
-                                            .build())
-                                    addValues(ValueFilter.newBuilder()
-                                            .setMessageFilter(MessageFilter.newBuilder()
-                                                    .putAllFields(mapOf(
-                                                            "A" to "1".toValueFilter(),
-                                                            "B" to "2".toValueFilter()
-                                                    )).build())
+                                                    .putAllFields(resultByFilter.second).build())
                                             .build())
                                 }).build())
                         .build())
                 .build()
         val eventID = EventID.newBuilder().setId("root").build()
 
-        val task = checkTask(messageFilterForCheckOrder, eventID, streams)
-        task.begin()
+        checkTask(messageFilterForCheckOrder, eventID, streams).begin()
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
@@ -254,13 +246,18 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             val verificationEvents = eventList.filter { it.type == "Verification" }
             assertEquals(1, verificationEvents.size)
 
-            val eventStatus: EventStatus = if (checkRepeatingGroupOrder) {
-                FAILED
-            } else {
-                SUCCESS
-            }
-
-            assertTrue(verificationEvents.all { it.status == eventStatus})
+            assertTrue(verificationEvents.all { it.status == resultByFilter.first})
         })
+    }
+
+
+    companion object {
+        @JvmStatic
+        fun resultByFilter(): Stream<Arguments> {
+            return Stream.of(
+                Arguments.arguments(FAILED to mapOf("C" to "3".toValueFilter(), "D" to "4".toValueFilter())),
+                Arguments.arguments(SUCCESS to mapOf("A" to "1".toValueFilter(), "B" to "2".toValueFilter()))
+            )
+        }
     }
 }

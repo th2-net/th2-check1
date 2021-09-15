@@ -112,7 +112,8 @@ spec:
 
 ### 3.7.2
 
-+ Added support to verify the order of repeating groups using the `check_repeating_group_order` flag in `RootComparisonSettings`
++ Migrated sailfish-utils from `3.7.0` to `3.8.1`
+  + Now Check1 keep the order of repeating result groups by default
 
 ### 3.7.1
 
