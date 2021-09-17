@@ -1,4 +1,4 @@
-# th2 check1 (3.7.1)
+# th2 check1 (3.7.2)
 
 ## Overview
 
@@ -109,6 +109,12 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.7.2
+
+#### Changed:
++ The root event name is now shorter. The additional information about session alias and direction is moved to the event body.
+  The user's description should be displayed more clearly in the report.
 
 ### 3.7.1
 

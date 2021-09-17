@@ -98,7 +98,8 @@ class SequenceCheckRuleTask(
 
     init {
         rootEvent
-            .name("Check sequence rule $sessionKey")
+            .name("Check sequence rule")
+            .bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
             .type("checkSequenceRule")
     }
 
