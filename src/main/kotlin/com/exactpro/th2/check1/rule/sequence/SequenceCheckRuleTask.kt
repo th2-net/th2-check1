@@ -71,7 +71,7 @@ class SequenceCheckRuleTask(
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
-        converter.fromProtoPreFilter(protoPreMessageFilter, PRE_FILTER_MESSAGE_NAME),
+        converter.fromProtoPreFilter(protoPreMessageFilter),
         protoPreMessageFilter.toCompareSettings()
     )
     private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
@@ -85,23 +85,14 @@ class SequenceCheckRuleTask(
     /**
      * List of filters which haven't matched yet. It is created from the requested filters and reduced after every match
      */
-    private var messageFilters: MutableList<MessageFilterContainer> = protoMessageFilters.map {
-        MessageFilterContainer(
-                it,
-                SailfishFilter(converter.fromProtoPreFilter(it, it.messageType), it.toCompareSettings()),
-                it.metadataFilterOrNull()?.let { metadataFilter ->
-                    SailfishFilter(converter.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
-                            metadataFilter.toComparisonSettings())
-                }
-        )
-    }.toMutableList()
+    private lateinit var messageFilters: MutableList<MessageFilterContainer>
 
     private lateinit var messageFilteringResults: MutableMap<MessageID, ComparisonContainer>
 
     private lateinit var preFilterEvent: Event
 
     private var reordered: Boolean = false
-    private var matchedByKeys: MutableSet<MessageFilterContainer> = HashSet(messageFilters.size)
+    private lateinit var matchedByKeys: MutableSet<MessageFilterContainer>
 
     override fun onStart() {
         super.onStart()
@@ -110,6 +101,18 @@ class SequenceCheckRuleTask(
         preFilteringResults = LinkedHashMap()
 
         messageFilteringResults = LinkedHashMap()
+        messageFilters = protoMessageFilters.map {
+            MessageFilterContainer(
+                it,
+                SailfishFilter(converter.fromProtoFilter(it.messageFilter, it.messageType), it.toCompareSettings()),
+                it.metadataFilterOrNull()?.let { metadataFilter ->
+                    SailfishFilter(converter.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
+                        metadataFilter.toComparisonSettings())
+                }
+            )
+        }.toMutableList()
+
+        matchedByKeys = HashSet(messageFilters.size)
 
         preFilterEvent = Event.start()
             .type("preFiltering")

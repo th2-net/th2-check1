@@ -1,4 +1,4 @@
-# th2 check1 (3.7.2)
+# th2 check1 (3.8.0)
 
 ## Overview
 
@@ -110,9 +110,9 @@ spec:
 
 ## Release Notes
 
-### 3.7.2
+### 3.8.0
 
-+ Added exception handling for regex operation in the message filter and pre filter
++ Added mechanism for handling exceptions when creating and executing rules which publishes events about an error that has occurred
 
 ### 3.7.1
 

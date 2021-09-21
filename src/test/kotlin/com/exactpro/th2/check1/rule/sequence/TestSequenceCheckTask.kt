@@ -14,6 +14,7 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.exception.RuleInternalException
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
@@ -45,7 +46,6 @@ import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
-import java.util.regex.PatternSyntaxException
 import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -459,35 +459,6 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     }
 
     @Test
-    fun `failed rule creation due to invalid regex operation in the pre filter`() {
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                        .mergeMetadata(MessageMetadata.newBuilder()
-                                .putProperties("keyProp", "42")
-                                .putProperties("notKeyProp", "2")
-                                .build())
-                        .build()
-        ))
-
-        val eventID = EventID.newBuilder().setId("root").build()
-
-        val preFilter = PreFilter.newBuilder()
-                .putFields("keyProp", ValueFilter.newBuilder().setSimpleFilter(".[").setKey(true).setOperation(FilterOperation.LIKE).build())
-                .build()
-
-        assertThrows<PatternSyntaxException> {
-            sequenceCheckRuleTask(parentEventID = eventID, messageStream = streams, preFilterParam = preFilter, checkOrder = false)
-        }
-
-        val eventBatches = awaitEventBatchRequest(1000L, 2)
-        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertAll({
-            assertEquals(2, eventList.size)
-            assertEquals(1, eventList.filter { it.type == "invalidRegexOperation" }.size)
-        })
-    }
-
-    @Test
     fun `failed rule creation due to invalid regex operation in the message filter`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
                 message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
@@ -506,15 +477,15 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 .setMessageFilter(messageFilter().putFields("keyProp", ValueFilter.newBuilder().setOperation(FilterOperation.LIKE).setSimpleFilter(".[").build()))
                 .build()
 
-        assertThrows<PatternSyntaxException> {
-            sequenceCheckRuleTask(parentEventID = eventID, messageStream = streams, filtersParam = listOf(filter), checkOrder = false)
+        assertThrows<RuleInternalException> {
+            sequenceCheckRuleTask(parentEventID = eventID, messageStream = streams, filtersParam = listOf(filter), checkOrder = false).begin()
         }
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertAll({
-            assertEquals(2, eventList.size)
-            assertEquals(1, eventList.filter { it.type == "invalidRegexOperation" }.size)
+            assertEquals(3, eventList.size)
+            assertEquals(1, eventList.filter { it.type == "internalError" }.size)
         })
     }
 

@@ -194,35 +194,4 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             "No failed event $eventBatch"
         }
     }
-
-    @Test
-    fun `failed rule creation due to invalid regex operation`() {
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                        .mergeMetadata(MessageMetadata.newBuilder()
-                                .putProperties("keyProp", "42")
-                                .putProperties("notKeyProp", "2")
-                                .build())
-                        .build()
-        ))
-
-        val eventID = EventID.newBuilder().setId("root").build()
-        val filter = RootMessageFilter.newBuilder()
-                .setMessageType(MESSAGE_TYPE)
-                .setMetadataFilter(MetadataFilter.newBuilder()
-                        .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
-                .setMessageFilter(messageFilter().putFields("Regex", ValueFilter.newBuilder().setOperation(FilterOperation.LIKE).setSimpleFilter(".[").build()))
-                .build()
-        
-        assertThrows<PatternSyntaxException> {
-            checkTask(filter, eventID, streams)
-        }
-
-        val eventBatches = awaitEventBatchRequest(1000L, 2)
-        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertAll({
-            assertEquals(2, eventList.size)
-            assertEquals(1, eventList.filter { it.type == "invalidRegexOperation" }.size)
-        })
-    }
 }

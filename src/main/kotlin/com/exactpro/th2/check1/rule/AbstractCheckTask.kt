@@ -22,12 +22,12 @@ import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
+import com.exactpro.th2.check1.exception.RuleInternalException
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
@@ -52,7 +52,6 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import java.util.regex.PatternSyntaxException
 
 /**
  * Implements common logic for check task.
@@ -106,7 +105,6 @@ abstract class AbstractCheckTask(
         BEGIN,
         TIMEOUT,
         COMPLETED,
-        INTERNAL_ERROR,
         PUBLISHED
     }
 
@@ -230,30 +228,48 @@ abstract class AbstractCheckTask(
         endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end("Timeout is exited") }
 
-        messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
-            .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
+        try {
+            messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
+                    .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
 
-            // All sources above will be disposed on this scheduler.
-            //
-            // This method should be called as closer as possible
-            // to the actual dispose that you want to execute on this scheduler
-            // because other operations are executed on the same single-thread scheduler.
-            //
-            // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
-            // In the worst-case scenario, it might never happen.
-            .unsubscribeOn(scheduler)
-            .continueObserve(sessionKey, sequence)
-            .doOnNext {
-                handledMessageCounter++
+                    // All sources above will be disposed on this scheduler.
+                    //
+                    // This method should be called as closer as possible
+                    // to the actual dispose that you want to execute on this scheduler
+                    // because other operations are executed on the same single-thread scheduler.
+                    //
+                    // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
+                    // In the worst-case scenario, it might never happen.
+                    .unsubscribeOn(scheduler)
+                    .continueObserve(sessionKey, sequence)
+                    .doOnNext {
+                        handledMessageCounter++
 
-                with(it.metadata.id) {
-                    rootEvent.messageID(this)
-                }
-            }
-            .mapToMessageContainer()
-            .taskPipeline()
-            .subscribe(this)
+                        with(it.metadata.id) {
+                            rootEvent.messageID(this)
+                        }
+                    }
+                    .mapToMessageContainer()
+                    .taskPipeline()
+                    .subscribe(this)
+        } catch (exception: Exception) {
+            val initialException = getInitialException(exception)
+            rootEvent.addSubEventWithSamePeriod()
+                    .name("An error occurred while executing rule")
+                    .type("internalError")
+                    .status(FAILED)
+                    .bodyData(EventUtils.createMessageBean(initialException.message))
+            taskFinished()
+            throw RuleInternalException("An internal error occurred while executing rule", initialException)
+        }
     }
+
+    private fun getInitialException(exception: Exception): Throwable =
+            if (exception is NullPointerException) {
+                exception.cause ?: exception
+            } else {
+                exception
+            }
 
     private fun taskFinished() {
         try {
@@ -325,9 +341,7 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            if (prevState != State.INTERNAL_ERROR) {
-                completeEvent(prevState == State.TIMEOUT)
-            }
+            tryToCompleteEvent(prevState)
             _endTime = Instant.now()
 
             val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
@@ -347,6 +361,18 @@ abstract class AbstractCheckTask(
             }
         } else {
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
+        }
+    }
+
+    private fun tryToCompleteEvent(prevState: State) {
+        try {
+            completeEvent(prevState == State.TIMEOUT)
+        } catch (e: Exception) {
+            rootEvent.addSubEventWithSamePeriod()
+                    .name("Event cannot be completed")
+                    .type("eventNotComplete")
+                    .bodyData(EventUtils.createMessageBean(e.message))
+                    .status(FAILED)
         }
     }
 
@@ -474,18 +500,7 @@ abstract class AbstractCheckTask(
 
     protected fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter,
                                                               messageName: String = protoPreMessageFilter.messageType): IMessage {
-        try {
-            return fromProtoFilter(protoPreMessageFilter.messageFilter, messageName)
-        } catch (e: PatternSyntaxException) {
-            rootEvent.addSubEventWithSamePeriod()
-                    .name("An error occurred while converting message filter. Invalid regex operation")
-                    .type("invalidRegexOperation")
-                    .bodyData(MessageBuilder().text(e.message).build())
-                    .status(FAILED)
-            taskState.set(State.INTERNAL_ERROR)
-            publishEvent()
-            throw e
-        }
+        return fromProtoFilter(protoPreMessageFilter.messageFilter, messageName)
     }
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
