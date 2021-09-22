@@ -140,9 +140,9 @@ class CollectorService(
     }
 
     private fun MessageFilter.toRootMessageFilter(): RootMessageFilter {
+        check(this.messageType.isNotEmpty()) { "Rule cannot be executed because the message filter does not contain 'message type'" }
         return RootMessageFilter.newBuilder()
             .setMessageType(this.messageType).also {
-                check(this.messageType.isNotEmpty()) { "Rule cannot be executed because the message filter does not contain 'message type'" }
                 logger.info("Rule used a message type '${this.messageType}' from the message filter")
             }
             .setComparisonSettings(this.comparisonSettings.toRootComparisonSettings())
