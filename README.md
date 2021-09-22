@@ -1,4 +1,4 @@
-# th2 check1 (3.7.2)
+# th2 check1 (3.8.0)
 
 ## Overview
 
@@ -109,6 +109,9 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.8.0
++ Update common library and sailfish-utils versions for new filter SimpleList usage
 
 ### 3.7.2
 
