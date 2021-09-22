@@ -1,4 +1,4 @@
-# th2 check1 (3.7.2)
+# th2 check1 (3.7.3)
 
 ## Overview
 
@@ -110,10 +110,16 @@ spec:
 
 ## Release Notes
 
-### 3.7.2
+### 3.7.3
 
 + Migrated common version from `3.25.0` to `3.25.2`
   + Added support for converting SimpleList to readable payload body
+
+### 3.7.2
+
+#### Changed:
++ The root event name is now shorter. The additional information about session alias and direction is moved to the event body.
+  The user's description should be displayed more clearly in the report.
 
 ### 3.7.1
 
