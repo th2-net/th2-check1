@@ -1,4 +1,4 @@
-# th2 check1 (3.7.1)
+# th2 check1 (3.7.2)
 
 ## Overview
 
@@ -109,6 +109,11 @@ spec:
 ```
 
 ## Release Notes
+
+### 3.7.2
+
++ Migrated common version from `3.25.0` to `3.25.2`
+  + Added support for converting SimpleList to readable payload body
 
 ### 3.7.1
 
