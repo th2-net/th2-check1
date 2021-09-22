@@ -17,12 +17,14 @@ import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.util.toSimpleFilter
+import com.exactpro.th2.common.event.bean.Verification
+import com.exactpro.th2.common.event.bean.VerificationStatus
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
-import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.EventStatus.FAILED
+import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.ListValueFilter
 import com.exactpro.th2.common.grpc.MessageFilter
@@ -36,17 +38,17 @@ import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.listValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import io.reactivex.Observable
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
-import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.MethodSource
 import java.time.Instant
 import java.util.stream.Stream
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     private fun checkTask(
@@ -204,19 +206,20 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         }
     }
 
-    @ParameterizedTest(name = "keepRepeatingGroupResult = {0}")
-    @MethodSource("resultByFilter")
-    fun `check that the order is kept in repeating groups`(resultByFilter: Pair<EventStatus, Map<String, ValueFilter>>) {
+    @Test
+    fun `check that the order is kept in repeating groups`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
                 message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                         .putFields("legs", listValue()
                                 .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                                         .putAllFields(mapOf(
-                                                "A" to "1".toValue(), "B" to "2".toValue()
+                                                "A" to "1".toValue(),
+                                                "B" to "1".toValue()
                                         )))
                                 .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
                                         .putAllFields(mapOf(
-                                                "C" to "3".toValue(), "D" to "4".toValue()
+                                                "A" to "2".toValue(),
+                                                "B" to "2".toValue()
                                         )))
                                 .toValue())
                         .build()
@@ -229,8 +232,17 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                                 .setListFilter(ListValueFilter.newBuilder().apply {
                                     addValues(ValueFilter.newBuilder()
                                             .setMessageFilter(MessageFilter.newBuilder()
-                                                    .putAllFields(resultByFilter.second).build())
+                                                    .putAllFields(mapOf(
+                                                            "A" to "2".toValueFilter(),
+                                                            "B" to "2".toValueFilter()
+                                                    )).build())
                                             .build())
+                                    addValues(ValueFilter.newBuilder()
+                                            .setMessageFilter(MessageFilter.newBuilder()
+                                                    .putAllFields(mapOf(
+                                                            "A" to "1".toValueFilter(),
+                                                            "B" to "3".toValueFilter()
+                                                    )).build()))
                                 }).build())
                         .build())
                 .build()
@@ -243,10 +255,34 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertAll({
             assertEquals(3, eventList.size)
         }, {
-            val verificationEvents = eventList.filter { it.type == "Verification" }
-            assertEquals(1, verificationEvents.size)
+            val verificationEvent = eventList.find { it.type == "Verification" }
+            assertNotNull(verificationEvent) { "Missed verification event" }
 
-            assertTrue(verificationEvents.all { it.status == resultByFilter.first})
+            val verification = jacksonObjectMapper().readValue<List<Verification>>(verificationEvent.body.toByteArray()).firstOrNull()
+            assertNotNull(verification) { "Verification event does not contain the verification" }
+            val actualLegs = verification.fields["legs"]?.fields?.values?.toList()
+            assertNotNull(actualLegs) { "Actual legs is missed" }
+
+            val expectedLegs = linkedMapOf(
+                    0 to linkedMapOf(
+                            "A" to VerificationStatus.PASSED,
+                            "B" to VerificationStatus.FAILED
+                    ),
+                    1 to linkedMapOf(
+                            "A" to VerificationStatus.PASSED,
+                            "B" to VerificationStatus.PASSED
+                    )
+            )
+
+            expectedLegs.forEach { (leg, verificationEntryByField) ->
+                val actualLeg = actualLegs[leg].fields
+                assertNotNull(actualLeg) { "The validation event does not contain the expected leg" }
+                verificationEntryByField.forEach { (field, status) ->
+                    val expectedVerificationEntry = actualLeg[field]
+                    assertNotNull(expectedVerificationEntry) { "Actual leg does not contain the expected field" }
+                    assertEquals(status, expectedVerificationEntry.status)
+                }
+            }
         })
     }
 
