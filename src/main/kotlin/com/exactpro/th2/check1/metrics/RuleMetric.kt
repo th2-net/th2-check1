@@ -16,7 +16,7 @@ package com.exactpro.th2.check1.metrics
 import io.prometheus.client.Gauge
 
 object RuleMetric {
-    private val ACTIVE_TASK_COUNTER = Gauge.build("th2_check1_active_tasks_count", "Current active tasks count in execution").register()
+    private val ACTIVE_TASK_COUNTER = Gauge.build("th2_check1_active_tasks_number", "Current active tasks number in execution").register()
 
     fun incrementActiveRule() {
         ACTIVE_TASK_COUNTER.inc()
