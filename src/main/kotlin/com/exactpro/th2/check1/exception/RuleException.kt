@@ -13,7 +13,7 @@
 
 package com.exactpro.th2.check1.exception
 
-class RuleInternalException : RuleException {
+open class RuleException : Exception {
     constructor() : super()
     constructor(message: String) : super(message)
     constructor(message: String, cause: Throwable) : super(message, cause)

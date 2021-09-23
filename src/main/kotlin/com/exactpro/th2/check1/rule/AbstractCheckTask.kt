@@ -43,6 +43,7 @@ import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.disposables.Disposable
+import io.reactivex.exceptions.UndeliverableException
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.SingleSubject
 import java.time.Instant
@@ -254,19 +255,20 @@ abstract class AbstractCheckTask(
                     .subscribe(this)
         } catch (exception: Exception) {
             val initialException = getInitialException(exception)
+            LOGGER.error("An internal error occurred while executing rule", exception)
             rootEvent.addSubEventWithSamePeriod()
                     .name("An error occurred while executing rule")
                     .type("internalError")
                     .status(FAILED)
-                    .bodyData(EventUtils.createMessageBean(initialException.message))
+                    .exception(exception, true)
             taskFinished()
             throw RuleInternalException("An internal error occurred while executing rule", initialException)
         }
     }
 
     private fun getInitialException(exception: Exception): Throwable =
-            if (exception is NullPointerException) {
-                exception.cause ?: exception
+            if (exception.message == "Actually not, but can't throw other exceptions due to RS" || exception is UndeliverableException) {
+                exception.cause!!
             } else {
                 exception
             }
@@ -341,7 +343,7 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            tryToCompleteEvent(prevState)
+            completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
             val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
@@ -364,13 +366,15 @@ abstract class AbstractCheckTask(
         }
     }
 
-    private fun tryToCompleteEvent(prevState: State) {
+    private fun completeEventOrReportError(prevState: State) {
         try {
             completeEvent(prevState == State.TIMEOUT)
         } catch (e: Exception) {
+            LOGGER.error("Result event cannot be completed", e)
             rootEvent.addSubEventWithSamePeriod()
-                    .name("Event cannot be completed")
+                    .name("Check result event cannot build completely")
                     .type("eventNotComplete")
+                    .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
                     .bodyData(EventUtils.createMessageBean(e.message))
                     .status(FAILED)
         }

@@ -13,9 +13,9 @@
 
 package com.exactpro.th2.check1.exception
 
-class RuleCreationException : Exception {
+class RuleCreationException : RuleException {
     constructor() : super()
     constructor(message: String) : super(message)
-    constructor(message: String, cause: Throwable?) : super(message, cause)
+    constructor(message: String, cause: Throwable) : super(message, cause)
     constructor(cause: Throwable) : super(cause)
 }

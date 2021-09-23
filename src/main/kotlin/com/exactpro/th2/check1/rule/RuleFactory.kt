@@ -75,7 +75,7 @@ class RuleFactory(
                     )
                 }
                 onErrorEvent(request.parentEventId) {
-                    Event.from(Instant.now())
+                    Event.start()
                             .name("Check rule cannot be created")
                             .type("checkRuleCreation")
                 }
@@ -113,7 +113,7 @@ class RuleFactory(
                     )
                 }
                 onErrorEvent(request.parentEventId) {
-                    Event.from(Instant.now())
+                    Event.start()
                             .name("Sequence check rule cannot be created")
                             .type("sequenceCheckRuleCreation")
                 }
