@@ -30,20 +30,14 @@ import com.google.protobuf.Timestamp
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
-import org.junit.jupiter.api.assertThrows
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.MethodSource
 import java.time.Instant
-import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class TestNoMessageCheckTask : AbstractCheckTaskTest() {
-    @ParameterizedTest(name = "TaskTimeout = {0}")
-    @MethodSource("taskTimeouts")
-    fun `no messages outside the prefilter`(taskTimeout: TaskTimeout) {
+    @Test
+    fun `no messages outside the prefilter`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(
             messages = createMessages(
@@ -63,7 +57,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             eventID,
             streams,
             createPreFilter("E", "5", FilterOperation.EQUAL),
-            taskTimeout
+            TaskTimeout(5000L, 1500L)
         )
         task.begin(createCheckpoint(checkpointTimestamp, 1))
 
@@ -182,60 +176,6 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         })
     }
 
-    @Test
-    fun `rule cannot be create due to missed timeout and message timeout`() {
-        val checkpointTimestamp = Instant.now()
-        val streams = createStreams(
-                messages = createMessages(
-                        MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
-                        MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
-                        MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
-                        MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 1300)),
-                        MessageData("D", "4".toValue(), getMessageTimestamp(checkpointTimestamp, 1500)),
-                        MessageData("E", "5".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
-                        // should be skipped because of message timeout
-                        MessageData("F", "6".toValue(), getMessageTimestamp(checkpointTimestamp, 1600))
-                )
-        )
-
-        val exception = assertThrows<IllegalArgumentException> {
-            noMessageCheckTask(
-                    createEvent("root"),
-                    streams,
-                    createPreFilter("E", "5", FilterOperation.EQUAL),
-                    TaskTimeout(0)
-            ).begin(createCheckpoint(checkpointTimestamp, 1))
-        }
-        assertEquals("Timeout cannot be calculated because 'timeout' and 'message timeout' is not specified or negative", exception.message)
-    }
-
-    @Test
-    fun `rule cannot be create because specified timeout less than message timeout`() {
-        val checkpointTimestamp = Instant.now()
-        val streams = createStreams(
-                messages = createMessages(
-                        MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
-                        MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
-                        MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
-                        MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 1300)),
-                        MessageData("D", "4".toValue(), getMessageTimestamp(checkpointTimestamp, 1500)),
-                        MessageData("E", "5".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
-                        // should be skipped because of message timeout
-                        MessageData("F", "6".toValue(), getMessageTimestamp(checkpointTimestamp, 1600))
-                )
-        )
-
-        val exception = assertThrows<IllegalArgumentException> {
-            noMessageCheckTask(
-                    createEvent("root"),
-                    streams,
-                    createPreFilter("E", "5", FilterOperation.EQUAL),
-                    TaskTimeout(1000, 5000)
-            ).begin(createCheckpoint(checkpointTimestamp, 1))
-        }
-        assertEquals("The 'timeout' should be greater than the 'message timeout'", exception.message)
-    }
-
 
     private fun createMessages(
         vararg messageData: MessageData,
@@ -271,15 +211,6 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         )
     }
 
-    companion object {
-        @JvmStatic
-        fun taskTimeouts(): Stream<Arguments> {
-            return Stream.of(
-                    Arguments.arguments(TaskTimeout(5000, 1500)), // with timeout and message timeout
-                    Arguments.arguments(TaskTimeout(0, 1500)) // with message timeout and missed timeout
-            )
-        }
-    }
 
     data class MessageData(val fieldName: String, val value: Value, val timestamp: Timestamp)
 }

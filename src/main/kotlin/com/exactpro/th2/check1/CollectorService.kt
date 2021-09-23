@@ -70,6 +70,7 @@ class CollectorService(
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
     private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
+    private val defaultRuleExecutionTimeout = configuration.ruleExecutionTimeout
 
     init {
         val limitSize = configuration.messageCacheSize
@@ -104,9 +105,17 @@ class CollectorService(
 
         val chainID = request.getChainIdOrGenerate()
 
-        val task = CheckRuleTask(request.description, Instant.now(), sessionKey,
-            TaskTimeout(request.timeout, request.messageTimeout), maxEventBatchContentSize,
-            filter, parentEventID, streamObservable, eventBatchRouter)
+        val task = CheckRuleTask(
+                request.description,
+                Instant.now(),
+                sessionKey,
+                createTaskTimeout(request.timeout, request.messageTimeout),
+                maxEventBatchContentSize,
+                filter,
+                parentEventID,
+                streamObservable,
+                eventBatchRouter
+        )
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -137,10 +146,20 @@ class CollectorService(
         } else {
             request.messageFiltersList.map { it.toRootMessageFilter() }
         }
-        
-        val task = SequenceCheckRuleTask(request.description, Instant.now(), sessionKey,
-            TaskTimeout(request.timeout, request.messageTimeout), maxEventBatchContentSize, request.preFilter,
-            protoMessageFilters, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
+
+        val task = SequenceCheckRuleTask(
+                request.description,
+                Instant.now(),
+                sessionKey,
+                createTaskTimeout(request.timeout, request.messageTimeout),
+                maxEventBatchContentSize,
+                request.preFilter,
+                protoMessageFilters,
+                request.checkOrder,
+                parentEventID,
+                streamObservable,
+                eventBatchRouter
+        )
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -164,7 +183,7 @@ class CollectorService(
             request.description,
             Instant.now(),
             sessionKey,
-            TaskTimeout(request.timeout, request.messageTimeout),
+            createTaskTimeout(request.timeout, request.messageTimeout),
             maxEventBatchContentSize,
             request.preFilter,
             parentEventID,
@@ -328,9 +347,9 @@ class CollectorService(
         check(checkpoint !== GrpcCheckpoint.getDefaultInstance()) { "Request doesn't contain a checkpoint" }
         with(sessionKey) {
             val directionCheckpoint = checkpoint.sessionAliasToDirectionCheckpointMap[sessionAlias]
-            check(directionCheckpoint != null) { "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'" }
+            checkNotNull(directionCheckpoint) { "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'" }
             val checkpointData = directionCheckpoint.directionToCheckpointDataMap[direction.number]
-            check(checkpointData != null) { "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'" }
+            checkNotNull(checkpointData) { "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'" }
             with(checkpointData) {
                 check(sequence > 0L) { "The checkpoint data has incorrect sequence number '$sequence'" }
                 check(this.hasTimestamp()) { "The checkpoint data doesn't contain timestamp" }
@@ -343,5 +362,15 @@ class CollectorService(
             messageTimeout > 0 -> checkpointCheckAction()
             messageTimeout < 0 -> error("Message timeout cannot be negative")
         }
+    }
+
+    private fun createTaskTimeout(timeout: Long, messageTimeout: Long): TaskTimeout {
+        val newRuleTimeout = if (timeout <= 0) {
+            logger.info("Rule execution timeout is less than or equal to zero, used default rule execution timeout '$defaultRuleExecutionTimeout'")
+            defaultRuleExecutionTimeout
+        } else {
+            timeout
+        }
+        return TaskTimeout(newRuleTimeout, messageTimeout)
     }
 }

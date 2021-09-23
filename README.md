@@ -68,7 +68,8 @@ This block describes the configuration for check1.
   "message-cache-size": 1000,
   "cleanup-older-than": 60,
   "cleanup-time-unit": "SECONDS",
-  "max-event-batch-content-size": "1048576"
+  "max-event-batch-content-size": "1048576",
+  "rule-execution-timeout": 5000
 }
 ```
 
@@ -113,7 +114,9 @@ spec:
 
 ### 3.8.0
 
+#### Added:
 + Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
++ New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
 
 ### 3.7.2
 

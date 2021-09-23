@@ -256,7 +256,7 @@ abstract class AbstractCheckTask(
         this.isDefaultSequence = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
 
-        endFuture = Single.timer(taskTimeout.getOrCalculateTimeout(checkpointTimestamp), MILLISECONDS, Schedulers.computation())
+        endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end(State.TIMEOUT, "Timeout is exited") }
 
         messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
@@ -611,29 +611,6 @@ abstract class AbstractCheckTask(
         } else {
             null
         }
-
-    private fun TaskTimeout.getOrCalculateTimeout(checkpointTimestamp: Timestamp?): Long {
-        if (timeout > 0L) {
-            if (messageTimeout > 0L) {
-                require(timeout > messageTimeout) { "The 'timeout' should be greater than the 'message timeout'" }
-            }
-            return timeout
-        }
-        require(messageTimeout > 0) {
-            "Timeout cannot be calculated because 'timeout' and 'message timeout' is not specified or negative"
-        }
-        checkNotNull(checkpointTimestamp) { "Timeout cannot be calculated because 'checkpoint timestamp' is not specified" }
-        val timestampDiff = Timestamps.between(Instant.now().toTimestamp(), checkpointTimestamp)
-        val durationDiff = Durations.subtract(Durations.fromMillis(timeout), timestampDiff)
-        val newTimeout = Durations.toMillis(durationDiff)
-        return if (newTimeout < 0) {
-            DEFAULT_TASK_TIMEOUT
-        } else if (newTimeout < 1000L) {
-            1000L
-        } else {
-            newTimeout
-        }
-    }
 
 
     private data class Legacy(val executorService: ExecutorService, val sequenceData: SequenceData)
