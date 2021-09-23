@@ -83,6 +83,7 @@ abstract class AbstractCheckTask(
         Event.from(submitTime)
                 .name(name())
                 .type(type())
+                .bodyData(EventUtils.createMessageBean(eventBody()))
                 .description(description)
     }
 
@@ -208,6 +209,7 @@ abstract class AbstractCheckTask(
 
     protected abstract fun name(): String
     protected abstract fun type(): String
+    protected abstract fun eventBody(): String
 
     /**
      * Observe a message sequence from the previous task.

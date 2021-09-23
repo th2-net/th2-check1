@@ -87,7 +87,9 @@ class CheckRuleTask(
             .status(FAILED)
     }
 
-    override fun name(): String = "Check rule $sessionKey"
+    override fun name(): String = "Check rule"
 
     override fun type(): String = "Check rule"
+
+    override fun eventBody(): String = "Check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)" }}"
 }

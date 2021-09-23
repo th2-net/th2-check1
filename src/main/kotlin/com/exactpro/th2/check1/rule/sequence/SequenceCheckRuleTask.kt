@@ -182,10 +182,12 @@ class SequenceCheckRuleTask(
         fillCheckMessagesEvent()
     }
 
-    override fun name(): String = "Check sequence rule $sessionKey"
+    override fun name(): String = "Check sequence rule"
 
     override fun type(): String = "checkSequenceRule"
 
+    override fun eventBody(): String = "Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"
+    
     /**
      * Creates events for check messages
      */
