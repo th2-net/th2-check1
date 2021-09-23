@@ -125,6 +125,12 @@ The `th2_check1_actual_cache_size` and `th2_check1_active_tasks_count` metrics s
 + Added memory volume metric for cache monitoring such as actual buffer count and size
 + Added metric for monitoring active rules count
 
+### 3.7.2
+
+#### Changed:
++ The root event name is now shorter. The additional information about session alias and direction is moved to the event body.
+  The user's description should be displayed more clearly in the report.
+
 ### 3.7.1
 
 + Migrated common version from `3.23.0` to `3.25.0`

@@ -22,6 +22,8 @@ import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil.METADATA_MESSAGE_NAME
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
+import com.exactpro.th2.common.event.EventUtils
+import com.exactpro.th2.common.event.EventUtils.createMessageBean
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -58,7 +60,8 @@ class CheckRuleTask(
 
     init {
         rootEvent
-            .name("Check rule $sessionKey")
+            .name("Check rule")
+            .bodyData(createMessageBean("Check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
             .type("Check rule")
     }
 
