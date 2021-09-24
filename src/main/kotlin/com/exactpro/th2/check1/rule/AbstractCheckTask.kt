@@ -256,7 +256,6 @@ abstract class AbstractCheckTask(
                     .taskPipeline()
                     .subscribe(this)
         } catch (exception: Exception) {
-            val initialException = getInitialException(exception)
             LOGGER.error("An internal error occurred while executing rule", exception)
             rootEvent.addSubEventWithSamePeriod()
                     .name("An error occurred while executing rule")
@@ -264,16 +263,9 @@ abstract class AbstractCheckTask(
                     .status(FAILED)
                     .exception(exception, true)
             taskFinished()
-            throw RuleInternalException("An internal error occurred while executing rule", initialException)
+            throw RuleInternalException("An internal error occurred while executing rule", exception)
         }
     }
-
-    private fun getInitialException(exception: Exception): Throwable =
-            if (exception.message == "Actually not, but can't throw other exceptions due to RS" || exception is UndeliverableException) {
-                exception.cause!!
-            } else {
-                exception
-            }
 
     private fun taskFinished() {
         try {
