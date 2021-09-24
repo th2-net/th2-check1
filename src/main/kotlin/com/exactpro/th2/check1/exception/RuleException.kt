@@ -13,9 +13,8 @@
 
 package com.exactpro.th2.check1.exception
 
-open class RuleException : Exception {
-    constructor() : super()
-    constructor(message: String) : super(message)
-    constructor(message: String, cause: Throwable) : super(message, cause)
-    constructor(cause: Throwable) : super(cause)
-}
+open class RuleException @JvmOverloads constructor(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
+class RuleCreationException @JvmOverloads constructor(message: String? = null, cause: Throwable? = null) : RuleException(message, cause)
+
+class RuleInternalException @JvmOverloads constructor(message: String? = null, cause: Throwable? = null) : RuleException(message, cause)

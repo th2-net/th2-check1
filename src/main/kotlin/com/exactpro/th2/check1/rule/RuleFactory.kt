@@ -22,7 +22,6 @@ import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.common.event.Event
-import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.grpc.ComparisonSettings
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
@@ -40,13 +39,13 @@ import java.time.Instant
 import java.util.concurrent.ForkJoinPool
 
 class RuleFactory(
-        private val maxEventBatchContentSize: Int,
-        private val streamObservable: Observable<StreamContainer>,
-        private val eventBatchRouter: MessageRouter<EventBatch>
+    private val maxEventBatchContentSize: Int,
+    private val streamObservable: Observable<StreamContainer>,
+    private val eventBatchRouter: MessageRouter<EventBatch>
 ) {
 
     fun createCheckRule(request: CheckRuleRequest): CheckRuleTask =
-            ruleCreation(request) {
+            ruleCreation(request, request.parentEventId) {
                 checkAndCreateRule { request ->
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
@@ -74,7 +73,7 @@ class RuleFactory(
                             eventBatchRouter
                     )
                 }
-                onErrorEvent(request.parentEventId) {
+                onErrorEvent {
                     Event.start()
                             .name("Check rule cannot be created")
                             .type("checkRuleCreation")
@@ -82,7 +81,7 @@ class RuleFactory(
             }
 
     fun createSequenceCheckRule(request: CheckSequenceRuleRequest): SequenceCheckRuleTask =
-            ruleCreation(request) {
+            ruleCreation(request, request.parentEventId) {
                 checkAndCreateRule { request ->
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
@@ -112,7 +111,7 @@ class RuleFactory(
                             eventBatchRouter
                     )
                 }
-                onErrorEvent(request.parentEventId) {
+                onErrorEvent {
                     Event.start()
                             .name("Sequence check rule cannot be created")
                             .type("sequenceCheckRuleCreation")
@@ -120,7 +119,7 @@ class RuleFactory(
             }
 
 
-    private fun <T : GeneratedMessageV3, R : AbstractCheckTask> ruleCreation(request: T, block: RuleCreationContext<T, R>.() -> Unit): R {
+    private inline fun <T : GeneratedMessageV3, R : AbstractCheckTask> ruleCreation(request: T, parentEventId: EventID, block: RuleCreationContext<T, R>.() -> Unit): R {
         val ruleCreationContext = RuleCreationContext<T, R>().apply(block)
         try {
             return ruleCreationContext.action(request)
@@ -131,9 +130,9 @@ class RuleFactory(
             rootEvent.addSubEventWithSamePeriod()
                     .name("An error occurred while creating rule")
                     .type("ruleCreationException")
-                    .bodyData(MessageBuilder().text(e.message).build())
+                    .exception(e, true)
                     .status(Event.Status.FAILED)
-            publishEvents(rootEvent, ruleCreationContext.eventID)
+            publishEvents(rootEvent, parentEventId)
             throw RuleCreationException("An error occurred while creating rule", e)
         }
     }
@@ -175,14 +174,7 @@ class RuleFactory(
         }
     }
 
-    companion object {
-        @JvmField
-        val LOGGER: Logger = KotlinLogging.logger { }
-        private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
-    }
-
     private class RuleCreationContext<T : GeneratedMessageV3, R : AbstractCheckTask> {
-        var eventID: EventID = EventID.getDefaultInstance()
         lateinit var action: (T) -> R
         lateinit var event: () -> Event
 
@@ -190,9 +182,14 @@ class RuleFactory(
             action = block
         }
 
-        fun onErrorEvent(parentEventId: EventID, block: () -> Event) {
-            eventID = parentEventId
+        fun onErrorEvent(block: () -> Event) {
             event = block
         }
+    }
+
+    companion object {
+        @JvmField
+        val LOGGER: Logger = KotlinLogging.logger { }
+        private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
     }
 }
