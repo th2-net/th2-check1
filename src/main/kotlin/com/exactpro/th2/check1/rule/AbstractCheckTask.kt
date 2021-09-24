@@ -213,7 +213,7 @@ abstract class AbstractCheckTask(
      * @throws IllegalStateException when method is called more than once.
      */
     private fun begin(sequence: Long = DEFAULT_SEQUENCE, executorService: ExecutorService = createExecutorService()) {
-        completeRootEvent()
+        configureRootEvent()
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
@@ -368,7 +368,7 @@ abstract class AbstractCheckTask(
         }
     }
 
-    private fun completeRootEvent() {
+    private fun configureRootEvent() {
         rootEvent.name(name()).type(type())
         setup(rootEvent)
     }
