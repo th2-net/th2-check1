@@ -78,13 +78,7 @@ abstract class AbstractCheckTask(
     protected var handledMessageCounter: Long = 0
 
     protected val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
-    protected val rootEvent: Event by lazy {
-        Event.from(submitTime)
-                .name(name())
-                .type(type())
-                .bodyData(EventUtils.createMessageBean(eventBody()))
-                .description(description)
-    }
+    protected val rootEvent: Event = Event.from(submitTime).description(description)
 
     private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
@@ -208,7 +202,7 @@ abstract class AbstractCheckTask(
 
     protected abstract fun name(): String
     protected abstract fun type(): String
-    protected abstract fun eventBody(): String
+    protected abstract fun setup(rootEvent: Event)
 
     /**
      * Observe a message sequence from the previous task.
@@ -219,6 +213,7 @@ abstract class AbstractCheckTask(
      * @throws IllegalStateException when method is called more than once.
      */
     private fun begin(sequence: Long = DEFAULT_SEQUENCE, executorService: ExecutorService = createExecutorService()) {
+        completeRootEvent()
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
@@ -371,6 +366,11 @@ abstract class AbstractCheckTask(
                     .bodyData(EventUtils.createMessageBean(e.message))
                     .status(FAILED)
         }
+    }
+
+    private fun completeRootEvent() {
+        rootEvent.name(name()).type(type())
+        setup(rootEvent)
     }
 
     protected fun matchFilter(
