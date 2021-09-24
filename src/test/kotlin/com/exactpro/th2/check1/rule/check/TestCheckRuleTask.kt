@@ -285,15 +285,4 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             }
         })
     }
-
-
-    companion object {
-        @JvmStatic
-        fun resultByFilter(): Stream<Arguments> {
-            return Stream.of(
-                Arguments.arguments(FAILED to mapOf("C" to "3".toValueFilter(), "D" to "4".toValueFilter())),
-                Arguments.arguments(SUCCESS to mapOf("A" to "1".toValueFilter(), "B" to "2".toValueFilter()))
-            )
-        }
-    }
 }
