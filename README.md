@@ -111,7 +111,7 @@ spec:
 ## Release Notes
 
 ### 3.8.0
-+ Update common library and sailfish-utils versions for new filter SimpleList usage
++ Update common library from `3.25.0` to `3.26.0` and sailfish-utils from `3.7.0` to `3.9.0` versions for new filter SimpleList usage.
 
 ### 3.7.2
 

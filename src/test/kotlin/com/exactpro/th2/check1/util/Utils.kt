@@ -15,9 +15,19 @@ package com.exactpro.th2.check1.util
 
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.MetadataFilter
+import com.exactpro.th2.common.grpc.SimpleList
 
 fun String.toSimpleFilter(op: FilterOperation, key: Boolean = false): MetadataFilter.SimpleFilter = MetadataFilter.SimpleFilter.newBuilder()
     .setOperation(op)
     .setValue(this)
     .setKey(key)
     .build()
+
+fun List<String>.toSimpleFilter(op: FilterOperation, key: Boolean = false): MetadataFilter.SimpleFilter = MetadataFilter.SimpleFilter.newBuilder()
+    .setOperation(op)
+    .setSimpleList(SimpleList.newBuilder()
+        .addAllSimpleValues(this)
+        .build())
+    .setKey(key)
+    .build()
+

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow;
+import com.exactpro.th2.common.grpc.FilterOperation;
 import com.exactpro.th2.common.grpc.MessageFilter;
 import com.exactpro.th2.common.grpc.MessageMetadata;
 import com.exactpro.th2.common.grpc.MetadataFilter;
@@ -142,6 +143,9 @@ public class CheckSequenceUtils {
 
     private static String getKeyFields(String name, SimpleFilter valueFilter) {
         if (valueFilter.getKey()) {
+            if (valueFilter.hasSimpleList() && (valueFilter.getOperation() == FilterOperation.IN || valueFilter.getOperation() == FilterOperation.NOT_IN)) {
+                return ", " + name + '=' + valueFilter.getSimpleList();
+            }
             return ", " + name + '=' + valueFilter.getValue();
         }
         return "";
