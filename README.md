@@ -1,4 +1,4 @@
-# th2 check1 (3.7.3)
+# th2 check1 (3.8.0)
 
 ## Overview
 
@@ -110,7 +110,7 @@ spec:
 
 ## Release Notes
 
-### 3.7.3
+### 3.8.0
 
 + Migrated sailfish-utils from `3.7.0` to `3.8.1`
   + Now Check1 keep the order of repeating result groups by default
