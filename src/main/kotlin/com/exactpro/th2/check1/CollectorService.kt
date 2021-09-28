@@ -79,7 +79,7 @@ class CollectorService(
             .replay().apply { connect() }
 
         checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
-        
+
         ruleFactory = RuleFactory(maxEventBatchContentSize, streamObservable, eventBatchRouter)
     }
 

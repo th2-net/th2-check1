@@ -58,7 +58,7 @@ class RuleFactory(
                         request.rootFilter
                     } else {
                         request.filter.toRootMessageFilter()
-                    }
+                    }.also { it.validateRootMessageFilter() }
                     val direction = directionOrDefault(request.direction)
 
                     CheckRuleTask(
@@ -95,7 +95,7 @@ class RuleFactory(
 
                     val protoMessageFilters: List<RootMessageFilter> = request.rootMessageFiltersList.ifEmpty {
                         request.messageFiltersList.map { it.toRootMessageFilter() }
-                    }
+                    }.onEach { it.validateRootMessageFilter() }
 
                     SequenceCheckRuleTask(
                             request.description,
@@ -143,6 +143,10 @@ class RuleFactory(
                 .setComparisonSettings(this.comparisonSettings.toRootComparisonSettings())
                 .setMessageFilter(this)
                 .build()
+    }
+
+    private fun RootMessageFilter.validateRootMessageFilter() {
+        check(this.messageType.isNotBlank()) { "Rule cannot be executed because the message filter does not contain 'message type'" }
     }
 
     private fun ComparisonSettings.toRootComparisonSettings(): RootComparisonSettings {
