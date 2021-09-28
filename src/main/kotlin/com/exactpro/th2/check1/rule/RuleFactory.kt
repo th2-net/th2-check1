@@ -55,7 +55,7 @@ class RuleFactory(
                         "Either old filter or root filter must be set"
                     }
                     val filter: RootMessageFilter = if (request.hasRootFilter()) {
-                        request.rootFilter
+                        request.rootFilter.also { checkMessageType(it.messageType) }
                     } else {
                         request.filter.toRootMessageFilter()
                     }
@@ -93,8 +93,10 @@ class RuleFactory(
                         "Either messageFilters or rootMessageFilters must be set but not both"
                     }
 
-                    val protoMessageFilters: List<RootMessageFilter> = request.rootMessageFiltersList.ifEmpty {
+                    val protoMessageFilters: List<RootMessageFilter> = if (request.rootMessageFiltersList.isEmpty()) {
                         request.messageFiltersList.map { it.toRootMessageFilter() }
+                    } else {
+                        request.rootMessageFiltersList.onEach { checkMessageType(it.messageType) }
                     }
 
                     SequenceCheckRuleTask(
@@ -138,11 +140,16 @@ class RuleFactory(
     }
 
     private fun MessageFilter.toRootMessageFilter(): RootMessageFilter {
+        checkMessageType(this.messageType)
         return RootMessageFilter.newBuilder()
                 .setMessageType(this.messageType)
                 .setComparisonSettings(this.comparisonSettings.toRootComparisonSettings())
                 .setMessageFilter(this)
                 .build()
+    }
+
+    private fun checkMessageType(messageType: String) {
+        check(messageType.isNotBlank()) { "Rule cannot be executed because the message filter does not contain 'message type'" }
     }
 
     private fun ComparisonSettings.toRootComparisonSettings(): RootComparisonSettings {
