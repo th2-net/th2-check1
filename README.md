@@ -112,7 +112,12 @@ spec:
 
 ### 3.8.0
 
+#### Added:
 + Added mechanism for handling exceptions when creating and executing rules which publishes events about an error that has occurred
+
+#### Changed:
++ Migrated common version from `3.25.0` to `3.25.2`
+  + Added support for converting SimpleList to readable payload body
 
 ### 3.7.2
 
