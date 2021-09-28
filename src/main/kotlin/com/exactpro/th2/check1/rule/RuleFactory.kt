@@ -188,8 +188,7 @@ class RuleFactory(
     }
 
     companion object {
-        @JvmField
-        val LOGGER: Logger = KotlinLogging.logger { }
+        private val LOGGER: Logger = KotlinLogging.logger { }
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
     }
 }
