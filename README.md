@@ -113,6 +113,7 @@ spec:
 ### 3.8.0
 
 #### Added:
++ Added check for positive timeout
 + Added check for required message type in the message filter
 
 #### Changed:
