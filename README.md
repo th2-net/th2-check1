@@ -108,12 +108,25 @@ spec:
         - "parsed"
 ```
 
+## Prometheus metrics
+The Check1 component publishes Prometheus metrics to observe the actual state of it
+* `th2_check1_actual_cache_number` - actual number of messages in caches
+* `th2_check1_active_tasks_number` - actual number of currently working rules
+
+The `th2_check1_actual_cache_number` metric separate messages with two labels:
+* `session_alias` - session alias of received message
+* `direction` - direction of received message
+
+The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
+
 ## Release Notes
 
 ### 3.8.0
 
 #### Added:
 + Added check for positive timeout
++ Added mechanism for handling exceptions when creating and executing rules which publishes events about an error that has occurred
++ Added metric for monitoring active rules and messages count
 + Added check for required message type in the message filter
 
 #### Changed:

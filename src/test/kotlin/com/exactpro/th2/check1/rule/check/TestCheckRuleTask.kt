@@ -26,7 +26,9 @@ import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
+import com.exactpro.th2.common.message.messageFilter
 import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue

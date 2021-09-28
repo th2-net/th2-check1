@@ -13,6 +13,7 @@
 
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
@@ -21,6 +22,8 @@ import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
+import com.exactpro.th2.check1.exception.RuleInternalException
+import com.exactpro.th2.check1.metrics.RuleMetric
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -79,8 +82,7 @@ abstract class AbstractCheckTask(
     protected var handledMessageCounter: Long = 0
 
     protected val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
-    protected val rootEvent: Event = Event.from(submitTime)
-        .description(description)
+    protected val rootEvent: Event = Event.from(submitTime).description(description)
 
     private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
@@ -202,6 +204,10 @@ abstract class AbstractCheckTask(
      */
     protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
 
+    protected abstract fun name(): String
+    protected abstract fun type(): String
+    protected abstract fun setup(rootEvent: Event)
+
     /**
      * Observe a message sequence from the previous task.
      * Task subscribe to messages stream with sequence after call.
@@ -211,10 +217,12 @@ abstract class AbstractCheckTask(
      * @throws IllegalStateException when method is called more than once.
      */
     private fun begin(sequence: Long = DEFAULT_SEQUENCE, executorService: ExecutorService = createExecutorService()) {
+        configureRootEvent()
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
+        RuleMetric.incrementActiveRule(type())
         this.lastSequence = sequence
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
@@ -222,29 +230,40 @@ abstract class AbstractCheckTask(
         endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end("Timeout is exited") }
 
-        messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
-            .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
+        try {
+            messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
+                    .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
 
-            // All sources above will be disposed on this scheduler.
-            //
-            // This method should be called as closer as possible
-            // to the actual dispose that you want to execute on this scheduler
-            // because other operations are executed on the same single-thread scheduler.
-            //
-            // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
-            // In the worst-case scenario, it might never happen.
-            .unsubscribeOn(scheduler)
-            .continueObserve(sessionKey, sequence)
-            .doOnNext {
-                handledMessageCounter++
+                    // All sources above will be disposed on this scheduler.
+                    //
+                    // This method should be called as closer as possible
+                    // to the actual dispose that you want to execute on this scheduler
+                    // because other operations are executed on the same single-thread scheduler.
+                    //
+                    // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
+                    // In the worst-case scenario, it might never happen.
+                    .unsubscribeOn(scheduler)
+                    .continueObserve(sessionKey, sequence)
+                    .doOnNext {
+                        handledMessageCounter++
 
-                with(it.metadata.id) {
-                    rootEvent.messageID(this)
-                }
-            }
-            .mapToMessageContainer()
-            .taskPipeline()
-            .subscribe(this)
+                        with(it.metadata.id) {
+                            rootEvent.messageID(this)
+                        }
+                    }
+                    .mapToMessageContainer()
+                    .taskPipeline()
+                    .subscribe(this)
+        } catch (exception: Exception) {
+            LOGGER.error("An internal error occurred while executing rule", exception)
+            rootEvent.addSubEventWithSamePeriod()
+                    .name("An error occurred while executing rule")
+                    .type("internalError")
+                    .status(FAILED)
+                    .exception(exception, true)
+            taskFinished()
+            throw RuleInternalException("An internal error occurred while executing rule", exception)
+        }
     }
 
     private fun taskFinished() {
@@ -270,6 +289,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
+            RuleMetric.decrementActiveRule(type())
             sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
         }
     }
@@ -317,7 +337,7 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            completeEvent(prevState == State.TIMEOUT)
+            completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
             val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
@@ -338,6 +358,25 @@ abstract class AbstractCheckTask(
         } else {
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
         }
+    }
+
+    private fun completeEventOrReportError(prevState: State) {
+        try {
+            completeEvent(prevState == State.TIMEOUT)
+        } catch (e: Exception) {
+            LOGGER.error("Result event cannot be completed", e)
+            rootEvent.addSubEventWithSamePeriod()
+                    .name("Check result event cannot build completely")
+                    .type("eventNotComplete")
+                    .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
+                    .bodyData(EventUtils.createMessageBean(e.message))
+                    .status(FAILED)
+        }
+    }
+
+    private fun configureRootEvent() {
+        rootEvent.name(name()).type(type())
+        setup(rootEvent)
     }
 
     protected fun matchFilter(
@@ -460,6 +499,11 @@ abstract class AbstractCheckTask(
             addSubEventWithSamePeriod()
                 .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.result.metadataResult!!)
         }
+    }
+
+    protected fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter,
+                                                              messageName: String = protoPreMessageFilter.messageType): IMessage {
+        return fromProtoFilter(protoPreMessageFilter.messageFilter, messageName)
     }
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =

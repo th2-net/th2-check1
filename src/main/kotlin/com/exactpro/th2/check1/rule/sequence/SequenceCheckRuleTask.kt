@@ -15,7 +15,6 @@
  */
 package com.exactpro.th2.check1.rule.sequence
 
-import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.CheckSequenceUtils
@@ -40,7 +39,6 @@ import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import java.time.Instant
@@ -95,13 +93,6 @@ class SequenceCheckRuleTask(
 
     private var reordered: Boolean = false
     private lateinit var matchedByKeys: MutableSet<MessageFilterContainer>
-
-    init {
-        rootEvent
-            .name("Check sequence rule")
-            .bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
-            .type("checkSequenceRule")
-    }
 
     override fun onStart() {
         super.onStart()
@@ -191,6 +182,14 @@ class SequenceCheckRuleTask(
         fillCheckMessagesEvent()
     }
 
+    override fun name(): String = "Check sequence rule"
+
+    override fun type(): String = "checkSequenceRule"
+
+    override fun setup(rootEvent: Event) {
+        rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
+    }
+
     /**
      * Creates events for check messages
      */
@@ -239,9 +238,6 @@ class SequenceCheckRuleTask(
                 .build())
             .bodyData(sequenceTable.build())
     }
-
-    private fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter): IMessage =
-        fromProtoFilter(protoPreMessageFilter.messageFilter, PRE_FILTER_MESSAGE_NAME)
 
     private fun PreFilter.toRootMessageFilter() = RootMessageFilter.newBuilder()
         .setMessageType(PRE_FILTER_MESSAGE_NAME)
