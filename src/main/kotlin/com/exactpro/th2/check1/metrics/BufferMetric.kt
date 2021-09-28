@@ -19,6 +19,7 @@ import com.exactpro.th2.common.metrics.DEFAULT_DIRECTION_LABEL_NAME
 import com.exactpro.th2.common.metrics.DEFAULT_SESSION_ALIAS_LABEL_NAME
 import io.prometheus.client.Gauge
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.min
 
 object BufferMetric {
 
@@ -37,19 +38,12 @@ object BufferMetric {
     fun processMessage(sessionKey: SessionKey) {
         val labels = arrayOf(sessionKey.sessionAlias, sessionKey.direction.name)
 
-        bufferMessagesSizeBySessionKey.compute(sessionKey) { _, bufferedMessagesNumber ->
-            if (bufferedMessagesNumber == null) {
-                actualBufferCountMetric.labels(*labels).inc()
-                return@compute 1
+        bufferMessagesSizeBySessionKey.compute(sessionKey) { _, old ->
+            min(maxBufferSize, (old ?: 0) + 1).also {
+                if (it != old) {
+                    actualBufferCountMetric.labels(*labels).inc()
+                }
             }
-
-            if (bufferedMessagesNumber == maxBufferSize) {
-                return@compute bufferedMessagesNumber
-            }
-
-            actualBufferCountMetric.labels(*labels).inc()
-
-            return@compute bufferedMessagesNumber.inc()
         }
     }
 }
