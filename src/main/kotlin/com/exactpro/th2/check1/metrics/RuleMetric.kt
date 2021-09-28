@@ -16,13 +16,16 @@ package com.exactpro.th2.check1.metrics
 import io.prometheus.client.Gauge
 
 object RuleMetric {
-    private val ACTIVE_TASK_COUNTER = Gauge.build("th2_check1_active_tasks_number", "Current active tasks number in execution").register()
+    private val ACTIVE_TASK_COUNTER = Gauge
+            .build("th2_check1_active_tasks_number", "The number of currently working rules")
+            .labelNames("rule_type")
+            .register()
 
-    fun incrementActiveRule() {
-        ACTIVE_TASK_COUNTER.inc()
+    fun incrementActiveRule(ruleType: String) {
+        ACTIVE_TASK_COUNTER.labels(ruleType).inc()
     }
 
-    fun decrementActiveRule() {
-        ACTIVE_TASK_COUNTER.dec()
+    fun decrementActiveRule(ruleType: String) {
+        ACTIVE_TASK_COUNTER.labels(ruleType).dec()
     }
 }

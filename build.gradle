@@ -177,8 +177,9 @@ dependencies {
 
     implementation "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
 
-    // metrics
-    implementation 'io.prometheus:simpleclient'
+    implementation('io.prometheus:simpleclient') {
+        because('metrics from messages and rules')
+    }
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'

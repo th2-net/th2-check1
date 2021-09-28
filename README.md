@@ -111,11 +111,13 @@ spec:
 ## Prometheus metrics
 The Check1 component publishes Prometheus metrics to observe the actual state of it
 * `th2_check1_actual_cache_number` - actual number of messages in caches
-* `th2_check1_active_tasks_number` - number of currently active rules in execution
+* `th2_check1_active_tasks_number` - actual number of currently working rules
 
-The `th2_check1_active_tasks_number` metric separate messages with two labels:
+The `th2_check1_actual_cache_number` metric separate messages with two labels:
 * `session_alias` - session alias of received message
 * `direction` - direction of received message
+
+The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
 

@@ -222,7 +222,7 @@ abstract class AbstractCheckTask(
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
-        RuleMetric.incrementActiveRule()
+        RuleMetric.incrementActiveRule(type())
         this.lastSequence = sequence
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
@@ -289,7 +289,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
-            RuleMetric.decrementActiveRule()
+            RuleMetric.decrementActiveRule(type())
             sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
         }
     }
