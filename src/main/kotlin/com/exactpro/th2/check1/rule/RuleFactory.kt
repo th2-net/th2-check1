@@ -138,7 +138,6 @@ class RuleFactory(
     }
 
     private fun MessageFilter.toRootMessageFilter(): RootMessageFilter {
-        check(this.messageType.isNotBlank()) { "Rule cannot be executed because the message filter does not contain 'message type'" }
         return RootMessageFilter.newBuilder()
                 .setMessageType(this.messageType)
                 .setComparisonSettings(this.comparisonSettings.toRootComparisonSettings())

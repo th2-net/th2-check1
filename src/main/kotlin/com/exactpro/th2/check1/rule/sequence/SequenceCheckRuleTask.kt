@@ -104,7 +104,7 @@ class SequenceCheckRuleTask(
         messageFilters = protoMessageFilters.map {
             MessageFilterContainer(
                 it,
-                SailfishFilter(converter.fromProtoFilter(it.messageFilter, it.messageType), it.toCompareSettings()),
+                SailfishFilter(converter.fromProtoPreFilter(it), it.toCompareSettings()),
                 it.metadataFilterOrNull()?.let { metadataFilter ->
                     SailfishFilter(converter.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
                         metadataFilter.toComparisonSettings())

@@ -503,6 +503,9 @@ abstract class AbstractCheckTask(
 
     protected fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter,
                                                               messageName: String = protoPreMessageFilter.messageType): IMessage {
+        check(messageName.isNotBlank()) {
+            "Rule cannot be created or executed because the root message filter does not contain 'message type'"
+        }
         return fromProtoFilter(protoPreMessageFilter.messageFilter, messageName)
     }
 
