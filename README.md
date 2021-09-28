@@ -1,4 +1,4 @@
-# th2 check1 (3.8.0)
+# th2 check1 (3.8.1)
 
 ## Overview
 
@@ -110,8 +110,11 @@ spec:
 
 ## Release Notes
 
+### 3.8.1
++ Update common library from `3.26.0` to `3.26.2` and sailfish-utils from `3.9.0` to `3.9.1` versions with fix MetadataFilter.SimpleFilter treeTable convertation.
+
 ### 3.8.0
-+ Update common library from `3.25.0` to `3.26.0` and sailfish-utils from `3.7.0` to `3.9.0` versions for new filter SimpleList usage.
++ Update common library from `3.25.0` to `3.26.0` and sailfish-utils from `3.7.0` to `3.9.0` versions for the new filter SimpleList usage.
 
 ### 3.7.2
 
