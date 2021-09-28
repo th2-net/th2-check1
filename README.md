@@ -113,6 +113,7 @@ spec:
 ### 3.8.0
 
 #### Added:
++ Added check for positive timeout
 + Added mechanism for handling exceptions when creating and executing rules which publishes events about an error that has occurred
 
 #### Changed:
