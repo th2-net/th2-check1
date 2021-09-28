@@ -81,6 +81,9 @@ abstract class AbstractCheckTask(
         require(maxEventBatchContentSize > 0) {
             "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize"
         }
+        require(taskTimeout.timeout > 0) {
+            "'timeout' should be set or be greater than zero, actual: ${taskTimeout.timeout}"
+        }
     }
 
     protected var handledMessageCounter: Long = 0

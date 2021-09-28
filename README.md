@@ -115,8 +115,13 @@ spec:
 ### 3.8.0
 
 #### Added:
++ Added check for positive timeout
 + Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
 + New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
+
+#### Changed:
++ Migrated common version from `3.25.0` to `3.25.2`
+  + Added support for converting SimpleList to readable payload body
 
 ### 3.7.2
 

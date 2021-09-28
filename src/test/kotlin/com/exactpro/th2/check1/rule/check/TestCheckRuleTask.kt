@@ -34,6 +34,10 @@ import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.lang.IllegalArgumentException
 import java.time.Instant
 import kotlin.test.assertEquals
 
@@ -193,6 +197,32 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             "No failed event $eventBatch"
         }
     }
+
+    @ParameterizedTest(name = "timeout = {0}")
+    @ValueSource(longs = [0, -1])
+    fun `handle error if the timeout is zero or negative`(timeout: Long) {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                        .mergeMetadata(MessageMetadata.newBuilder()
+                                .putProperties("keyProp", "42")
+                                .putProperties("notKeyProp", "2")
+                                .build())
+                        .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+        val filter = RootMessageFilter.newBuilder()
+                .setMessageType(MESSAGE_TYPE)
+                .setMetadataFilter(MetadataFilter.newBuilder()
+                        .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
+                .build()
+
+        val exception = assertThrows<IllegalArgumentException>("Task cannot be created due to invalid timeout") {
+            checkTask(filter, eventID, streams, taskTimeout = TaskTimeout(timeout))
+        }
+        assertEquals("'timeout' should be set or be greater than zero, actual: $timeout", exception.message)
+    }
+
 
     @Test
     fun `success verification with message timeout`() {
