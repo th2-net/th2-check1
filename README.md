@@ -132,6 +132,8 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 #### Changed:
 + Migrated common version from `3.25.0` to `3.25.2`
   + Added support for converting SimpleList to readable payload body
++ Migrated sailfish-utils from `3.7.0` to `3.8.1`
+  + Now Check1 keep the order of repeating result groups by default
 
 ### 3.7.2
 
