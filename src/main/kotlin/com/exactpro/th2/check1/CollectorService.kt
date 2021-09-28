@@ -77,7 +77,7 @@ class CollectorService(
                 .groupBy { message ->
                     message.metadata.id.run {
                         SessionKey(connectionId.sessionAlias, direction)
-                    }.also { BufferMetric.processMessage(it, message) }
+                    }.also { BufferMetric.processMessage(it) }
                 }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
             .replay().apply { connect() }
