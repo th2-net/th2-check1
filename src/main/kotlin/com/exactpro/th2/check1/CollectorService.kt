@@ -17,6 +17,7 @@ import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
+import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.common.event.Event
@@ -62,12 +63,18 @@ class CollectorService(
     private var ruleFactory: RuleFactory
 
     init {
+        BufferMetric.configure(configuration)
+
         val limitSize = configuration.messageCacheSize
         mqSubject = PublishSubject.create()
 
         subscriberMonitor = subscribe(MessageListener { _: String, batch: MessageBatch -> mqSubject.onNext(batch) })
         streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
-            .groupBy { message -> message.metadata.id.run { SessionKey(connectionId.sessionAlias, direction) } }
+                .groupBy { message ->
+                    message.metadata.id.run {
+                        SessionKey(connectionId.sessionAlias, direction)
+                    }.also(BufferMetric::processMessage)
+                }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
             .replay().apply { connect() }
 
