@@ -167,13 +167,17 @@ dependencies {
     api platform('com.exactpro.th2:bom:3.0.0')
     implementation 'com.exactpro.th2:grpc-check1:3.3.0'
     implementation 'com.exactpro.th2:common:3.25.2'
-    implementation 'com.exactpro.th2:sailfish-utils:3.7.0'
+    implementation 'com.exactpro.th2:sailfish-utils:3.8.1'
     implementation "org.slf4j:slf4j-log4j12"
     implementation "org.slf4j:slf4j-api"
 
     implementation "com.exactpro.sf:sailfish-core:${sailfishVersion}"
 
     implementation "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
+
+    implementation('io.prometheus:simpleclient') {
+        because('metrics from messages and rules')
+    }
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'

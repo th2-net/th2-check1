@@ -27,8 +27,6 @@ import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil
-import com.exactpro.th2.check1.utils.fromProtoPreFilter
-import com.exactpro.th2.check1.utils.toRootMessageFilter
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
@@ -37,6 +35,7 @@ import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.event.bean.builder.TableBuilder
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toJson
@@ -97,13 +96,6 @@ class SequenceCheckRuleTask(
     private var reordered: Boolean = false
     private lateinit var matchedByKeys: MutableSet<MessageFilterContainer>
 
-    init {
-        rootEvent
-            .name("Check sequence rule")
-            .bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
-            .type("checkSequenceRule")
-    }
-
     override fun onStart() {
         super.onStart()
 
@@ -114,7 +106,7 @@ class SequenceCheckRuleTask(
         messageFilters = protoMessageFilters.map {
             MessageFilterContainer(
                 it,
-                SailfishFilter(converter.fromProtoFilter(it.messageFilter, it.messageType), it.toCompareSettings()),
+                SailfishFilter(converter.fromProtoPreFilter(it), it.toCompareSettings()),
                 it.metadataFilterOrNull()?.let { metadataFilter ->
                     SailfishFilter(converter.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
                         metadataFilter.toComparisonSettings())
@@ -192,6 +184,14 @@ class SequenceCheckRuleTask(
         fillCheckMessagesEvent()
     }
 
+    override fun name(): String = "Check sequence rule"
+
+    override fun type(): String = "checkSequenceRule"
+
+    override fun setup(rootEvent: Event) {
+        rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
+    }
+
     /**
      * Creates events for check messages
      */
@@ -240,6 +240,20 @@ class SequenceCheckRuleTask(
                 .build())
             .bodyData(sequenceTable.build())
     }
+
+    private fun PreFilter.toRootMessageFilter() = RootMessageFilter.newBuilder()
+        .setMessageType(PRE_FILTER_MESSAGE_NAME)
+        .setMessageFilter(toMessageFilter())
+        .also {
+            if (hasMetadataFilter()) {
+                it.metadataFilter = metadataFilter
+            }
+        }
+        .build()
+
+    private fun PreFilter.toMessageFilter() = MessageFilter.newBuilder()
+        .putAllFields(fieldsMap)
+        .build()
 
     companion object {
         const val PRE_FILTER_MESSAGE_NAME = "PreFilter"

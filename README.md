@@ -1,4 +1,4 @@
-# th2 check1 (3.8.0)
+# th2 check1 (3.9.0)
 
 ## Overview
 
@@ -110,18 +110,38 @@ spec:
         - "parsed"
 ```
 
+## Prometheus metrics
+The Check1 component publishes Prometheus metrics to observe the actual state of it
+* `th2_check1_actual_cache_number` - actual number of messages in caches
+* `th2_check1_active_tasks_number` - actual number of currently working rules
+
+The `th2_check1_actual_cache_number` metric separate messages with two labels:
+* `session_alias` - session alias of received message
+* `direction` - direction of received message
+
+The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
+
 ## Release Notes
+
+### 3.9.0
+
+#### Added:
++ Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
++ New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
 
 ### 3.8.0
 
 #### Added:
 + Added check for positive timeout
-+ Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
-+ New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
++ Added mechanism for handling exceptions when creating and executing rules which publishes events about an error that has occurred
++ Added metric for monitoring active rules and messages count
++ Added check for required message type in the message filter
 
 #### Changed:
 + Migrated common version from `3.25.0` to `3.25.2`
   + Added support for converting SimpleList to readable payload body
++ Migrated sailfish-utils from `3.7.0` to `3.8.1`
+  + Now Check1 keep the order of repeating result groups by default
 
 ### 3.7.2
 

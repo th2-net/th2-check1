@@ -22,9 +22,9 @@ import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.util.VerificationUtil
-import com.exactpro.th2.check1.utils.fromProtoPreFilter
 import com.exactpro.th2.check1.utils.toRootMessageFilter
 import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -64,11 +64,6 @@ class NoMessageCheckTask(
 
     private var extraMessagesCounter: Int = 0
 
-    init {
-        rootEvent
-            .name("No message check $sessionKey")
-            .type("noMessageCheck")
-    }
 
     override fun onStart() {
         super.onStart()
@@ -97,6 +92,14 @@ class NoMessageCheckTask(
                 preFilterEvent.messageID(protoActual.metadata.id)
             }
         }.map(ComparisonContainer::messageContainer)
+
+    override fun name(): String = "No message check"
+
+    override fun type(): String = "noMessageCheck"
+
+    override fun setup(rootEvent: Event) {
+        rootEvent.bodyData(EventUtils.createMessageBean("No message check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)" }}"))
+    }
 
     override fun onNext(messageContainer: MessageContainer) {
         messageContainer.protoMessage.metadata.apply {
