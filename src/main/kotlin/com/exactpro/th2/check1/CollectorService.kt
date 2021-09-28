@@ -19,20 +19,14 @@ import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
 import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
-import com.exactpro.th2.check1.rule.check.CheckRuleTask
-import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
+import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.grpc.ComparisonSettings
 import com.exactpro.th2.common.grpc.ConnectionID
-import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageBatch
-import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
-import com.exactpro.th2.common.grpc.RootComparisonSettings
-import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
@@ -65,6 +59,8 @@ class CollectorService(
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
     private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
+    
+    private var ruleFactory: RuleFactory
 
     init {
         BufferMetric.configure(configuration)
@@ -83,29 +79,14 @@ class CollectorService(
             .replay().apply { connect() }
 
         checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
+        
+        ruleFactory = RuleFactory(maxEventBatchContentSize, streamObservable, eventBatchRouter)
     }
 
     @Throws(InterruptedException::class)
     fun verifyCheckRule(request: CheckRuleRequest): ChainID {
-        check(request.hasParentEventId()) { "Parent event id can't be null" }
-        val parentEventID: EventID = request.parentEventId
-        check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
-        val sessionAlias: String = request.connectivityId.sessionAlias
-
-        check(request.kindCase != CheckRuleRequest.KindCase.KIND_NOT_SET) {
-            "Either old filter or root filter must be set"
-        }
-        val filter: RootMessageFilter = if (request.hasRootFilter()) {
-            request.rootFilter
-        } else {
-            request.filter.toRootMessageFilter()
-        }
-        val direction = directionOrDefault(request.direction)
-
         val chainID = request.getChainIdOrGenerate()
-
-        val task = CheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, maxEventBatchContentSize,
-            filter, parentEventID, streamObservable, eventBatchRouter)
+        val task = ruleFactory.createCheckRule(request)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -117,26 +98,8 @@ class CollectorService(
 
     @Throws(InterruptedException::class)
     fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): ChainID {
-        check(request.hasParentEventId()) { "Parent event id can't be null" }
-        val parentEventID: EventID = request.parentEventId
-        check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
-        val sessionAlias: String = request.connectivityId.sessionAlias
-        val direction = directionOrDefault(request.direction)
-
-        check((request.messageFiltersList.isEmpty() && request.rootMessageFiltersList.isNotEmpty())
-                || (request.messageFiltersList.isNotEmpty() && request.rootMessageFiltersList.isEmpty())) {
-            "Either messageFilters or rootMessageFilters must be set but not both"
-        }
-
         val chainID = request.getChainIdOrGenerate()
-
-        val protoMessageFilters: List<RootMessageFilter> = if (request.rootMessageFiltersList.isNotEmpty()) {
-            request.rootMessageFiltersList
-        } else {
-            request.messageFiltersList.map { it.toRootMessageFilter() }
-        }
-        val task = SequenceCheckRuleTask(request.description, Instant.now(), SessionKey(sessionAlias, direction), request.timeout, maxEventBatchContentSize,
-            request.preFilter, protoMessageFilters, request.checkOrder, parentEventID, streamObservable, eventBatchRouter)
+        val task = ruleFactory.createSequenceCheckRule(request)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
@@ -145,24 +108,6 @@ class CollectorService(
         }
         return chainID
     }
-
-    private fun MessageFilter.toRootMessageFilter(): RootMessageFilter {
-        return RootMessageFilter.newBuilder()
-                .setMessageType(this.messageType)
-                .setComparisonSettings(this.comparisonSettings.toRootComparisonSettings())
-                .setMessageFilter(this)
-                .build()
-    }
-
-    private fun ComparisonSettings.toRootComparisonSettings(): RootComparisonSettings {
-        return RootComparisonSettings.newBuilder()
-                .addAllIgnoreFields(this.ignoreFieldsList)
-                .build()
-    }
-
-
-    private fun directionOrDefault(direction: Direction) =
-        if (direction == Direction.UNRECOGNIZED) Direction.FIRST else direction
 
     private fun AbstractCheckTask.addToChainOrBegin(
             value: AbstractCheckTask?,

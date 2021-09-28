@@ -122,6 +122,8 @@ The `th2_check1_active_tasks_number` metric separate messages with two labels:
 ### 3.8.0
 
 #### Added:
++ Added check for positive timeout
++ Added mechanism for handling exceptions when creating and executing rules which publishes events about an error that has occurred
 + Added metric for monitoring active rules and messages count
 
 #### Changed:
