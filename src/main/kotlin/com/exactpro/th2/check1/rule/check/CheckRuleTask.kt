@@ -23,7 +23,6 @@ import com.exactpro.th2.check1.util.VerificationUtil.METADATA_MESSAGE_NAME
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.event.EventUtils.createMessageBean
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -48,7 +47,7 @@ class CheckRuleTask(
 ) : AbstractCheckTask(description, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val messageFilter: SailfishFilter = SailfishFilter(
-        converter.fromProtoFilter(protoMessageFilter.messageFilter, protoMessageFilter.messageType),
+        converter.fromProtoPreFilter(protoMessageFilter),
         protoMessageFilter.toCompareSettings()
     )
     private val metadataFilter: SailfishFilter? = protoMessageFilter.metadataFilterOrNull()?.let {
@@ -56,13 +55,6 @@ class CheckRuleTask(
             converter.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
-    }
-
-    init {
-        rootEvent
-            .name("Check rule")
-            .bodyData(createMessageBean("Check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
-            .type("Check rule")
     }
 
     override fun onStart() {
@@ -94,5 +86,13 @@ class CheckRuleTask(
             .name("No message found by target keys")
             .type("Check failed")
             .status(FAILED)
+    }
+
+    override fun name(): String = "Check rule"
+
+    override fun type(): String = "Check rule"
+
+    override fun setup(rootEvent: Event) {
+        rootEvent.bodyData(EventUtils.createMessageBean("Check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
     }
 }

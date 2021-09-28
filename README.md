@@ -114,6 +114,7 @@ spec:
 
 #### Added:
 + Added check for positive timeout
++ Added mechanism for handling exceptions when creating and executing rules which publishes events about an error that has occurred
 
 #### Changed:
 + Migrated common version from `3.25.0` to `3.25.2`
