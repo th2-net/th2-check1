@@ -121,8 +121,12 @@ The `th2_check1_active_tasks_number` metric separate messages with two labels:
 
 ### 3.8.0
 
-+ Added memory volume metric for cache monitoring such as actual buffer count and size
-+ Added metric for monitoring active rules count
+#### Added:
++ Added metric for monitoring active rules and messages count
+
+#### Changed:
++ Migrated common version from `3.25.0` to `3.25.2`
+  + Added support for converting SimpleList to readable payload body
 
 ### 3.7.2
 
