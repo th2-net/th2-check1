@@ -144,7 +144,7 @@ public class CheckSequenceUtils {
     private static String getKeyFields(String name, SimpleFilter valueFilter) {
         if (valueFilter.getKey()) {
             if (valueFilter.hasSimpleList() && (valueFilter.getOperation() == FilterOperation.IN || valueFilter.getOperation() == FilterOperation.NOT_IN)) {
-                return ", " + name + '=' + valueFilter.getSimpleList();
+                return ", " + name + ' ' + valueFilter.getOperation() + ' ' + valueFilter.getSimpleList().getSimpleValuesList();
             }
             return ", " + name + '=' + valueFilter.getValue();
         }

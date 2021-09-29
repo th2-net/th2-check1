@@ -1,4 +1,4 @@
-# th2 check1 (3.9.0)
+# th2 check1 (3.8.0)
 
 ## Overview
 
@@ -121,9 +121,6 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ## Release Notes
 
-### 3.9.0
-+ Migrate common library version from `3.25.2` to `3.26.2` and sailfish-utils from `3.8.1` to `3.9.1` versions for the new filter SimpleList usage.
-
 ### 3.8.0
 
 #### Added:
@@ -133,10 +130,12 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Added check for required message type in the message filter
 
 #### Changed:
-+ Migrated common version from `3.25.0` to `3.25.2`
++ Migrated common version from `3.25.0` to `3.26.2`
   + Added support for converting SimpleList to readable payload body
-+ Migrated sailfish-utils from `3.7.0` to `3.8.1`
+  + Added support for SimpleList in Metadata.SimpleFilter.
++ Migrated sailfish-utils from `3.7.0` to `3.9.1`
   + Now Check1 keep the order of repeating result groups by default
+  + Fix IN, NOT_IN FilterOperation interaction
 
 ### 3.7.2
 

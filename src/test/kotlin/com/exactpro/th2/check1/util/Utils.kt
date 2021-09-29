@@ -23,11 +23,3 @@ fun String.toSimpleFilter(op: FilterOperation, key: Boolean = false): MetadataFi
     .setKey(key)
     .build()
 
-fun List<String>.toSimpleFilter(op: FilterOperation, key: Boolean = false): MetadataFilter.SimpleFilter = MetadataFilter.SimpleFilter.newBuilder()
-    .setOperation(op)
-    .setSimpleList(SimpleList.newBuilder()
-        .addAllSimpleValues(this)
-        .build())
-    .setKey(key)
-    .build()
-
