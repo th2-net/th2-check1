@@ -408,7 +408,8 @@ abstract class AbstractCheckTask(
         }
 
         if (comparisonResult == null) {
-            LOGGER.debug("Comparison result for message '{}' does not match the filter by key fields or message type", messageContainer.sailfishMessage.name)
+            LOGGER.debug("Comparison result for the message '{}' with the message `{}` does not match the filter by key fields or message type",
+                    messageContainer.sailfishMessage.name, messageFilter.message.name)
         } else {
             LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
         }
