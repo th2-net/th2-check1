@@ -99,6 +99,13 @@ abstract class AbstractCheckTask(
     private val taskState = AtomicReference(State.CREATED)
     @Volatile
     private var streamCompletedState = State.STREAM_COMPLETED
+    @Volatile
+    private var completed = false
+    @Volatile
+    protected var isCanceled = false
+        private set
+    protected var isParentCompleted: Boolean? = null
+        private set
 
     /**
      * Used for observe messages in one thread.
@@ -171,17 +178,18 @@ abstract class AbstractCheckTask(
      */
     fun subscribeNextTask(checkTask: AbstractCheckTask) {
         if (hasNextTask.compareAndSet(false, true)) {
+            onChainedTaskSubscription()
             sequenceSubject.subscribe { legacy ->
                 val executor = if (legacy.executorService.isShutdown) {
-                        LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
-                        createExecutorService()
-                    } else {
-                        legacy.executorService
-                    }
-                legacy.sequenceData.apply {
-                    checkTask.begin(lastSequence, lastMessageTimestamp, executor, untrusted)
+                    LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
+                    createExecutorService()
+                } else {
+                    legacy.executorService
                 }
-             }
+                legacy.sequenceData.apply {
+                    checkTask.begin(lastSequence, lastMessageTimestamp, executor, untrusted, completed)
+                }
+            }
             LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
         } else {
             throw IllegalStateException("Subscription to last sequence for task $description (${hashCode()}) is already executed, subscriber ${checkTask.description} (${checkTask.hashCode()})")
@@ -201,6 +209,11 @@ abstract class AbstractCheckTask(
     }
 
     /**
+     * Callback when another task is subscribed to the result of the current task
+     */
+    protected open fun onChainedTaskSubscription() {}
+
+    /**
      * It is called when the timeout is over and the task is not complete yet
      */
     protected open fun onTimeout() {}
@@ -216,6 +229,7 @@ abstract class AbstractCheckTask(
         val prevValue = taskState.getAndSet(State.TASK_COMPLETED)
         dispose()
         endFuture.dispose()
+        completed = true
 
         when (prevValue) {
             State.TIMEOUT -> {
@@ -238,6 +252,12 @@ abstract class AbstractCheckTask(
      */
     protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
 
+    /**
+     * @return `true` if another task has been subscribed to the result of the current task.
+     * Otherwise, returns `false`
+     */
+    protected fun hasNextTask(): Boolean = hasNextTask.get()
+
     protected abstract fun name(): String
     protected abstract fun type(): String
     protected abstract fun setup(rootEvent: Event)
@@ -250,11 +270,18 @@ abstract class AbstractCheckTask(
      * @param checkpointTimestamp checkpoint timestamp from the previous task
      * @param executorService executor to schedule pipeline execution.
      * @param untrusted flag is guarantee that the previous sequence data is correct
+     * @param parentTaskCompleted indicates whether the parent task was completed normally. `null` if no parent task exists.
      * @throws IllegalStateException when method is called more than once.
      */
-    private fun begin(sequence: Long = DEFAULT_SEQUENCE, checkpointTimestamp: Timestamp? = null,
-                      executorService: ExecutorService = createExecutorService(), untrusted: Boolean = false) {
+    private fun begin(
+        sequence: Long = DEFAULT_SEQUENCE,
+        checkpointTimestamp: Timestamp? = null,
+        executorService: ExecutorService = createExecutorService(),
+        untrusted: Boolean = false,
+        parentTaskCompleted: Boolean? = null
+    ) {
         configureRootEvent()
+        isParentCompleted = parentTaskCompleted
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
@@ -307,6 +334,10 @@ abstract class AbstractCheckTask(
         }
     }
 
+    protected fun cancel() {
+        isCanceled = true
+    }
+
     private fun taskFinished() {
         try {
             val currentState = taskState.get()
@@ -314,8 +345,12 @@ abstract class AbstractCheckTask(
             if (currentState.callOnTimeoutCallback) {
                 callOnTimeoutCallback()
             }
-            publishEvent()
-            LOGGER.info("Task '$description' has been finished")
+            if (isCanceled) {
+                LOGGER.info("Task '$description' has been canceled. No result will published")
+            } else {
+                publishEvent()
+                LOGGER.info("Task '$description' has been finished")
+            }
         } catch (ex: Exception) {
             val message = "Cannot finish task '$description'"
             LOGGER.error(message, ex)

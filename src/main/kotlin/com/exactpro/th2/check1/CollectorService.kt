@@ -62,6 +62,7 @@ class CollectorService(
 
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
+    private val defaultAutoSilenceCheck: Boolean = configuration.isAutoSequenceRuleSilenceCheck
 
     private var ruleFactory: RuleFactory
 
@@ -105,9 +106,17 @@ class CollectorService(
         val task = ruleFactory.createSequenceCheckRule(request)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+        val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
+
+        val silenceCheckTask: AbstractCheckTask? = if (silenceCheck) {
+            ruleFactory.createSilenceCheck(request, olderThanTimeUnit.duration.toMillis() * olderThanDelta)
+        } else {
+            null
+        }
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
             task.apply { addToChainOrBegin(value, request.checkpoint) }
+                .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this }
         }
         return chainID
     }

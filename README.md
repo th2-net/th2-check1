@@ -36,6 +36,7 @@ spec:
     cleanup-older-than: '60'
     cleanup-time-unit: 'SECONDS'
     max-event-batch-content-size: '1048576'
+    auto-sequence-rule-silence-check: false
   type: th2-check1
   pins:
     - name: server
@@ -69,7 +70,8 @@ This block describes the configuration for check1.
   "cleanup-older-than": 60,
   "cleanup-time-unit": "SECONDS",
   "max-event-batch-content-size": "1048576",
-  "rule-execution-timeout": 5000
+  "rule-execution-timeout": 5000,
+  "auto-sequence-rule-silence-check": false
 }
 ```
 
@@ -87,6 +89,9 @@ The time unit for _cleanup-older-than_ setting. The available values are MILLIS,
 
 #### max-event-batch-content-size
 The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is set to 1048576_
+
+#### auto-sequence-rule-silence-check
+Defines a default behavior for creating CheckSequenceRule if `silence_check` parameter is not specified in the request. The default value is `false`
 
 ## Required pins
 
@@ -128,6 +133,10 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 #### Added:
 + Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
 + New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
++ Auto silence check after the CheckSequenceRule.
+  It verifies that there were not any messages matches the pre-filter in original request for CheckSequenceRule.
+  It awaits for realtime timeout that is equal to clean-up timeout.
+  Report about unexpected messages only after the timeout exceeds. Reports nothing if any task is added to the chain.
 
 ### 3.8.0
 

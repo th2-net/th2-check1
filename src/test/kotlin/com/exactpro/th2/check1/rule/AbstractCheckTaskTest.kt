@@ -15,6 +15,7 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.grpc.PreFilter
+import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.event.IBodyData
 import com.exactpro.th2.common.event.bean.Verification
 import com.exactpro.th2.common.event.bean.VerificationEntry
@@ -77,7 +78,7 @@ abstract class AbstractCheckTaskTest {
     }
 
     protected fun createEvent(id: String): EventID {
-        return EventID.newBuilder().setId(id).build()
+        return requireNotNull(EventUtils.toEventID(id))
     }
 
     protected fun getMessageTimestamp(start: Instant, delta: Long): Timestamp =

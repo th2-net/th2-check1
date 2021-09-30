@@ -16,6 +16,7 @@ package com.exactpro.th2.check1.configuration;
 import java.time.temporal.ChronoUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
 public class Check1Configuration {
 
@@ -33,6 +34,10 @@ public class Check1Configuration {
 
     @JsonProperty(value="rule-execution-timeout", defaultValue = "5000")
     private long ruleExecutionTimeout = 5000L;
+
+    @JsonProperty("auto-sequence-rule-silence-check")
+    @JsonPropertyDescription("The default behavior in case the SequenceCheckRule does not have silenceCheck parameter specified")
+    private boolean autoSequenceRuleSilenceCheck;
 
     public int getMessageCacheSize() {
         return messageCacheSize;
@@ -52,5 +57,9 @@ public class Check1Configuration {
 
     public long getRuleExecutionTimeout() {
         return ruleExecutionTimeout;
+    }
+
+    public boolean isAutoSequenceRuleSilenceCheck() {
+        return autoSequenceRuleSilenceCheck;
     }
 }
