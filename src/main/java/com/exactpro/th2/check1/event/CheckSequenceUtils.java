@@ -135,6 +135,8 @@ public class CheckSequenceUtils {
             messageFilter.getFieldsMap().forEach((childName, filter) -> result.append(getKeyFields(childName, filter)));
         } else if (valueFilter.hasListFilter()) {
             valueFilter.getListFilter().getValuesList().forEach(filter -> result.append(getKeyFields(name, filter)));
+        } else if (valueFilter.hasSimpleList() && (valueFilter.getOperation() == FilterOperation.IN || valueFilter.getOperation() == FilterOperation.NOT_IN)) {
+            result.append(", ").append(name).append(' ').append(valueFilter.getOperation()).append(' ').append(valueFilter.getSimpleList().getSimpleValuesList());
         } else if (valueFilter.getKey()) {
             result.append(", ").append(name).append('=').append(valueFilter.getSimpleFilter());
         }
