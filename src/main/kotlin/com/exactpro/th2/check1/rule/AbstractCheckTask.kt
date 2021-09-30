@@ -37,6 +37,7 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
@@ -391,21 +392,27 @@ abstract class AbstractCheckTask(
                 messageContainer.metadataMessage,
                 it.message, it.comparatorSettings,
                 matchNames
-            ).also { comparisonResult ->
+            )?.also { comparisonResult ->
                 LOGGER.debug("Metadata comparison result\n {}", comparisonResult)
             }
         }
         if (metadataFilter != null && metadataComparisonResult == null) {
             if (LOGGER.isDebugEnabled) {
                 LOGGER.debug("Metadata for message {} does not match the filter by key fields. Skip message checking",
-                    shortDebugString(messageContainer.protoMessage.metadata.id))
+                        messageContainer.protoMessage.metadata.id.toJson())
             }
             return AggregatedFilterResult.EMPTY
         }
         val comparisonResult: ComparisonResult? = messageFilter.let {
             MessageComparator.compare(messageContainer.sailfishMessage, it.message, it.comparatorSettings, matchNames)
         }
-        LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
+
+        if (comparisonResult == null) {
+            LOGGER.debug("Comparison result for the message '{}' with the message `{}` does not match the filter by key fields or message type",
+                    messageContainer.sailfishMessage.name, messageFilter.message.name)
+        } else {
+            LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
+        }
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
             if (significant) {
