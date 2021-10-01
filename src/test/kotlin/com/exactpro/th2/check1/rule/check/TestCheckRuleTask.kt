@@ -16,12 +16,10 @@ package com.exactpro.th2.check1.rule.check
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
+import com.exactpro.th2.check1.util.createVerificationEntry
 import com.exactpro.th2.check1.util.toSimpleFilter
-import com.exactpro.th2.common.event.bean.Verification
-import com.exactpro.th2.common.event.bean.VerificationEntry
 import com.exactpro.th2.common.event.bean.VerificationStatus
 import com.exactpro.th2.common.grpc.Direction
-import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
@@ -40,8 +38,6 @@ import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.listValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import com.google.protobuf.StringValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -291,24 +287,22 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         }, {
             val verificationEvent = eventList.find { it.type == "Verification" }
             assertNotNull(verificationEvent) { "Missed verification event" }
-            val actualLegs = assertVerificationsLegs(verificationEvent)
+            val verification = assertVerification(verificationEvent)
 
-            val expectedLegs = listOf(
-                    VerificationEntry().apply {
-                        fields = mapOf(
-                                "A" to VerificationEntry().apply { status = VerificationStatus.PASSED },
-                                "B" to VerificationEntry().apply { status = VerificationStatus.FAILED }
-                        )
-                    },
-                    VerificationEntry().apply {
-                        fields = mapOf(
-                                "A" to VerificationEntry().apply { status = VerificationStatus.PASSED },
-                                "B" to VerificationEntry().apply { status = VerificationStatus.PASSED }
-                        )
-                    }
+            val expectedLegs = mapOf(
+                    "legs" to createVerificationEntry(
+                            "0" to createVerificationEntry(
+                                    "A" to createVerificationEntry(VerificationStatus.PASSED),
+                                    "B" to createVerificationEntry(VerificationStatus.FAILED)
+                            ),
+                            "1" to createVerificationEntry(
+                                    "A" to createVerificationEntry(VerificationStatus.PASSED),
+                                    "B" to createVerificationEntry(VerificationStatus.PASSED)
+                            )
+                    )
             )
 
-            assertVerificationEntriesLegsByStatus(expectedLegs, actualLegs)
+            assertVerificationByStatus(verification, expectedLegs)
         })
     }
 
@@ -400,56 +394,29 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             val verificationEvent = eventList.find { it.type == "Verification" }
             assertNotNull(verificationEvent) { "Missed verification event" }
 
-            val actualLegs = assertVerificationsLegs(verificationEvent)
+            val verification = assertVerification(verificationEvent)
 
-            val expectedLegs = listOf(
-                    VerificationEntry().apply {
-                        fields = mapOf(
-                                "A" to VerificationEntry().apply { status = VerificationStatus.NA },
-                                "B" to VerificationEntry().apply { status = VerificationStatus.NA },
-                                "C" to VerificationEntry().apply { status = VerificationStatus.FAILED },
-                                "D" to VerificationEntry().apply { status = VerificationStatus.FAILED }
-                        )
-                    },
-                    VerificationEntry().apply {
-                        fields = mapOf(
-                                "C" to VerificationEntry().apply { status = VerificationStatus.NA },
-                                "D" to VerificationEntry().apply { status = VerificationStatus.NA },
-                                "A" to VerificationEntry().apply { status = VerificationStatus.FAILED },
-                                "B" to VerificationEntry().apply { status = VerificationStatus.FAILED }
-                        )
-                    }
+            val expectedLegs = mapOf(
+                    "legs" to createVerificationEntry(
+                            "0" to createVerificationEntry(
+                                    "A" to createVerificationEntry(VerificationStatus.NA),
+                                    "B" to createVerificationEntry(VerificationStatus.NA),
+                                    "C" to createVerificationEntry(VerificationStatus.FAILED),
+                                    "D" to createVerificationEntry(VerificationStatus.FAILED)
+                            ),
+                            "1" to createVerificationEntry(
+                                    "C" to createVerificationEntry(VerificationStatus.NA),
+                                    "D" to createVerificationEntry(VerificationStatus.NA),
+                                    "A" to createVerificationEntry(VerificationStatus.FAILED),
+                                    "B" to createVerificationEntry(VerificationStatus.FAILED)
+                            )
+                    )
             )
 
-            assertVerificationEntriesLegsByStatus(expectedLegs, actualLegs)
+            assertVerificationByStatus(verification, expectedLegs)
         })
     }
 
-
-    private fun extractVerificationFromEvent(verificationEvent: Event): Verification? {
-        return jacksonObjectMapper().readValue<List<Verification>>(verificationEvent.body.toByteArray()).firstOrNull()
-    }
-
-    private fun assertVerificationsLegs(verificationEvent: Event): List<VerificationEntry> {
-        val verification = extractVerificationFromEvent(verificationEvent)
-        assertNotNull(verification) { "Verification event does not contain the verification" }
-        val actualLegs = verification.fields["legs"]?.fields?.values?.toList()
-        assertNotNull(actualLegs) { "Actual legs is missed" }
-        return actualLegs
-    }
-
-    private fun assertVerificationEntriesLegsByStatus(expectedLegs: List<VerificationEntry>, actualLegs: List<VerificationEntry>) {
-        assertEquals(expectedLegs.size, actualLegs.size, "The size of expected and actual legs is not equal")
-        expectedLegs.forEachIndexed { legIndex, expectedVerificationEntry ->
-            val actualLeg = actualLegs[legIndex].fields
-            assertNotNull(actualLeg) { "The validation event does not contain the expected leg" }
-            expectedVerificationEntry.fields.forEach { (field, verificationEntry) ->
-                val actualVerificationEntry = actualLeg[field]
-                assertNotNull(actualVerificationEntry) { "Actual leg does not contain the expected field" }
-                assertEquals(verificationEntry.status, actualVerificationEntry.status)
-            }
-        }
-    }
 
     companion object {
         private const val VERIFICATION_DESCRIPTION = "Test verification with description"
