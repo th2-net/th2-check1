@@ -449,10 +449,10 @@ abstract class AbstractCheckTask(
             it.metaContainer = VerificationUtil.toMetaContainer(this)
         }
 
-    protected fun Event.appendEventWithVerification(protoMessage: Message, protoMessageFilter: MessageFilter, comparisonResult: ComparisonResult): Event {
+    protected fun Event.appendEventWithVerification(protoMessage: Message, protoFilter: RootMessageFilter, comparisonResult: ComparisonResult): Event {
         val verificationComponent = VerificationBuilder()
         comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
-            verificationComponent.verification(key, value, protoMessageFilter, true)
+            verificationComponent.verification(key, value, protoFilter.messageFilter, true)
         }
 
         with(protoMessage.metadata) {
@@ -461,6 +461,9 @@ abstract class AbstractCheckTask(
                 .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
                 .messageID(id)
                 .bodyData(verificationComponent.build())
+            if (protoFilter.hasDescription()) {
+                description(protoFilter.description.value)
+            }
         }
         return this
     }
@@ -502,7 +505,7 @@ abstract class AbstractCheckTask(
     protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {
         val protoFilter = comparisonContainer.protoFilter
         addSubEventWithSamePeriod()
-            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter.messageFilter, comparisonContainer.result.messageResult!!)
+            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter, comparisonContainer.result.messageResult!!)
         if (protoFilter.hasMetadataFilter()) {
             addSubEventWithSamePeriod()
                 .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.result.metadataResult!!)

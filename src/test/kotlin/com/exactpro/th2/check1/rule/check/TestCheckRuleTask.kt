@@ -26,19 +26,20 @@ import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.ListValueFilter
-import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
-import com.exactpro.th2.common.grpc.RootComparisonSettings
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
+import com.exactpro.th2.common.message.messageFilter
+import com.exactpro.th2.common.message.rootMessageFilter
 import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.listValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.google.protobuf.StringValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -252,28 +253,31 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                                 .toValue())
                         .build()
         ))
-        val messageFilterForCheckOrder: RootMessageFilter = RootMessageFilter.newBuilder()
-                .setComparisonSettings(RootComparisonSettings.newBuilder().build())
-                .setMessageType(MESSAGE_TYPE)
-                .setMessageFilter(MessageFilter.newBuilder()
-                        .putFields("legs", ValueFilter.newBuilder()
-                                .setListFilter(ListValueFilter.newBuilder().apply {
-                                    addValues(ValueFilter.newBuilder()
-                                            .setMessageFilter(MessageFilter.newBuilder()
-                                                    .putAllFields(mapOf(
-                                                            "A" to "2".toValueFilter(),
-                                                            "B" to "2".toValueFilter()
-                                                    )).build())
-                                            .build())
-                                    addValues(ValueFilter.newBuilder()
-                                            .setMessageFilter(MessageFilter.newBuilder()
-                                                    .putAllFields(mapOf(
-                                                            "A" to "1".toValueFilter(),
-                                                            "B" to "3".toValueFilter()
-                                                    )).build()))
-                                }).build())
-                        .build())
-                .build()
+
+        val messageFilterForCheckOrder: RootMessageFilter = rootMessageFilter(MESSAGE_TYPE).apply {
+            messageFilter = messageFilter().apply {
+                putFields("legs", ValueFilter.newBuilder()
+                        .setListFilter(ListValueFilter.newBuilder().apply {
+                            addValues(ValueFilter.newBuilder().apply {
+                                messageFilter = messageFilter().apply {
+                                    putAllFields(mapOf(
+                                            "A" to "2".toValueFilter(),
+                                            "B" to "2".toValueFilter()
+                                    ))
+                                }.build()
+                            }.build())
+                            addValues(ValueFilter.newBuilder().apply {
+                                messageFilter = messageFilter().apply {
+                                    putAllFields(mapOf(
+                                            "A" to "1".toValueFilter(),
+                                            "B" to "3".toValueFilter()
+                                    ))
+                                }.build()
+                            }.build())
+                        }.build()).build())
+            }.build()
+        }.build()
+
         val eventID = EventID.newBuilder().setId("root").build()
 
         checkTask(messageFilterForCheckOrder, eventID, streams).begin()
@@ -312,5 +316,40 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 }
             }
         })
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `check verification description`(includeDescription: Boolean) {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                        .putFields("A", "1".toValue())
+                        .build()
+        ))
+        val messageFilterForCheckOrder: RootMessageFilter = RootMessageFilter.newBuilder().apply {
+            messageType = MESSAGE_TYPE
+            messageFilter = messageFilter().putFields("A", "1".toValueFilter()).build()
+            if (includeDescription) {
+                description = StringValue.of(VERIFICATION_DESCRIPTION)
+            }
+        }.build()
+        val eventID = EventID.newBuilder().setId("root").build()
+
+        checkTask(messageFilterForCheckOrder, eventID, streams).begin()
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertAll({
+            assertEquals(3, eventList.size)
+        }, {
+            val verificationEvent = eventList.find { it.type == "Verification" }
+            assertNotNull(verificationEvent) { "Missed verification event" }
+            assertEquals(includeDescription, verificationEvent.name.contains(VERIFICATION_DESCRIPTION))
+        })
+    }
+
+
+    companion object {
+        private const val VERIFICATION_DESCRIPTION = "Test verification with description"
     }
 }
