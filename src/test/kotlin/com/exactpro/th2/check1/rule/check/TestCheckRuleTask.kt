@@ -19,6 +19,7 @@ import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.event.bean.Verification
 import com.exactpro.th2.common.event.bean.VerificationStatus
+import com.exactpro.th2.common.grpc.ComparisonSettings
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
@@ -28,6 +29,7 @@ import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.ListValueFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
+import com.exactpro.th2.common.grpc.RootComparisonSettings
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
@@ -234,7 +236,6 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertEquals("'timeout' should be set or be greater than zero, actual: $timeout", exception.message)
     }
 
-
     @Test
     fun `check that the order is kept in repeating groups`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
@@ -345,6 +346,97 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             val verificationEvent = eventList.find { it.type == "Verification" }
             assertNotNull(verificationEvent) { "Missed verification event" }
             assertEquals(includeDescription, verificationEvent.name.contains(VERIFICATION_DESCRIPTION))
+        })
+    }
+
+    @Test
+    fun `verify repeating groups according to defined filters`() {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                        .putFields("legs", listValue()
+                                .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                                        .putAllFields(mapOf(
+                                                "A" to "1".toValue(),
+                                                "B" to "2".toValue()
+                                        )))
+                                .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                                        .putAllFields(mapOf(
+                                                "C" to "3".toValue(),
+                                                "D" to "4".toValue()
+                                        )))
+                                .toValue())
+                        .build()
+        ))
+
+        val messageFilterForCheckOrder: RootMessageFilter = rootMessageFilter(MESSAGE_TYPE).apply {
+            comparisonSettings = RootComparisonSettings.newBuilder().apply {
+                checkRepeatingGroupOrder = true
+            }.build()
+            messageFilter = messageFilter().apply {
+                putFields("legs", ValueFilter.newBuilder()
+                        .setListFilter(ListValueFilter.newBuilder().apply {
+                            addValues(ValueFilter.newBuilder().apply {
+                                messageFilter = messageFilter().apply {
+                                    putAllFields(mapOf(
+                                            "C" to "3".toValueFilter(),
+                                            "D" to "4".toValueFilter()
+                                    ))
+                                }.build()
+                            }.build())
+                            addValues(ValueFilter.newBuilder().apply {
+                                messageFilter = messageFilter().apply {
+                                    putAllFields(mapOf(
+                                            "A" to "1".toValueFilter(),
+                                            "B" to "2".toValueFilter()
+                                    ))
+                                }.build()
+                            }.build())
+                        }.build()).build())
+            }.build()
+        }.build()
+
+        val eventID = EventID.newBuilder().setId("root").build()
+
+        checkTask(messageFilterForCheckOrder, eventID, streams).begin()
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertAll({
+            assertEquals(3, eventList.size)
+        }, {
+            val verificationEvent = eventList.find { it.type == "Verification" }
+            assertNotNull(verificationEvent) { "Missed verification event" }
+
+            val verification = jacksonObjectMapper().readValue<List<Verification>>(verificationEvent.body.toByteArray()).firstOrNull()
+            assertNotNull(verification) { "Verification event does not contain the verification" }
+            val actualLegs = verification.fields["legs"]?.fields?.values?.toList()
+            assertNotNull(actualLegs) { "Actual legs is missed" }
+
+            val expectedLegs = linkedMapOf(
+                    0 to linkedMapOf(
+                            "A" to VerificationStatus.NA,
+                            "B" to VerificationStatus.NA,
+                            "C" to VerificationStatus.FAILED,
+                            "D" to VerificationStatus.FAILED
+                            
+                    ),
+                    1 to linkedMapOf(
+                            "C" to VerificationStatus.NA,
+                            "D" to VerificationStatus.NA,
+                            "A" to VerificationStatus.FAILED,
+                            "B" to VerificationStatus.FAILED
+                    )
+            )
+
+            expectedLegs.forEach { (leg, verificationEntryByField) ->
+                val actualLeg = actualLegs[leg].fields
+                assertNotNull(actualLeg) { "The validation event does not contain the expected leg" }
+                verificationEntryByField.forEach { (field, status) ->
+                    val expectedVerificationEntry = actualLeg[field]
+                    assertNotNull(expectedVerificationEntry) { "Actual leg does not contain the expected field" }
+                    assertEquals(status, expectedVerificationEntry.status)
+                }
+            }
         })
     }
 
