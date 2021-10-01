@@ -37,6 +37,7 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
@@ -391,21 +392,27 @@ abstract class AbstractCheckTask(
                 messageContainer.metadataMessage,
                 it.message, it.comparatorSettings,
                 matchNames
-            ).also { comparisonResult ->
+            )?.also { comparisonResult ->
                 LOGGER.debug("Metadata comparison result\n {}", comparisonResult)
             }
         }
         if (metadataFilter != null && metadataComparisonResult == null) {
             if (LOGGER.isDebugEnabled) {
                 LOGGER.debug("Metadata for message {} does not match the filter by key fields. Skip message checking",
-                    shortDebugString(messageContainer.protoMessage.metadata.id))
+                        messageContainer.protoMessage.metadata.id.toJson())
             }
             return AggregatedFilterResult.EMPTY
         }
         val comparisonResult: ComparisonResult? = messageFilter.let {
             MessageComparator.compare(messageContainer.sailfishMessage, it.message, it.comparatorSettings, matchNames)
         }
-        LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
+
+        if (comparisonResult == null) {
+            LOGGER.debug("Comparison result for the message '{}' with the message `{}` does not match the filter by key fields or message type",
+                    messageContainer.sailfishMessage.name, messageFilter.message.name)
+        } else {
+            LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
+        }
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
             if (significant) {
@@ -442,10 +449,10 @@ abstract class AbstractCheckTask(
             it.metaContainer = VerificationUtil.toMetaContainer(this)
         }
 
-    protected fun Event.appendEventWithVerification(protoMessage: Message, protoMessageFilter: MessageFilter, comparisonResult: ComparisonResult): Event {
+    protected fun Event.appendEventWithVerification(protoMessage: Message, protoFilter: RootMessageFilter, comparisonResult: ComparisonResult): Event {
         val verificationComponent = VerificationBuilder()
         comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
-            verificationComponent.verification(key, value, protoMessageFilter, true)
+            verificationComponent.verification(key, value, protoFilter.messageFilter, true)
         }
 
         with(protoMessage.metadata) {
@@ -454,6 +461,9 @@ abstract class AbstractCheckTask(
                 .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
                 .messageID(id)
                 .bodyData(verificationComponent.build())
+            if (protoFilter.hasDescription()) {
+                description(protoFilter.description.value)
+            }
         }
         return this
     }
@@ -495,7 +505,7 @@ abstract class AbstractCheckTask(
     protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {
         val protoFilter = comparisonContainer.protoFilter
         addSubEventWithSamePeriod()
-            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter.messageFilter, comparisonContainer.result.messageResult!!)
+            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter, comparisonContainer.result.messageResult!!)
         if (protoFilter.hasMetadataFilter()) {
             addSubEventWithSamePeriod()
                 .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.result.metadataResult!!)
