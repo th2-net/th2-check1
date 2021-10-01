@@ -138,6 +138,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Migrated `grpc-check1` version from `3.2.0` to `3.4.1`
 + Migrated sailfish-utils from `3.7.0` to `3.8.1`
   + Now Check1 keep the order of repeating result groups by default
+  + Fix IN, NOT_IN FilterOperation interaction
 
 ### 3.7.2
 
