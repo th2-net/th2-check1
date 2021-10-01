@@ -129,10 +129,13 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Added metric for monitoring active rules and messages count
 + Added check for required message type in the message filter
 + Provided more detailed logging in comparable messages
++ Provided the ability to attach verification description to event
 
 #### Changed:
-+ Migrated common version from `3.25.0` to `3.25.2`
++ Migrated `common` version from `3.25.0` to `3.26.3`
   + Added support for converting SimpleList to readable payload body
+  + Added the new `description` parameter to `RootMessageFilter` message
++ Migrated `grpc-check1` version from `3.2.0` to `3.4.1`
 + Migrated sailfish-utils from `3.7.0` to `3.8.1`
   + Now Check1 keep the order of repeating result groups by default
 
