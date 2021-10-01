@@ -33,6 +33,7 @@ import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import io.reactivex.Observable
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicBoolean
 
 class SilenceCheckTask(
     protoPreFilter: PreFilter,
@@ -71,6 +72,7 @@ class SilenceCheckTask(
 
     @Volatile
     private var started = false
+    private val isCanceled = AtomicBoolean()
 
     override fun onStart() {
         super.onStart()
@@ -83,7 +85,6 @@ class SilenceCheckTask(
                 LOGGER.info("Parent task was not finished normally. Skip checking extra messages")
             }
             cancel()
-            checkComplete()
             return
         }
         preFilterEvent = Event.start()
@@ -98,9 +99,8 @@ class SilenceCheckTask(
     }
 
     override fun onChainedTaskSubscription() {
-        if (started) {
+        if (started) { // because we cannot cancel task before it is actually started
             cancel()
-            checkComplete()
         } else {
             if (LOGGER.isInfoEnabled) {
                 LOGGER.info("The ${type()} task '$description' will be automatically canceled when it begins")
@@ -139,7 +139,10 @@ class SilenceCheckTask(
         }
     }
 
-    override fun completeEvent(taskState: State) {
+    override fun completeEvent(taskState: State): Boolean {
+        if (isCanceled.get()) {
+            return false
+        }
         preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
@@ -147,6 +150,15 @@ class SilenceCheckTask(
         } else {
             resultEvent.status(Event.Status.FAILED)
                 .name("Check failed: $extraMessagesCounter extra messages were found.")
+        }
+        return true
+    }
+
+    private fun cancel() {
+        if (isCanceled.compareAndSet(false, true)) {
+            checkComplete()
+        } else {
+            LOGGER.debug("Task {} '{}' already canceled", type(), description)
         }
     }
 }

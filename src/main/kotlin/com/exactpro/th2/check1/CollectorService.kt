@@ -62,7 +62,7 @@ class CollectorService(
 
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
-    private val defaultAutoSilenceCheck: Boolean = configuration.isAutoSequenceRuleSilenceCheck
+    private val defaultAutoSilenceCheck: Boolean = configuration.isAutoSilenceCheckAfterSequenceRule
 
     private var ruleFactory: RuleFactory
 

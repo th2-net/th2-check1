@@ -169,11 +169,12 @@ class SequenceCheckRuleTask(
         }
     }
 
-    override fun completeEvent(taskState: State) {
+    override fun completeEvent(taskState: State): Boolean {
         preFilterEvent.name("Pre-filtering (filtered ${preFilteringResults.size} / processed $handledMessageCounter) messages")
 
         fillSequenceEvent()
         fillCheckMessagesEvent()
+        return super.completeEvent(taskState)
     }
 
     override fun name(): String = "Check sequence rule"

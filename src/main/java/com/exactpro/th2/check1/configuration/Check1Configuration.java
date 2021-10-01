@@ -35,9 +35,9 @@ public class Check1Configuration {
     @JsonProperty(value="rule-execution-timeout", defaultValue = "5000")
     private long ruleExecutionTimeout = 5000L;
 
-    @JsonProperty("auto-sequence-rule-silence-check")
+    @JsonProperty("auto-silence-check-after-sequence-rule")
     @JsonPropertyDescription("The default behavior in case the SequenceCheckRule does not have silenceCheck parameter specified")
-    private boolean autoSequenceRuleSilenceCheck;
+    private boolean autoSilenceCheckAfterSequenceRule;
 
     public int getMessageCacheSize() {
         return messageCacheSize;
@@ -59,7 +59,7 @@ public class Check1Configuration {
         return ruleExecutionTimeout;
     }
 
-    public boolean isAutoSequenceRuleSilenceCheck() {
-        return autoSequenceRuleSilenceCheck;
+    public boolean isAutoSilenceCheckAfterSequenceRule() {
+        return autoSilenceCheckAfterSequenceRule;
     }
 }

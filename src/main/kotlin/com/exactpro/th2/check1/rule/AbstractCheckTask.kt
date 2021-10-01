@@ -101,9 +101,6 @@ abstract class AbstractCheckTask(
     private var streamCompletedState = State.STREAM_COMPLETED
     @Volatile
     private var completed = false
-    @Volatile
-    protected var isCanceled = false
-        private set
     protected var isParentCompleted: Boolean? = null
         private set
 
@@ -334,10 +331,6 @@ abstract class AbstractCheckTask(
         }
     }
 
-    protected fun cancel() {
-        isCanceled = true
-    }
-
     private fun taskFinished() {
         try {
             val currentState = taskState.get()
@@ -345,12 +338,8 @@ abstract class AbstractCheckTask(
             if (currentState.callOnTimeoutCallback) {
                 callOnTimeoutCallback()
             }
-            if (isCanceled) {
-                LOGGER.info("Task '$description' has been canceled. No result will published")
-            } else {
-                publishEvent()
-                LOGGER.info("Task '$description' has been finished")
-            }
+            publishEvent()
+            LOGGER.info("Task '$description' has been finished")
         } catch (ex: Exception) {
             val message = "Cannot finish task '$description'"
             LOGGER.error(message, ex)
@@ -405,8 +394,9 @@ abstract class AbstractCheckTask(
     /**
      * Prepare the root event or children events for publication.
      * This method is invoked in [State.PUBLISHED] state.
+     * @return `true` if the event should be published. Otherwise, `false`
      */
-    protected open fun completeEvent(taskState: State) {}
+    protected open fun completeEvent(taskState: State): Boolean = true
 
     protected fun isCheckpointLastReceivedMessage(): Boolean = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
 
@@ -416,9 +406,13 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            completeEventOrReportError(prevState)
+            val publish = completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
+            if (!publish) {
+                LOGGER.info("Skip event publication for task ${type()} '$description' (${hashCode()})")
+                return
+            }
             val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
 
             RESPONSE_EXECUTOR.execute {
@@ -439,10 +433,9 @@ abstract class AbstractCheckTask(
         }
     }
 
-    private fun completeEventOrReportError(prevState: State) {
-        try {
-            completeEvent(prevState)
-            doAfterCompleteEvent()
+    private fun completeEventOrReportError(prevState: State): Boolean {
+        return try {
+            completeEvent(prevState).also { doAfterCompleteEvent() }
         } catch (e: Exception) {
             LOGGER.error("Result event cannot be completed", e)
             rootEvent.addSubEventWithSamePeriod()
@@ -451,6 +444,7 @@ abstract class AbstractCheckTask(
                     .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
                     .bodyData(EventUtils.createMessageBean(e.message))
                     .status(FAILED)
+            true
         }
     }
 

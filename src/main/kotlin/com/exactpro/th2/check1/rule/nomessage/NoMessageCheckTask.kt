@@ -98,7 +98,7 @@ class NoMessageCheckTask(
         }
     }
 
-    override fun completeEvent(taskState: State) {
+    override fun completeEvent(taskState: State): Boolean {
         preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
@@ -117,5 +117,6 @@ class NoMessageCheckTask(
             }
             resultEvent.addSubEvent(executionStopEvent)
         }
+        return super.completeEvent(taskState)
     }
 }
