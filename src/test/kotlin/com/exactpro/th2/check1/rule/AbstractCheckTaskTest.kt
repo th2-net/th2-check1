@@ -86,7 +86,7 @@ abstract class AbstractCheckTaskTest {
             }
             asserts(expectedVerificationEntry, actualVerificationEntry)
             if (expectedVerificationEntry.fields == null) {
-                return
+                return@forEach
             }
             assertVerificationEntries(expectedVerificationEntry.fields, actualVerificationEntry.fields, asserts)
         }
