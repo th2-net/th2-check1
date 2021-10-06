@@ -463,7 +463,7 @@ abstract class AbstractCheckTask(
         )
     }
 
-    protected fun matchFilter(
+    internal fun matchFilter(
         messageContainer: MessageContainer,
         messageFilter: SailfishFilter,
         metadataFilter: SailfishFilter?,
