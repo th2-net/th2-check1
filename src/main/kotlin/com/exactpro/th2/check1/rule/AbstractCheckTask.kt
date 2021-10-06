@@ -394,9 +394,10 @@ abstract class AbstractCheckTask(
     /**
      * Prepare the root event or children events for publication.
      * This method is invoked in [State.PUBLISHED] state.
-     * @return `true` if the event should be published. Otherwise, `false`
      */
-    protected open fun completeEvent(taskState: State): Boolean = true
+    protected open fun completeEvent(taskState: State) {}
+
+    protected open val skipPublication: Boolean = false
 
     protected fun isCheckpointLastReceivedMessage(): Boolean = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
 
@@ -406,10 +407,10 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            val publish = completeEventOrReportError(prevState)
+            val hasError = completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
-            if (!publish) {
+            if (skipPublication && !hasError) {
                 LOGGER.info("Skip event publication for task ${type()} '$description' (${hashCode()})")
                 return
             }
@@ -435,7 +436,9 @@ abstract class AbstractCheckTask(
 
     private fun completeEventOrReportError(prevState: State): Boolean {
         return try {
-            completeEvent(prevState).also { doAfterCompleteEvent() }
+            completeEvent(prevState)
+            doAfterCompleteEvent()
+            false
         } catch (e: Exception) {
             LOGGER.error("Result event cannot be completed", e)
             rootEvent.addSubEventWithSamePeriod()

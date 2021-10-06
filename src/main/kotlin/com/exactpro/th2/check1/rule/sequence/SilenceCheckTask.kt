@@ -139,9 +139,9 @@ class SilenceCheckTask(
         }
     }
 
-    override fun completeEvent(taskState: State): Boolean {
-        if (isCanceled.get()) {
-            return false
+    override fun completeEvent(taskState: State) {
+        if (skipPublication) {
+            return
         }
         preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
@@ -151,8 +151,10 @@ class SilenceCheckTask(
             resultEvent.status(Event.Status.FAILED)
                 .name("Check failed: $extraMessagesCounter extra messages were found.")
         }
-        return true
     }
+
+    override val skipPublication: Boolean
+        get() = isCanceled.get()
 
     private fun cancel() {
         if (isCanceled.compareAndSet(false, true)) {
