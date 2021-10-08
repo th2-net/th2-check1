@@ -12,6 +12,7 @@
  */
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.sf.common.impl.messages.DefaultMessageFactory
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
@@ -25,9 +26,17 @@ class MessageContainer(
     val metadataMessage: IMessage by lazy {
         VerificationUtil.toMessage(protoMessage.metadata)
     }
+
+    companion object {
+        private val EMPTY_MESSAGE = DefaultMessageFactory.getFactory().createMessage("empty", "empty")
+        @JvmField
+        val FAKE = MessageContainer(Message.getDefaultInstance(), EMPTY_MESSAGE)
+    }
 }
 
 class SailfishFilter(
     val message: IMessage,
     val comparatorSettings: ComparatorSettings
 )
+
+fun MessageContainer.isNotFake(): Boolean = this !== MessageContainer.FAKE

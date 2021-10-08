@@ -17,6 +17,7 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.event.CheckSequenceUtils
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow
 import com.exactpro.th2.check1.grpc.PreFilter
@@ -25,6 +26,7 @@ import com.exactpro.th2.check1.rule.AggregatedFilterResult
 import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
+import com.exactpro.th2.check1.rule.preFilterBy
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -59,7 +61,7 @@ class SequenceCheckRuleTask(
     description: String?,
     startTime: Instant,
     sessionKey: SessionKey,
-    timeout: Long,
+    taskTimeout: TaskTimeout,
     maxEventBatchContentSize: Int,
     protoPreFilter: PreFilter,
     private val protoMessageFilters: List<RootMessageFilter>,
@@ -67,7 +69,7 @@ class SequenceCheckRuleTask(
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(description, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+) : AbstractCheckTask(description, taskTimeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
@@ -122,22 +124,14 @@ class SequenceCheckRuleTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        map { messageContainer -> // Compare the message with pre-filter
-            if (LOGGER.isDebugEnabled) {
-                LOGGER.debug("Pre-filtering message with id: {}", shortDebugString(messageContainer.protoMessage.metadata.id))
-            }
-            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false, significant = false)
-            ComparisonContainer(messageContainer, protoPreMessageFilter, result)
-        }.filter { preFilterContainer -> // Filter  check result of pre-filter
-            preFilterContainer.fullyMatches
-        }.doOnNext { preFilterContainer -> // Update pre-filter state
+        preFilterBy(this, protoPreMessageFilter, messagePreFilter, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 preFilterEvent.appendEventsWithVerification(preFilterContainer)
                 preFilterEvent.messageID(protoActual.metadata.id)
 
                 preFilteringResults[protoActual.metadata.id] = preFilterContainer
             }
-        }.map(ComparisonContainer::messageContainer)
+        }
 
     override fun onNext(messageContainer: MessageContainer) {
         for (index in messageFilters.indices) {
@@ -175,7 +169,7 @@ class SequenceCheckRuleTask(
         }
     }
 
-    override fun completeEvent(canceled: Boolean) {
+    override fun completeEvent(taskState: State) {
         preFilterEvent.name("Pre-filtering (filtered ${preFilteringResults.size} / processed $handledMessageCounter) messages")
 
         fillSequenceEvent()

@@ -15,13 +15,18 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.configuration.Check1Configuration
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.exception.RuleCreationException
 import com.exactpro.th2.check1.exception.RuleInternalException
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
+import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
+import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.ComparisonSettings
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
@@ -39,10 +44,12 @@ import java.time.Instant
 import java.util.concurrent.ForkJoinPool
 
 class RuleFactory(
-    private val maxEventBatchContentSize: Int,
+    configuration: Check1Configuration,
     private val streamObservable: Observable<StreamContainer>,
     private val eventBatchRouter: MessageRouter<EventBatch>
 ) {
+    private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
+    private val defaultRuleExecutionTimeout = configuration.ruleExecutionTimeout
 
     fun createCheckRule(request: CheckRuleRequest): CheckRuleTask =
             ruleCreation(request, request.parentEventId) {
@@ -50,6 +57,8 @@ class RuleFactory(
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
+                    val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
 
                     check(request.kindCase != CheckRuleRequest.KindCase.KIND_NOT_SET) {
                         "Either old filter or root filter must be set"
@@ -64,8 +73,8 @@ class RuleFactory(
                     CheckRuleTask(
                             request.description,
                             Instant.now(),
-                            SessionKey(sessionAlias, direction),
-                            request.timeout,
+                            sessionKey,
+                            createTaskTimeout(request.timeout, request.messageTimeout),
                             maxEventBatchContentSize,
                             filter,
                             request.parentEventId,
@@ -86,7 +95,8 @@ class RuleFactory(
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
-                    val direction = directionOrDefault(request.direction)
+                    val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
 
                     check((request.messageFiltersList.isEmpty() && request.rootMessageFiltersList.isNotEmpty())
                             || (request.messageFiltersList.isNotEmpty() && request.rootMessageFiltersList.isEmpty())) {
@@ -100,8 +110,8 @@ class RuleFactory(
                     SequenceCheckRuleTask(
                             request.description,
                             Instant.now(),
-                            SessionKey(sessionAlias, direction),
-                            request.timeout,
+                            sessionKey,
+                            createTaskTimeout(request.timeout, request.messageTimeout),
                             maxEventBatchContentSize,
                             request.preFilter,
                             protoMessageFilters,
@@ -115,6 +125,35 @@ class RuleFactory(
                     Event.start()
                             .name("Sequence check rule cannot be created")
                             .type("sequenceCheckRuleCreation")
+                }
+            }
+
+    fun createNoMessageCheckRule(request: NoMessageCheckRequest): NoMessageCheckTask =
+            ruleCreation(request, request.parentEventId) {
+                checkAndCreateRule { request ->
+                    check(request.hasParentEventId()) { "Parent event id can't be null" }
+                    val parentEventID: EventID = request.parentEventId
+                    check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
+                    val sessionAlias: String = request.connectivityId.sessionAlias
+                    val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
+
+                    NoMessageCheckTask(
+                            request.description,
+                            Instant.now(),
+                            sessionKey,
+                            createTaskTimeout(request.timeout, request.messageTimeout),
+                            maxEventBatchContentSize,
+                            request.preFilter,
+                            parentEventID,
+                            streamObservable,
+                            eventBatchRouter
+                    )
+                }
+                onErrorEvent {
+                    Event.start()
+                            .name("Check rule cannot be created")
+                            .type("checkRuleCreation")
                 }
             }
 
@@ -176,6 +215,37 @@ class RuleFactory(
                 LOGGER.error("Can not send event batch '{}'", batch.toJson(), e)
             }
         }
+    }
+
+    private fun checkCheckpoint(checkpoint: Checkpoint, sessionKey: SessionKey) {
+        check(checkpoint !== Checkpoint.getDefaultInstance()) { "Request doesn't contain a checkpoint" }
+        with(sessionKey) {
+            val directionCheckpoint = checkpoint.sessionAliasToDirectionCheckpointMap[sessionAlias]
+            checkNotNull(directionCheckpoint) { "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'" }
+            val checkpointData = directionCheckpoint.directionToCheckpointDataMap[direction.number]
+            checkNotNull(checkpointData) { "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'" }
+            with(checkpointData) {
+                check(sequence > 0L) { "The checkpoint data has incorrect sequence number '$sequence'" }
+                check(this.hasTimestamp()) { "The checkpoint data doesn't contain timestamp" }
+            }
+        }
+    }
+
+    private fun checkMessageTimeout(messageTimeout: Long, checkpointCheckAction: () -> Unit) {
+        when {
+            messageTimeout > 0 -> checkpointCheckAction()
+            messageTimeout < 0 -> error("Message timeout cannot be negative")
+        }
+    }
+
+    private fun createTaskTimeout(timeout: Long, messageTimeout: Long): TaskTimeout {
+        val newRuleTimeout = if (timeout <= 0) {
+            LOGGER.info("Rule execution timeout is less than or equal to zero, used default rule execution timeout '$defaultRuleExecutionTimeout'")
+            defaultRuleExecutionTimeout
+        } else {
+            timeout
+        }
+        return TaskTimeout(newRuleTimeout, messageTimeout)
     }
 
     private class RuleCreationContext<T : GeneratedMessageV3, R : AbstractCheckTask> {

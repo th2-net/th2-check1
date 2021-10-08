@@ -14,24 +14,32 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.common.event.IBodyData
 import com.exactpro.th2.common.event.bean.Verification
 import com.exactpro.th2.common.event.bean.VerificationEntry
+import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Direction.FIRST
 import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.ValueFilter
+import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.google.protobuf.Timestamp
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -50,9 +58,16 @@ abstract class AbstractCheckTaskTest {
         )
     }
 
-    fun constructMessage(sequence: Long = 0, alias: String = SESSION_ALIAS, type: String = MESSAGE_TYPE, direction: Direction = FIRST): Message.Builder = Message.newBuilder().apply {
+    fun constructMessage(
+        sequence: Long = 0,
+        alias: String = SESSION_ALIAS,
+        type: String = MESSAGE_TYPE,
+        direction: Direction = FIRST,
+        timestamp: Timestamp = Timestamp.getDefaultInstance()
+    ): Message.Builder = Message.newBuilder().apply {
         metadataBuilder.apply {
-            messageType = type
+            this.messageType = type
+            this.timestamp = timestamp
             idBuilder.apply {
                 this.sequence = sequence
                 this.direction = direction
@@ -60,6 +75,39 @@ abstract class AbstractCheckTaskTest {
             }
         }
     }
+
+    protected fun createEvent(id: String): EventID {
+        return EventID.newBuilder().setId(id).build()
+    }
+
+    protected fun getMessageTimestamp(start: Instant, delta: Long): Timestamp =
+        start.plusMillis(delta).toTimestamp()
+
+    protected fun createCheckpoint(timestamp: Instant? = null, sequence: Long = -1) : Checkpoint =
+        Checkpoint.newBuilder().apply {
+            putSessionAliasToDirectionCheckpoint(
+                SESSION_ALIAS,
+                Checkpoint.DirectionCheckpoint.newBuilder().apply {
+                    putDirectionToCheckpointData(
+                        FIRST.number,
+                        Checkpoint.CheckpointData.newBuilder().apply {
+                            this.sequence = sequence
+                            if (timestamp != null) {
+                                this.timestamp = timestamp.toTimestamp()
+                            }
+                        }.build()
+                    )
+                }.build()
+            )
+        }.build()
+
+    protected fun createPreFilter(fieldName: String, value: String, operation: FilterOperation): PreFilter =
+        PreFilter.newBuilder()
+            .putFields(fieldName, ValueFilter.newBuilder().setSimpleFilter(value).setKey(true).setOperation(operation).build())
+            .build()
+
+    protected fun List<Event>.findEventByType(eventType: String): Event? =
+        this.find { it.type == eventType }
 
     protected fun extractEventBody(verificationEvent: Event): List<IBodyData> {
         return jacksonObjectMapper()

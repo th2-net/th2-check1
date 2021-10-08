@@ -15,6 +15,7 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.exception.RuleCreationException
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.common.event.EventUtils
@@ -50,7 +51,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(1024 * 1024, streams, clientStub)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())

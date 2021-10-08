@@ -1,4 +1,4 @@
-# th2 check1 (3.8.0)
+# th2 check1 (3.9.0)
 
 ## Overview
 
@@ -18,6 +18,7 @@ Available requests are described in [this repository](https://gitlab.exactpro.co
 
 - CheckSequenceRuleRequest - prefilters the messages and verify all of them by filter. Order checking configured from request.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
+- NoMessageCheckRequest - prefilters messages and verifies that no other messages have been received.
 
 ## Quick start
 General view of the component will look like this:
@@ -67,7 +68,8 @@ This block describes the configuration for check1.
   "message-cache-size": 1000,
   "cleanup-older-than": 60,
   "cleanup-time-unit": "SECONDS",
-  "max-event-batch-content-size": "1048576"
+  "max-event-batch-content-size": "1048576",
+  "rule-execution-timeout": 5000
 }
 ```
 
@@ -120,6 +122,12 @@ The `th2_check1_actual_cache_number` metric separate messages with two labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 3.9.0
+
+#### Added:
++ Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
++ New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
 
 ### 3.8.0
 

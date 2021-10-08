@@ -31,6 +31,9 @@ public class Check1Configuration {
     @JsonProperty(value="cleanup-time-unit", defaultValue = "SECONDS")
     private ChronoUnit cleanupTimeUnit = ChronoUnit.SECONDS;
 
+    @JsonProperty(value="rule-execution-timeout", defaultValue = "5000")
+    private long ruleExecutionTimeout = 5000L;
+
     public int getMessageCacheSize() {
         return messageCacheSize;
     }
@@ -45,5 +48,9 @@ public class Check1Configuration {
 
     public ChronoUnit getCleanupTimeUnit() {
         return cleanupTimeUnit;
+    }
+
+    public long getRuleExecutionTimeout() {
+        return ruleExecutionTimeout;
     }
 }
