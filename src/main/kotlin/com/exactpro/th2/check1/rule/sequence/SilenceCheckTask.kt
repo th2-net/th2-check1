@@ -18,9 +18,9 @@ import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTask
-import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
 import com.exactpro.th2.check1.rule.SailfishFilter
+import com.exactpro.th2.check1.rule.preFilterBy
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.check1.utils.toRootMessageFilter
 import com.exactpro.th2.common.event.Event
@@ -28,7 +28,6 @@ import com.exactpro.th2.common.event.EventUtils.createMessageBean
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.RootMessageFilter
-import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import io.reactivex.Observable
@@ -117,20 +116,12 @@ class SilenceCheckTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        map { messageContainer -> // Compare the message with pre-filter
-            if (LOGGER.isDebugEnabled) {
-                LOGGER.debug("Pre-filtering message with id: {}", messageContainer.protoMessage.metadata.id.toJson())
-            }
-            val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false, significant = false)
-            ComparisonContainer(messageContainer, protoPreMessageFilter, result)
-        }.filter { preFilterContainer -> // Filter  check result of pre-filter
-            preFilterContainer.fullyMatches
-        }.doOnNext { preFilterContainer -> // Update pre-filter state
+        preFilterBy(this, protoPreMessageFilter, messagePreFilter, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 preFilterEvent.appendEventsWithVerification(preFilterContainer)
                 preFilterEvent.messageID(protoActual.metadata.id)
             }
-        }.map(ComparisonContainer::messageContainer)
+        }
 
     override fun onNext(container: MessageContainer) {
         container.protoMessage.metadata.apply {
