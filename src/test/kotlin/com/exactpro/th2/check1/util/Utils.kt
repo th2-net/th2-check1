@@ -13,6 +13,8 @@
 
 package com.exactpro.th2.check1.util
 
+import com.exactpro.th2.common.event.bean.VerificationEntry
+import com.exactpro.th2.common.event.bean.VerificationStatus
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.MetadataFilter
 
@@ -21,3 +23,12 @@ fun String.toSimpleFilter(op: FilterOperation, key: Boolean = false): MetadataFi
     .setValue(this)
     .setKey(key)
     .build()
+
+
+fun createVerificationEntry(status: VerificationStatus): VerificationEntry = VerificationEntry().apply {
+    this.status = status
+}
+
+fun createVerificationEntry(vararg verificationEntries: Pair<String, VerificationEntry>): VerificationEntry = VerificationEntry().apply {
+    fields = linkedMapOf(*verificationEntries)
+}

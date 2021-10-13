@@ -14,16 +14,26 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.common.event.IBodyData
+import com.exactpro.th2.common.event.bean.Verification
+import com.exactpro.th2.common.event.bean.VerificationEntry
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Direction.FIRST
+import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
@@ -50,6 +60,56 @@ abstract class AbstractCheckTaskTest {
             }
         }
     }
+
+    protected fun extractEventBody(verificationEvent: Event): List<IBodyData> {
+        return jacksonObjectMapper()
+                .addMixIn(IBodyData::class.java, IBodyDataMixIn::class.java)
+                .readValue(verificationEvent.body.toByteArray())
+    }
+
+    protected fun assertVerification(verificationEvent: Event): Verification {
+        val verifications = extractEventBody(verificationEvent)
+        val verification = verifications.filterIsInstance<Verification>().firstOrNull()
+        assertNotNull(verification) { "Verification event does not contain the verification" }
+        return verification
+    }
+
+    protected fun assertVerificationEntries(
+            expectedVerificationEntries: Map<String, VerificationEntry>,
+            actualVerificationEntries: Map<String, VerificationEntry>?,
+            asserts: (VerificationEntry, VerificationEntry) -> Unit) {
+        assertNotNull(actualVerificationEntries) { "Actual verification entry is null" }
+        expectedVerificationEntries.forEach { (expectedFieldName, expectedVerificationEntry) ->
+            val actualVerificationEntry = actualVerificationEntries[expectedFieldName]
+            assertNotNull(actualVerificationEntry) {
+                "Actual verification entry does not contains field '${expectedFieldName}'"
+            }
+            asserts(expectedVerificationEntry, actualVerificationEntry)
+            if (expectedVerificationEntry.fields == null) {
+                return@forEach
+            }
+            assertVerificationEntries(expectedVerificationEntry.fields, actualVerificationEntry.fields, asserts)
+        }
+    }
+
+    protected fun assertVerifications(
+            expectedVerification: Verification,
+            actualVerification: Verification,
+            asserts: (VerificationEntry, VerificationEntry) -> Unit) =  assertVerificationEntries(expectedVerification.fields, actualVerification.fields, asserts)
+
+    protected fun assertVerificationByStatus(verification: Verification, expectedVerificationEntries: Map<String, VerificationEntry>) {
+        assertVerificationEntries(expectedVerificationEntries, verification.fields) { expected, actual ->
+            assertEquals(expected.status, actual.status)
+        }
+    }
+
+
+    @JsonSubTypes(value = [
+        JsonSubTypes.Type(value = Verification::class, name = Verification.TYPE),
+        JsonSubTypes.Type(value = com.exactpro.th2.common.event.bean.Message::class, name = com.exactpro.th2.common.event.bean.Message.TYPE)
+    ])
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type", include = JsonTypeInfo.As.PROPERTY, visible = true)
+    private interface IBodyDataMixIn
 
     companion object {
         const val MESSAGE_TYPE = "TestMsg"

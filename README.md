@@ -1,4 +1,4 @@
-# th2 check1 (3.7.2)
+# th2 check1 (3.8.0)
 
 ## Overview
 
@@ -108,7 +108,38 @@ spec:
         - "parsed"
 ```
 
+## Prometheus metrics
+The Check1 component publishes Prometheus metrics to observe the actual state of it
+* `th2_check1_actual_cache_number` - actual number of messages in caches
+* `th2_check1_active_tasks_number` - actual number of currently working rules
+
+The `th2_check1_actual_cache_number` metric separate messages with two labels:
+* `session_alias` - session alias of received message
+* `direction` - direction of received message
+
+The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
+
 ## Release Notes
+
+### 3.8.0
+
+#### Added:
++ Added check for positive timeout
++ Added mechanism for handling exceptions when creating and executing rules which publishes events about an error that has occurred
++ Added metric for monitoring active rules and messages count
++ Added check for required message type in the message filter
++ Provided more detailed logging in comparable messages
++ Provided the ability to attach verification description to event
++ Provided the ability to verify repeating groups according to defined filters via `check_repeating_group_order` parameter in the `RootComparisonSettings` message
+
+#### Changed:
++ Migrated `common` version from `3.25.0` to `3.26.4`
+  + Added support for converting SimpleList to readable payload body
+  + Added the new `description` parameter to `RootMessageFilter` message
++ Migrated `grpc-check1` version from `3.2.0` to `3.4.2`
++ Migrated sailfish-utils from `3.7.0` to `3.8.1`
+  + Now Check1 keep the order of repeating result groups by default
+  + Fix IN, NOT_IN FilterOperation interaction
 
 ### 3.7.2
 

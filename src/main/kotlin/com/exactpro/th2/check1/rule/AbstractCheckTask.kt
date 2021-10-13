@@ -13,6 +13,7 @@
 
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
@@ -21,6 +22,8 @@ import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
+import com.exactpro.th2.check1.exception.RuleInternalException
+import com.exactpro.th2.check1.metrics.RuleMetric
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
@@ -34,6 +37,7 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
@@ -71,13 +75,15 @@ abstract class AbstractCheckTask(
         require(maxEventBatchContentSize > 0) {
             "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize"
         }
+        require(timeout > 0) {
+            "'timeout' should be set or be greater than zero, actual: $timeout"
+        }
     }
 
     protected var handledMessageCounter: Long = 0
 
     protected val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
-    protected val rootEvent: Event = Event.from(submitTime)
-        .description(description)
+    protected val rootEvent: Event = Event.from(submitTime).description(description)
 
     private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
@@ -199,6 +205,10 @@ abstract class AbstractCheckTask(
      */
     protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
 
+    protected abstract fun name(): String
+    protected abstract fun type(): String
+    protected abstract fun setup(rootEvent: Event)
+
     /**
      * Observe a message sequence from the previous task.
      * Task subscribe to messages stream with sequence after call.
@@ -208,10 +218,12 @@ abstract class AbstractCheckTask(
      * @throws IllegalStateException when method is called more than once.
      */
     private fun begin(sequence: Long = DEFAULT_SEQUENCE, executorService: ExecutorService = createExecutorService()) {
+        configureRootEvent()
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
+        RuleMetric.incrementActiveRule(type())
         this.lastSequence = sequence
         this.executorService = executorService
         val scheduler = Schedulers.from(executorService)
@@ -219,29 +231,40 @@ abstract class AbstractCheckTask(
         endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end("Timeout is exited") }
 
-        messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
-            .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
+        try {
+            messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
+                    .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
 
-            // All sources above will be disposed on this scheduler.
-            //
-            // This method should be called as closer as possible
-            // to the actual dispose that you want to execute on this scheduler
-            // because other operations are executed on the same single-thread scheduler.
-            //
-            // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
-            // In the worst-case scenario, it might never happen.
-            .unsubscribeOn(scheduler)
-            .continueObserve(sessionKey, sequence)
-            .doOnNext {
-                handledMessageCounter++
+                    // All sources above will be disposed on this scheduler.
+                    //
+                    // This method should be called as closer as possible
+                    // to the actual dispose that you want to execute on this scheduler
+                    // because other operations are executed on the same single-thread scheduler.
+                    //
+                    // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
+                    // In the worst-case scenario, it might never happen.
+                    .unsubscribeOn(scheduler)
+                    .continueObserve(sessionKey, sequence)
+                    .doOnNext {
+                        handledMessageCounter++
 
-                with(it.metadata.id) {
-                    rootEvent.messageID(this)
-                }
-            }
-            .mapToMessageContainer()
-            .taskPipeline()
-            .subscribe(this)
+                        with(it.metadata.id) {
+                            rootEvent.messageID(this)
+                        }
+                    }
+                    .mapToMessageContainer()
+                    .taskPipeline()
+                    .subscribe(this)
+        } catch (exception: Exception) {
+            LOGGER.error("An internal error occurred while executing rule", exception)
+            rootEvent.addSubEventWithSamePeriod()
+                    .name("An error occurred while executing rule")
+                    .type("internalError")
+                    .status(FAILED)
+                    .exception(exception, true)
+            taskFinished()
+            throw RuleInternalException("An internal error occurred while executing rule", exception)
+        }
     }
 
     private fun taskFinished() {
@@ -267,6 +290,7 @@ abstract class AbstractCheckTask(
                     .toProto(parentEventID))
                 .build())
         } finally {
+            RuleMetric.decrementActiveRule(type())
             sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
         }
     }
@@ -314,7 +338,7 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            completeEvent(prevState == State.TIMEOUT)
+            completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
             val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
@@ -337,6 +361,25 @@ abstract class AbstractCheckTask(
         }
     }
 
+    private fun completeEventOrReportError(prevState: State) {
+        try {
+            completeEvent(prevState == State.TIMEOUT)
+        } catch (e: Exception) {
+            LOGGER.error("Result event cannot be completed", e)
+            rootEvent.addSubEventWithSamePeriod()
+                    .name("Check result event cannot build completely")
+                    .type("eventNotComplete")
+                    .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
+                    .bodyData(EventUtils.createMessageBean(e.message))
+                    .status(FAILED)
+        }
+    }
+
+    private fun configureRootEvent() {
+        rootEvent.name(name()).type(type())
+        setup(rootEvent)
+    }
+
     protected fun matchFilter(
         messageContainer: MessageContainer,
         messageFilter: SailfishFilter,
@@ -349,21 +392,27 @@ abstract class AbstractCheckTask(
                 messageContainer.metadataMessage,
                 it.message, it.comparatorSettings,
                 matchNames
-            ).also { comparisonResult ->
+            )?.also { comparisonResult ->
                 LOGGER.debug("Metadata comparison result\n {}", comparisonResult)
             }
         }
         if (metadataFilter != null && metadataComparisonResult == null) {
             if (LOGGER.isDebugEnabled) {
                 LOGGER.debug("Metadata for message {} does not match the filter by key fields. Skip message checking",
-                    shortDebugString(messageContainer.protoMessage.metadata.id))
+                        messageContainer.protoMessage.metadata.id.toJson())
             }
             return AggregatedFilterResult.EMPTY
         }
         val comparisonResult: ComparisonResult? = messageFilter.let {
             MessageComparator.compare(messageContainer.sailfishMessage, it.message, it.comparatorSettings, matchNames)
         }
-        LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
+
+        if (comparisonResult == null) {
+            LOGGER.debug("Comparison result for the message '{}' with the message `{}` does not match the filter by key fields or message type",
+                    messageContainer.sailfishMessage.name, messageFilter.message.name)
+        } else {
+            LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
+        }
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
             if (significant) {
@@ -387,6 +436,11 @@ abstract class AbstractCheckTask(
         ComparatorSettings().also {
             it.metaContainer = VerificationUtil.toMetaContainer(this.messageFilter, false)
             it.ignoredFields = this.comparisonSettings.ignoreFieldsList.toSet()
+            if (this.comparisonSettings.checkRepeatingGroupOrder) {
+                it.isCheckGroupsOrder = true
+            } else {
+                it.isKeepResultGroupOrder = true
+            }
         }
 
     protected fun MessageFilter.toCompareSettings(): ComparatorSettings =
@@ -399,10 +453,10 @@ abstract class AbstractCheckTask(
             it.metaContainer = VerificationUtil.toMetaContainer(this)
         }
 
-    protected fun Event.appendEventWithVerification(protoMessage: Message, protoMessageFilter: MessageFilter, comparisonResult: ComparisonResult): Event {
+    protected fun Event.appendEventWithVerification(protoMessage: Message, protoFilter: RootMessageFilter, comparisonResult: ComparisonResult): Event {
         val verificationComponent = VerificationBuilder()
         comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
-            verificationComponent.verification(key, value, protoMessageFilter, true)
+            verificationComponent.verification(key, value, protoFilter.messageFilter, true)
         }
 
         with(protoMessage.metadata) {
@@ -411,6 +465,9 @@ abstract class AbstractCheckTask(
                 .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
                 .messageID(id)
                 .bodyData(verificationComponent.build())
+            if (protoFilter.hasDescription()) {
+                description(protoFilter.description.value)
+            }
         }
         return this
     }
@@ -452,11 +509,16 @@ abstract class AbstractCheckTask(
     protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {
         val protoFilter = comparisonContainer.protoFilter
         addSubEventWithSamePeriod()
-            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter.messageFilter, comparisonContainer.result.messageResult!!)
+            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter, comparisonContainer.result.messageResult!!)
         if (protoFilter.hasMetadataFilter()) {
             addSubEventWithSamePeriod()
                 .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.result.metadataResult!!)
         }
+    }
+
+    protected fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter,
+                                                              messageName: String = protoPreMessageFilter.messageType): IMessage {
+        return fromProtoFilter(protoPreMessageFilter.messageFilter, messageName)
     }
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
