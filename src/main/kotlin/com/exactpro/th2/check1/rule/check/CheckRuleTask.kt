@@ -15,7 +15,7 @@ package com.exactpro.th2.check1.rule.check
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
-import com.exactpro.th2.check1.entities.TaskTimeout
+import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
@@ -36,16 +36,15 @@ import java.time.Instant
  * This rule checks for the presence of a single message in the messages stream.
  */
 class CheckRuleTask(
-    description: String?,
+    ruleConfiguration: RuleConfiguration,
     startTime: Instant,
     sessionKey: SessionKey,
-    taskTimeout: TaskTimeout,
     maxEventBatchContentSize: Int,
     private val protoMessageFilter: RootMessageFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(description, taskTimeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+) : AbstractCheckTask(ruleConfiguration, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val messageFilter: SailfishFilter = SailfishFilter(
         converter.fromProtoPreFilter(protoMessageFilter),

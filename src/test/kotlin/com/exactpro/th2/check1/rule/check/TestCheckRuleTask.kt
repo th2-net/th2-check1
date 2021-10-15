@@ -62,10 +62,9 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         maxEventBatchContentSize: Int = 1024 * 1024,
         taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ) = CheckRuleTask(
-        SESSION_ALIAS,
+        createRuleConfiguration(taskTimeout, SESSION_ALIAS),
         Instant.now(),
         SessionKey(SESSION_ALIAS, Direction.FIRST),
-        taskTimeout,
         maxEventBatchContentSize,
         messageFilter,
         parentEventID,

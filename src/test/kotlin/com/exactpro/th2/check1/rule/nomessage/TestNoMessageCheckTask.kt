@@ -199,10 +199,9 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         maxEventBatchContentSize: Int = 1024 * 1024
     ): NoMessageCheckTask {
         return NoMessageCheckTask(
-            description = "Test",
+            ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, Direction.FIRST),
-            taskTimeout = taskTimeout,
             maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,

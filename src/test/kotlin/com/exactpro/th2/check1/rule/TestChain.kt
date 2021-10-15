@@ -14,6 +14,7 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
@@ -277,10 +278,9 @@ class TestChain: AbstractCheckTaskTest() {
         taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
-            description = "Test",
+            ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            taskTimeout = taskTimeout,
             maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),
@@ -298,10 +298,9 @@ class TestChain: AbstractCheckTaskTest() {
         maxEventBatchContentSize: Int = 1024 * 1024,
         taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ) = CheckRuleTask(
-        SESSION_ALIAS,
+        createRuleConfiguration(taskTimeout, SESSION_ALIAS),
         Instant.now(),
         SessionKey(SESSION_ALIAS, FIRST),
-        taskTimeout,
         maxEventBatchContentSize,
         createMessageFilter(sequence),
         parentEventID,
@@ -317,10 +316,9 @@ class TestChain: AbstractCheckTaskTest() {
         maxEventBatchContentSize: Int = 1024 * 1024
     ): NoMessageCheckTask {
         return NoMessageCheckTask(
-            description = "Test",
+            ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            taskTimeout = taskTimeout,
             maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,

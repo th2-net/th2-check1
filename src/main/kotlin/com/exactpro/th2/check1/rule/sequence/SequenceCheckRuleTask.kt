@@ -17,6 +17,7 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.event.CheckSequenceUtils
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow
@@ -58,10 +59,9 @@ import kotlin.collections.set
  * If this parameter is set to `false`, the order won't be checked.
  */
 class SequenceCheckRuleTask(
-    description: String?,
+    ruleConfiguration: RuleConfiguration,
     startTime: Instant,
     sessionKey: SessionKey,
-    taskTimeout: TaskTimeout,
     maxEventBatchContentSize: Int,
     protoPreFilter: PreFilter,
     private val protoMessageFilters: List<RootMessageFilter>,
@@ -69,7 +69,7 @@ class SequenceCheckRuleTask(
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(description, taskTimeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+) : AbstractCheckTask(ruleConfiguration, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(

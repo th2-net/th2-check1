@@ -783,10 +783,9 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         taskTimeout: TaskTimeout = TaskTimeout(5000L)
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
-            description = "Test",
+            ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, Direction.FIRST),
-            taskTimeout = taskTimeout,
             maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = filtersParam,

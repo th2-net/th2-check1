@@ -16,6 +16,7 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
+import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.exception.RuleCreationException
 import com.exactpro.th2.check1.exception.RuleInternalException
@@ -50,6 +51,8 @@ class RuleFactory(
 ) {
     private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
     private val defaultRuleExecutionTimeout = configuration.ruleExecutionTimeout
+    private val timePrecision = configuration.timePrecision
+    private val decimalPrecision = configuration.decimalPrecision
 
     fun createCheckRule(request: CheckRuleRequest): CheckRuleTask =
             ruleCreation(request, request.parentEventId) {
@@ -68,13 +71,18 @@ class RuleFactory(
                     } else {
                         request.filter.toRootMessageFilter()
                     }.also { it.validateRootMessageFilter() }
-                    val direction = directionOrDefault(request.direction)
+
+                    val ruleConfiguration = RuleConfiguration(
+                            createTaskTimeout(request.timeout, request.messageTimeout),
+                            request.description,
+                            timePrecision,
+                            decimalPrecision
+                    )
 
                     CheckRuleTask(
-                            request.description,
+                            ruleConfiguration,
                             Instant.now(),
                             sessionKey,
-                            createTaskTimeout(request.timeout, request.messageTimeout),
                             maxEventBatchContentSize,
                             filter,
                             request.parentEventId,
@@ -107,11 +115,17 @@ class RuleFactory(
                         request.messageFiltersList.map { it.toRootMessageFilter() }
                     }.onEach { it.validateRootMessageFilter() }
 
-                    SequenceCheckRuleTask(
+                    val ruleConfiguration = RuleConfiguration(
+                            createTaskTimeout(request.timeout, request.messageTimeout),
                             request.description,
+                            timePrecision,
+                            decimalPrecision
+                    )
+
+                    SequenceCheckRuleTask(
+                            ruleConfiguration,
                             Instant.now(),
                             sessionKey,
-                            createTaskTimeout(request.timeout, request.messageTimeout),
                             maxEventBatchContentSize,
                             request.preFilter,
                             protoMessageFilters,
@@ -138,11 +152,17 @@ class RuleFactory(
                     val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
                     checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
 
-                    NoMessageCheckTask(
+                    val ruleConfiguration = RuleConfiguration(
+                            createTaskTimeout(request.timeout, request.messageTimeout),
                             request.description,
+                            timePrecision,
+                            decimalPrecision
+                    )
+
+                    NoMessageCheckTask(
+                            ruleConfiguration,
                             Instant.now(),
                             sessionKey,
-                            createTaskTimeout(request.timeout, request.messageTimeout),
                             maxEventBatchContentSize,
                             request.preFilter,
                             parentEventID,
