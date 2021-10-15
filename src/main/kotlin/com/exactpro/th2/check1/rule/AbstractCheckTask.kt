@@ -184,7 +184,7 @@ abstract class AbstractCheckTask(
                     legacy.executorService
                 }
                 legacy.sequenceData.apply {
-                    checkTask.begin(lastSequence, lastMessageTimestamp, executor, untrusted, completed)
+                    checkTask.begin(lastSequence, lastMessageTimestamp, executor, PreviousExecutionData(untrusted, completed))
                 }
             }
             LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
@@ -274,11 +274,10 @@ abstract class AbstractCheckTask(
         sequence: Long = DEFAULT_SEQUENCE,
         checkpointTimestamp: Timestamp? = null,
         executorService: ExecutorService = createExecutorService(),
-        untrusted: Boolean = false,
-        parentTaskCompleted: Boolean? = null
+        previousExecutionData: PreviousExecutionData = PreviousExecutionData.DEFAULT
     ) {
         configureRootEvent()
-        isParentCompleted = parentTaskCompleted
+        isParentCompleted = previousExecutionData.completed
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
@@ -286,7 +285,7 @@ abstract class AbstractCheckTask(
         RuleMetric.incrementActiveRule(type())
         this.lastSequence = sequence
         this.executorService = executorService
-        this.untrusted = untrusted
+        this.untrusted = previousExecutionData.untrusted
         this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
         this.isDefaultSequence = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
@@ -708,4 +707,20 @@ abstract class AbstractCheckTask(
 
     private data class Legacy(val executorService: ExecutorService, val sequenceData: SequenceData)
     private data class SequenceData(val lastSequence: Long, val lastMessageTimestamp: Timestamp?, val untrusted: Boolean)
+    private data class PreviousExecutionData(
+        /**
+         * `true` if the previous rule in the chain marked as untrusted
+         */
+        val untrusted: Boolean = false,
+        /**
+         * `true` if previous rule has been completed normally. Otherwise, `false`
+         *
+         * `null` if there is no previous rule in chain
+         */
+        val completed: Boolean? = null
+    ) {
+        companion object {
+            val DEFAULT = PreviousExecutionData()
+        }
+    }
 }
