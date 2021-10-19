@@ -18,7 +18,6 @@ package com.exactpro.th2.check1.rule.sequence
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.RuleConfiguration
-import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.event.CheckSequenceUtils
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow
 import com.exactpro.th2.check1.grpc.PreFilter
@@ -62,14 +61,13 @@ class SequenceCheckRuleTask(
     ruleConfiguration: RuleConfiguration,
     startTime: Instant,
     sessionKey: SessionKey,
-    maxEventBatchContentSize: Int,
     protoPreFilter: PreFilter,
     private val protoMessageFilters: List<RootMessageFilter>,
     private val checkOrder: Boolean,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(ruleConfiguration, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(

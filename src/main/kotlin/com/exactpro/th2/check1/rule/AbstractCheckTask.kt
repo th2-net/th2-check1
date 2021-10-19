@@ -73,7 +73,6 @@ import java.util.concurrent.atomic.AtomicReference
  */
 abstract class AbstractCheckTask(
     private val ruleConfiguration: RuleConfiguration,
-    private val maxEventBatchContentSize: Int,
     submitTime: Instant,
     protected val sessionKey: SessionKey,
     private val parentEventID: EventID,
@@ -83,17 +82,6 @@ abstract class AbstractCheckTask(
 
     val description: String? = ruleConfiguration.description
     private val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
-
-    init {
-        require(maxEventBatchContentSize > 0) {
-            "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize"
-        }
-        with(ruleConfiguration.taskTimeout) {
-            require(timeout > 0) {
-                "'timeout' should be set or be greater than zero, actual: $timeout"
-            }
-        }
-    }
 
     protected var handledMessageCounter: Long = 0
 
@@ -390,7 +378,7 @@ abstract class AbstractCheckTask(
             completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
-            val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
+            val batches = rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
 
             RESPONSE_EXECUTOR.execute {
                 batches.forEach { batch ->

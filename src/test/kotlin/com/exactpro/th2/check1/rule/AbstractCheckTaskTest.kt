@@ -155,8 +155,8 @@ abstract class AbstractCheckTaskTest {
         }
     }
 
-    protected fun createRuleConfiguration(taskTimeout: TaskTimeout, description: String = "Test"): RuleConfiguration {
-        return RuleConfiguration(taskTimeout, description, configuration.timePrecision, configuration.decimalPrecision)
+    protected fun createRuleConfiguration(taskTimeout: TaskTimeout, description: String = "Test", maxEventBatchContentSize: Int = 1024 * 1024): RuleConfiguration {
+        return RuleConfiguration(taskTimeout, description, configuration.timePrecision, configuration.decimalPrecision, maxEventBatchContentSize)
     }
 
 

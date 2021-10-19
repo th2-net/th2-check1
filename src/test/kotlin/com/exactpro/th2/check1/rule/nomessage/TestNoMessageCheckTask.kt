@@ -195,14 +195,12 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
         preFilterParam: PreFilter,
-        taskTimeout: TaskTimeout = TaskTimeout(5000L, 3500L),
-        maxEventBatchContentSize: Int = 1024 * 1024
+        taskTimeout: TaskTimeout = TaskTimeout(5000L, 3500L)
     ): NoMessageCheckTask {
         return NoMessageCheckTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, Direction.FIRST),
-            maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,
             messageStream = messageStream,

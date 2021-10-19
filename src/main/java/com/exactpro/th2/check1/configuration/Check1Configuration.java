@@ -13,13 +13,13 @@
 
 package com.exactpro.th2.check1.configuration;
 
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-
-import com.exactpro.th2.check1.configuration.deserializer.DurationDeserializer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.datatype.jsr310.deser.DurationDeserializer;
+
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
 public class Check1Configuration {
 
@@ -38,13 +38,13 @@ public class Check1Configuration {
     @JsonProperty(value="rule-execution-timeout", defaultValue = "5000")
     private long ruleExecutionTimeout = 5000L;
 
-    @JsonProperty(value="decimal-precision", defaultValue = "0.005")
-    private double decimalPrecision = 0.005;
+    @JsonProperty(value="decimal-precision", defaultValue = "0.00001")
+    private double decimalPrecision = 0.00001;
 
-    @JsonProperty(value="time-precision", defaultValue = "PT3S")
+    @JsonProperty(value="time-precision", defaultValue = "PT0.000000001S")
     @JsonDeserialize(using = DurationDeserializer.class)
     @JsonPropertyDescription("The default time precision value uses java duration format")
-    private Duration timePrecision = Duration.parse("PT3S");
+    private Duration timePrecision = Duration.parse("PT0.000000001S");
 
     public int getMessageCacheSize() {
         return messageCacheSize;

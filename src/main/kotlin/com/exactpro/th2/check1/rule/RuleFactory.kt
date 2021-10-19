@@ -76,14 +76,14 @@ class RuleFactory(
                             createTaskTimeout(request.timeout, request.messageTimeout),
                             request.description,
                             timePrecision,
-                            decimalPrecision
+                            decimalPrecision,
+                            maxEventBatchContentSize
                     )
 
                     CheckRuleTask(
                             ruleConfiguration,
                             Instant.now(),
                             sessionKey,
-                            maxEventBatchContentSize,
                             filter,
                             request.parentEventId,
                             streamObservable,
@@ -119,14 +119,14 @@ class RuleFactory(
                             createTaskTimeout(request.timeout, request.messageTimeout),
                             request.description,
                             timePrecision,
-                            decimalPrecision
+                            decimalPrecision,
+                            maxEventBatchContentSize
                     )
 
                     SequenceCheckRuleTask(
                             ruleConfiguration,
                             Instant.now(),
                             sessionKey,
-                            maxEventBatchContentSize,
                             request.preFilter,
                             protoMessageFilters,
                             request.checkOrder,
@@ -156,14 +156,14 @@ class RuleFactory(
                             createTaskTimeout(request.timeout, request.messageTimeout),
                             request.description,
                             timePrecision,
-                            decimalPrecision
+                            decimalPrecision,
+                            maxEventBatchContentSize
                     )
 
                     NoMessageCheckTask(
                             ruleConfiguration,
                             Instant.now(),
                             sessionKey,
-                            maxEventBatchContentSize,
                             request.preFilter,
                             parentEventID,
                             streamObservable,

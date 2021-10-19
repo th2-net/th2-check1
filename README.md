@@ -70,8 +70,8 @@ This block describes the configuration for check1.
   "cleanup-time-unit": "SECONDS",
   "max-event-batch-content-size": "1048576",
   "rule-execution-timeout": 5000,
-  "time-precision": "PT3S",
-  "decimal-precision": 0.005
+  "time-precision": "PT0.000000001S",
+  "decimal-precision": 0.00001
 }
 ```
 

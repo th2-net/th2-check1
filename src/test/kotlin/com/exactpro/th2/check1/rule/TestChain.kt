@@ -14,7 +14,6 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
-import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
@@ -274,14 +273,12 @@ class TestChain: AbstractCheckTaskTest() {
         messageStream: Observable<StreamContainer>,
         checkOrder: Boolean = true,
         preFilterParam: PreFilter = preFilter,
-        maxEventBatchContentSize: Int = 1024 * 1024,
         taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),
             checkOrder = checkOrder,
@@ -295,13 +292,11 @@ class TestChain: AbstractCheckTaskTest() {
         sequence: Int,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
-        maxEventBatchContentSize: Int = 1024 * 1024,
         taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ) = CheckRuleTask(
         createRuleConfiguration(taskTimeout, SESSION_ALIAS),
         Instant.now(),
         SessionKey(SESSION_ALIAS, FIRST),
-        maxEventBatchContentSize,
         createMessageFilter(sequence),
         parentEventID,
         messageStream,
@@ -312,14 +307,12 @@ class TestChain: AbstractCheckTaskTest() {
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
         preFilterParam: PreFilter,
-        taskTimeout: TaskTimeout = TaskTimeout(5000L, 3500L),
-        maxEventBatchContentSize: Int = 1024 * 1024
+        taskTimeout: TaskTimeout = TaskTimeout(5000L, 3500L)
     ): NoMessageCheckTask {
         return NoMessageCheckTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,
             messageStream = messageStream,
