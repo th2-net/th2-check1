@@ -6,7 +6,7 @@ The component is responsible for verifying decoded messages.
 
 Communication with the script takes place via grpc, messages are received via rabbit mq.
 
-The component subscribes to queues specified in the configuration and accumulates messages from them in a FIFO buffer. 
+The component subscribes to the queues specified in the configuration and accumulates messages from them in a FIFO buffer. 
 
 The buffer size is configurable, and it is set to 1000 by default.
 
@@ -17,6 +17,10 @@ When the component starts, the grpc server also starts and then the component wa
 Available requests are described in [this repository](https://gitlab.exactpro.com/vivarium/th2/th2-core-open-source/th2-grpc-check1)
 
 - CheckSequenceRuleRequest - prefilters the messages and verify all of them by filter. Order checking configured from request.
+  Depending on the request and check1 configuration **SilenceCheckRule** can be added after the CheckSequenceRule.
+  It verifies that there were not any messages matches the pre-filter in original request.
+  It awaits for realtime timeout that is equal to clean-up timeout.
+  Report about unexpected messages only after the timeout exceeds. Reports nothing if any task is added to the chain.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
 - NoMessageCheckRequest - prefilters messages and verifies that no other messages have been received.
 
@@ -36,6 +40,10 @@ spec:
     cleanup-older-than: '60'
     cleanup-time-unit: 'SECONDS'
     max-event-batch-content-size: '1048576'
+    rule-execution-timeout: '5000'
+    auto-silence-check-after-sequence-rule: false
+    time-precision: 'PT0.000000001S'
+    decimal-precision: '0.00001'
   type: th2-check1
   pins:
     - name: server
@@ -70,6 +78,7 @@ This block describes the configuration for check1.
   "cleanup-time-unit": "SECONDS",
   "max-event-batch-content-size": "1048576",
   "rule-execution-timeout": 5000,
+  "auto-silence-check-after-sequence-rule": false,
   "time-precision": "PT0.000000001S",
   "decimal-precision": 0.00001
 }
@@ -89,6 +98,9 @@ The time unit for _cleanup-older-than_ setting. The available values are MILLIS,
 
 #### max-event-batch-content-size
 The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is set to 1048576_
+
+#### auto-silence-check-after-sequence-rule
+Defines a default behavior for creating CheckSequenceRule if `silence_check` parameter is not specified in the request. The default value is `false`
 
 ## Required pins
 
@@ -130,6 +142,8 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 #### Added:
 + Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
 + New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
++ Auto silence check after the CheckSequenceRule.
++ `auto-silence-check-after-sequence-rule` to setup a default behavior for CheckSequenceRule
 + New configuration parameter `time-precision` witch is uses if the user has not specified a time precision
 + New configuration parameter `decimal-precision` witch is uses if the user has not specified a number precision
 

@@ -38,6 +38,10 @@ public class Check1Configuration {
     @JsonProperty(value="rule-execution-timeout", defaultValue = "5000")
     private long ruleExecutionTimeout = 5000L;
 
+    @JsonProperty("auto-silence-check-after-sequence-rule")
+    @JsonPropertyDescription("The default behavior in case the SequenceCheckRule does not have silenceCheck parameter specified")
+    private boolean autoSilenceCheckAfterSequenceRule;
+
     @JsonProperty(value="decimal-precision", defaultValue = "0.00001")
     private double decimalPrecision = 0.00001;
 
@@ -64,6 +68,10 @@ public class Check1Configuration {
 
     public long getRuleExecutionTimeout() {
         return ruleExecutionTimeout;
+    }
+
+    public boolean isAutoSilenceCheckAfterSequenceRule() {
+        return autoSilenceCheckAfterSequenceRule;
     }
 
     public double getDecimalPrecision() {

@@ -26,6 +26,7 @@ import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
+import com.exactpro.th2.check1.rule.sequence.SilenceCheckTask
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.ComparisonSettings
@@ -37,7 +38,6 @@ import com.exactpro.th2.common.grpc.RootComparisonSettings
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.google.protobuf.GeneratedMessageV3
 import io.reactivex.Observable
 import mu.KotlinLogging
 import org.slf4j.Logger
@@ -55,8 +55,8 @@ class RuleFactory(
     private val decimalPrecision = configuration.decimalPrecision
 
     fun createCheckRule(request: CheckRuleRequest): CheckRuleTask =
-            ruleCreation(request, request.parentEventId) {
-                checkAndCreateRule { request ->
+            ruleCreation(request.parentEventId) {
+                checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
@@ -98,8 +98,8 @@ class RuleFactory(
             }
 
     fun createSequenceCheckRule(request: CheckSequenceRuleRequest): SequenceCheckRuleTask =
-            ruleCreation(request, request.parentEventId) {
-                checkAndCreateRule { request ->
+            ruleCreation(request.parentEventId) {
+                checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
@@ -143,8 +143,8 @@ class RuleFactory(
             }
 
     fun createNoMessageCheckRule(request: NoMessageCheckRequest): NoMessageCheckTask =
-            ruleCreation(request, request.parentEventId) {
-                checkAndCreateRule { request ->
+            ruleCreation(request.parentEventId) {
+                checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     val parentEventID: EventID = request.parentEventId
                     check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
@@ -177,11 +177,46 @@ class RuleFactory(
                 }
             }
 
+    fun createSilenceCheck(
+        request: CheckSequenceRuleRequest,
+        timeout: Long
+    ): SilenceCheckTask {
+        return ruleCreation(request.parentEventId) {
+            checkAndCreateRule {
+                check(timeout > 0) { "timeout must be greater that zero" }
+                val sessionAlias: String = request.connectivityId.sessionAlias
+                val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
 
-    private inline fun <T : GeneratedMessageV3, R : AbstractCheckTask> ruleCreation(request: T, parentEventId: EventID, block: RuleCreationContext<T, R>.() -> Unit): R {
-        val ruleCreationContext = RuleCreationContext<T, R>().apply(block)
+                val ruleConfiguration = RuleConfiguration(
+                        createTaskTimeout(timeout),
+                        request.description.takeIf(String::isNotEmpty),
+                        timePrecision,
+                        decimalPrecision,
+                        maxEventBatchContentSize
+                )
+
+                SilenceCheckTask(
+                    ruleConfiguration,
+                    request.preFilter,
+                    Instant.now(),
+                    sessionKey,
+                    request.parentEventId,
+                    streamObservable,
+                    eventBatchRouter
+                )
+            }
+            onErrorEvent {
+                Event.start()
+                    .name("Auto silence check rule cannot be created")
+                    .type("checkRuleCreation")
+            }
+        }
+    }
+
+    private inline fun <R : AbstractCheckTask> ruleCreation(parentEventId: EventID, block: RuleCreationContext<R>.() -> Unit): R {
+        val ruleCreationContext = RuleCreationContext<R>().apply(block)
         try {
-            return ruleCreationContext.action(request)
+            return ruleCreationContext.action()
         } catch (e: RuleInternalException) {
             throw e
         } catch (e: Exception) {
@@ -258,7 +293,7 @@ class RuleFactory(
         }
     }
 
-    private fun createTaskTimeout(timeout: Long, messageTimeout: Long): TaskTimeout {
+    private fun createTaskTimeout(timeout: Long, messageTimeout: Long = 0): TaskTimeout {
         val newRuleTimeout = if (timeout <= 0) {
             LOGGER.info("Rule execution timeout is less than or equal to zero, used default rule execution timeout '$defaultRuleExecutionTimeout'")
             defaultRuleExecutionTimeout
@@ -268,11 +303,11 @@ class RuleFactory(
         return TaskTimeout(newRuleTimeout, messageTimeout)
     }
 
-    private class RuleCreationContext<T : GeneratedMessageV3, R : AbstractCheckTask> {
-        lateinit var action: (T) -> R
+    private class RuleCreationContext<R : AbstractCheckTask> {
+        lateinit var action: () -> R
         lateinit var event: () -> Event
 
-        fun checkAndCreateRule(block: (T) -> R) {
+        fun checkAndCreateRule(block: () -> R) {
             action = block
         }
 
