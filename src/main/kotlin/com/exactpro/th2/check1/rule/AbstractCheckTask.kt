@@ -43,12 +43,12 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toJavaDuration
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.FilterSettings
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
-import com.exactpro.th2.sailfish.utils.util.RootComparisonSettingsUtils
 import com.google.protobuf.TextFormat.shortDebugString
 import com.google.protobuf.Timestamp
 import com.google.protobuf.util.Durations
@@ -637,7 +637,7 @@ abstract class AbstractCheckTask(
                     this@run.decimalPrecision.toDouble()
                 }
                 timePrecision = if (this@run.hasTimePrecision()) {
-                    RootComparisonSettingsUtils.convert(this@run.timePrecision)
+                    this@run.timePrecision.toJavaDuration()
                 } else {
                     ruleConfiguration.timePrecision
                 }
