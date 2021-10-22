@@ -99,8 +99,17 @@ The time unit for _cleanup-older-than_ setting. The available values are MILLIS,
 #### max-event-batch-content-size
 The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is set to 1048576_
 
+#### rule-execution-timeout
+The default rule execution timeout is used if no rule timeout is specified. Measured in milliseconds
+
 #### auto-silence-check-after-sequence-rule
 Defines a default behavior for creating CheckSequenceRule if `silence_check` parameter is not specified in the request. The default value is `false`
+
+#### time-precision
+The time precision is used to compare two time values. It is based on the `ISO-8601` duration format `PnDTnHnMn.nS` with days considered to be exactly 24 hours
+
+#### decimal-precision
+The decimal precision is used to compare two number values. Can be specified in number or string format. For example `0.0001`, `0.125`, `125E-3`
 
 ## Required pins
 
