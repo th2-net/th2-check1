@@ -14,6 +14,9 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.configuration.Check1Configuration
+import com.exactpro.th2.check1.entities.RuleConfiguration
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.event.IBodyData
@@ -46,6 +49,7 @@ import kotlin.test.assertNotNull
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
+    protected val configuration = Check1Configuration()
 
     fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int): List<EventBatch> {
         val argumentCaptor = argumentCaptor<EventBatch>()
@@ -150,6 +154,10 @@ abstract class AbstractCheckTaskTest {
         assertVerificationEntries(expectedVerificationEntries, verification.fields) { expected, actual ->
             assertEquals(expected.status, actual.status)
         }
+    }
+
+    protected fun createRuleConfiguration(taskTimeout: TaskTimeout, description: String = "Test", maxEventBatchContentSize: Int = 1024 * 1024): RuleConfiguration {
+        return RuleConfiguration(taskTimeout, description, configuration.timePrecision, configuration.decimalPrecision, maxEventBatchContentSize)
     }
 
 

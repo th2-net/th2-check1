@@ -273,15 +273,12 @@ class TestChain: AbstractCheckTaskTest() {
         messageStream: Observable<StreamContainer>,
         checkOrder: Boolean = true,
         preFilterParam: PreFilter = preFilter,
-        maxEventBatchContentSize: Int = 1024 * 1024,
         taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
-            description = "Test",
+            ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            taskTimeout = taskTimeout,
-            maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),
             checkOrder = checkOrder,
@@ -295,14 +292,11 @@ class TestChain: AbstractCheckTaskTest() {
         sequence: Int,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
-        maxEventBatchContentSize: Int = 1024 * 1024,
         taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ) = CheckRuleTask(
-        SESSION_ALIAS,
+        createRuleConfiguration(taskTimeout, SESSION_ALIAS),
         Instant.now(),
         SessionKey(SESSION_ALIAS, FIRST),
-        taskTimeout,
-        maxEventBatchContentSize,
         createMessageFilter(sequence),
         parentEventID,
         messageStream,
@@ -313,15 +307,12 @@ class TestChain: AbstractCheckTaskTest() {
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
         preFilterParam: PreFilter,
-        taskTimeout: TaskTimeout = TaskTimeout(5000L, 3500L),
-        maxEventBatchContentSize: Int = 1024 * 1024
+        taskTimeout: TaskTimeout = TaskTimeout(5000L, 3500L)
     ): NoMessageCheckTask {
         return NoMessageCheckTask(
-            description = "Test",
+            ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            taskTimeout = taskTimeout,
-            maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,
             messageStream = messageStream,

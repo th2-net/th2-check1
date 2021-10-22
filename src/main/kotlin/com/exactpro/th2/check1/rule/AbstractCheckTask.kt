@@ -22,6 +22,7 @@ import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.CheckpointData
+import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
 import com.exactpro.th2.check1.exception.RuleInternalException
@@ -42,10 +43,11 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toJavaDuration
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
-import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.sailfish.utils.FilterSettings
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
 import com.google.protobuf.Timestamp
@@ -70,9 +72,7 @@ import java.util.concurrent.atomic.AtomicReference
  * **Class in not thread-safe**
  */
 abstract class AbstractCheckTask(
-    val description: String?,
-    private val taskTimeout: TaskTimeout,
-    private val maxEventBatchContentSize: Int,
+    private val ruleConfiguration: RuleConfiguration,
     submitTime: Instant,
     protected val sessionKey: SessionKey,
     private val parentEventID: EventID,
@@ -80,14 +80,8 @@ abstract class AbstractCheckTask(
     private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
 
-    init {
-        require(maxEventBatchContentSize > 0) {
-            "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize"
-        }
-        require(taskTimeout.timeout > 0) {
-            "'timeout' should be set or be greater than zero, actual: ${taskTimeout.timeout}"
-        }
-    }
+    val description: String? = ruleConfiguration.description
+    private val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
 
     protected var handledMessageCounter: Long = 0
 
@@ -413,7 +407,7 @@ abstract class AbstractCheckTask(
                 LOGGER.info("Skip event publication for task ${type()} '$description' (${hashCode()})")
                 return
             }
-            val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
+            val batches = rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
 
             RESPONSE_EXECUTOR.execute {
                 batches.forEach { batch ->
@@ -543,7 +537,6 @@ abstract class AbstractCheckTask(
 
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
-        const val DEFAULT_TASK_TIMEOUT = 3000L
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
     }
 
@@ -636,7 +629,22 @@ abstract class AbstractCheckTask(
 
     protected fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter,
                                                               messageName: String = protoPreMessageFilter.messageType): IMessage {
-        return fromProtoFilter(protoPreMessageFilter.messageFilter, messageName)
+        val filterSettings = protoPreMessageFilter.comparisonSettings.run {
+            FilterSettings().apply {
+                decimalPrecision = if (this@run.decimalPrecision.isBlank()) {
+                    ruleConfiguration.decimalPrecision
+                } else {
+                    this@run.decimalPrecision.toDouble()
+                }
+                timePrecision = if (this@run.hasTimePrecision()) {
+                    this@run.timePrecision.toJavaDuration()
+                } else {
+                    ruleConfiguration.timePrecision
+                }
+            }
+        }
+
+        return fromProtoFilter(protoPreMessageFilter.messageFilter, filterSettings, messageName)
     }
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =

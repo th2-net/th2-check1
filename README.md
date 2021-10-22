@@ -40,7 +40,10 @@ spec:
     cleanup-older-than: '60'
     cleanup-time-unit: 'SECONDS'
     max-event-batch-content-size: '1048576'
+    rule-execution-timeout: '5000'
     auto-silence-check-after-sequence-rule: false
+    time-precision: 'PT0.000000001S'
+    decimal-precision: '0.00001'
   type: th2-check1
   pins:
     - name: server
@@ -75,7 +78,9 @@ This block describes the configuration for check1.
   "cleanup-time-unit": "SECONDS",
   "max-event-batch-content-size": "1048576",
   "rule-execution-timeout": 5000,
-  "auto-silence-check-after-sequence-rule": false
+  "auto-silence-check-after-sequence-rule": false,
+  "time-precision": "PT0.000000001S",
+  "decimal-precision": 0.00001
 }
 ```
 
@@ -94,8 +99,17 @@ The time unit for _cleanup-older-than_ setting. The available values are MILLIS,
 #### max-event-batch-content-size
 The max size in bytes of summary events content in a batch defined in _max-event-batch-content-size_ setting. _The default value is set to 1048576_
 
+#### rule-execution-timeout
+The default rule execution timeout is used if no rule timeout is specified. Measured in milliseconds
+
 #### auto-silence-check-after-sequence-rule
 Defines a default behavior for creating CheckSequenceRule if `silence_check` parameter is not specified in the request. The default value is `false`
+
+#### time-precision
+The time precision is used to compare two time values. It is based on the `ISO-8601` duration format `PnDTnHnMn.nS` with days considered to be exactly 24 hours. Additional information can be found [here](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/Duration.html#parse(java.lang.CharSequence))
+
+#### decimal-precision
+The decimal precision is used to compare two number values. Can be specified in number or string format. For example `0.0001`, `0.125`, `125E-3`
 
 ## Required pins
 
@@ -139,6 +153,13 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
 + Auto silence check after the CheckSequenceRule.
 + `auto-silence-check-after-sequence-rule` to setup a default behavior for CheckSequenceRule
++ New configuration parameter `time-precision` witch is uses if the user has not specified a time precision
++ New configuration parameter `decimal-precision` witch is uses if the user has not specified a number precision
+
+#### Changed:
++ Migrated `common` version from `3.26.4` to `3.26.5`
++ Migrated `grpc-check1` version from `3.4.2` to `3.5.0`
++ Migrated `sailfish-utils` version from `3.9.1` to `3.10.0`
 
 ### 3.8.0
 

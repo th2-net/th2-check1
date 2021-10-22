@@ -13,10 +13,13 @@
 
 package com.exactpro.th2.check1.configuration;
 
-import java.time.temporal.ChronoUnit;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.datatype.jsr310.deser.DurationDeserializer;
+
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
 public class Check1Configuration {
 
@@ -38,6 +41,14 @@ public class Check1Configuration {
     @JsonProperty("auto-silence-check-after-sequence-rule")
     @JsonPropertyDescription("The default behavior in case the SequenceCheckRule does not have silenceCheck parameter specified")
     private boolean autoSilenceCheckAfterSequenceRule;
+
+    @JsonProperty(value="decimal-precision", defaultValue = "0.00001")
+    private double decimalPrecision = 0.00001;
+
+    @JsonProperty(value="time-precision", defaultValue = "PT0.000000001S")
+    @JsonDeserialize(using = DurationDeserializer.class)
+    @JsonPropertyDescription("The default time precision value uses java duration format")
+    private Duration timePrecision = Duration.parse("PT0.000000001S");
 
     public int getMessageCacheSize() {
         return messageCacheSize;
@@ -61,5 +72,13 @@ public class Check1Configuration {
 
     public boolean isAutoSilenceCheckAfterSequenceRule() {
         return autoSilenceCheckAfterSequenceRule;
+    }
+
+    public double getDecimalPrecision() {
+        return decimalPrecision;
+    }
+
+    public Duration getTimePrecision() {
+        return timePrecision;
     }
 }

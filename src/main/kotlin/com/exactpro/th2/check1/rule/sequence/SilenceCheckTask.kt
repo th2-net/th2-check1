@@ -15,6 +15,7 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTask
@@ -35,25 +36,14 @@ import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SilenceCheckTask(
+    ruleConfiguration: RuleConfiguration,
     protoPreFilter: PreFilter,
-    description: String?,
-    taskTimeout: TaskTimeout,
-    maxEventBatchContentSize: Int,
     submitTime: Instant,
     sessionKey: SessionKey,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(
-    description,
-    taskTimeout,
-    maxEventBatchContentSize,
-    submitTime,
-    sessionKey,
-    parentEventID,
-    messageStream,
-    eventBatchRouter
-) {
+) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
         converter.fromProtoPreFilter(protoPreMessageFilter),
