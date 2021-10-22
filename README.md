@@ -106,7 +106,7 @@ The default rule execution timeout is used if no rule timeout is specified. Meas
 Defines a default behavior for creating CheckSequenceRule if `silence_check` parameter is not specified in the request. The default value is `false`
 
 #### time-precision
-The time precision is used to compare two time values. It is based on the `ISO-8601` duration format `PnDTnHnMn.nS` with days considered to be exactly 24 hours
+The time precision is used to compare two time values. It is based on the `ISO-8601` duration format `PnDTnHnMn.nS` with days considered to be exactly 24 hours. Additional information can be found [here](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/Duration.html#parse(java.lang.CharSequence))
 
 #### decimal-precision
 The decimal precision is used to compare two number values. Can be specified in number or string format. For example `0.0001`, `0.125`, `125E-3`
