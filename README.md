@@ -159,7 +159,8 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 #### Changed:
 + Migrated `common` version from `3.26.4` to `3.26.5`
 + Migrated `grpc-check1` version from `3.4.2` to `3.5.0`
-+ Migrated `sailfish-utils` version from `3.9.1` to `3.10.0`
++ Migrated `sailfish-utils` version from `3.9.1` to `3.10.1`
+  + Fixed conversion of `null` values
 
 ### 3.8.0
 
