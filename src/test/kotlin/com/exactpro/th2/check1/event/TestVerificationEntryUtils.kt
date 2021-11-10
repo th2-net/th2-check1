@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -23,6 +23,7 @@ import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.value.toValue
+import com.exactpro.th2.common.value.toValueFilter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions
@@ -186,6 +187,70 @@ class TestVerificationEntryUtils {
         val entry = VerificationEntryUtils.createVerificationEntry(result)
         val msgEntry = entry.fields["msg"].assertNotNull { "msg field is missing in ${entry.toDebugString()}" }
         Assertions.assertTrue(msgEntry.isKey) { "msg is not a key field in ${msgEntry.toDebugString()}" }
+    }
+
+    @Test
+    fun `expected value converted as null value`() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+                .setMessageType("Test")
+                .setMessageFilter(MessageFilter.newBuilder()
+                        .putFields("A", "1".toValueFilter())
+                        .build())
+                .build()
+
+        val actual = message("Test").apply {
+            putFields("A", "1".toValue())
+            putFields("B", "2".toValue())
+        }.build()
+
+        val container = VerificationUtil.toMetaContainer(filter.messageFilter, false)
+        val settings = ComparatorSettings().apply {
+            metaContainer = container
+        }
+
+        val actualIMessage = converter.fromProtoMessage(actual, false)
+        val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
+        val result = MessageComparator.compare(
+                actualIMessage,
+                filterIMessage,
+                settings
+        )
+
+        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val keyEntry = entry.fields["B"].assertNotNull { "The key 'B' is missing in ${entry.toDebugString()}" }
+        Assertions.assertNull(keyEntry.expected) { "Expected value should be null" }
+    }
+
+    @Test
+    fun `actual value converted as null value`() {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+                .setMessageType("Test")
+                .setMessageFilter(MessageFilter.newBuilder()
+                        .putFields("A", "1".toValueFilter())
+                        .putFields("B", "2".toValueFilter())
+                        .build())
+                .build()
+
+        val actual = message("Test").apply {
+            putFields("A", "1".toValue())
+        }.build()
+
+        val container = VerificationUtil.toMetaContainer(filter.messageFilter, false)
+        val settings = ComparatorSettings().apply {
+            metaContainer = container
+        }
+
+        val actualIMessage = converter.fromProtoMessage(actual, false)
+        val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
+        val result = MessageComparator.compare(
+                actualIMessage,
+                filterIMessage,
+                settings
+        )
+
+        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val keyEntry = entry.fields["B"].assertNotNull { "The key 'B' is missing in ${entry.toDebugString()}" }
+        Assertions.assertNull(keyEntry.actual) { "Actual value should be null" }
     }
 
     companion object {

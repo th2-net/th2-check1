@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public class VerificationEntryUtils {
     public static VerificationEntry createVerificationEntry(ComparisonResult result) {
         VerificationEntry verificationEntry = new VerificationEntry();
         verificationEntry.setActual(Objects.toString(result.getActual(), null));
-        verificationEntry.setExpected(Formatter.formatExpected(result));
+        verificationEntry.setExpected(convertExpectedResult(result));
         verificationEntry.setStatus(toVerificationStatus(result.getStatus()));
         verificationEntry.setKey(result.isKey());
         verificationEntry.setOperation(resolveOperation(result));
@@ -88,5 +88,9 @@ public class VerificationEntryUtils {
         default:
             throw new IllegalArgumentException("Unsupported status type '" + statusType + '\'');
         }
+    }
+
+    private static String convertExpectedResult(ComparisonResult result) {
+        return result.getExpected() == null ? null : Formatter.formatExpected(result);
     }
 }
