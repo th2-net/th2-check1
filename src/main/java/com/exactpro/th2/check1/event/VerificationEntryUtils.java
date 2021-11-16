@@ -38,6 +38,7 @@ public class VerificationEntryUtils {
         verificationEntry.setStatus(toVerificationStatus(result.getStatus()));
         verificationEntry.setKey(result.isKey());
         verificationEntry.setOperation(resolveOperation(result));
+        verificationEntry.setHint(extractHint(result));
         if (result.hasResults()) {
             verificationEntry.setFields(result.getResults().entrySet().stream()
                     .collect(Collectors.toMap(
@@ -92,5 +93,10 @@ public class VerificationEntryUtils {
 
     private static String convertExpectedResult(ComparisonResult result) {
         return result.getExpected() == null ? null : Formatter.formatExpected(result);
+    }
+
+    private static String extractHint(ComparisonResult result) {
+        Exception exception = result.getException();
+        return exception == null ? null : exception.getMessage();
     }
 }

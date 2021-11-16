@@ -155,11 +155,12 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + `auto-silence-check-after-sequence-rule` to setup a default behavior for CheckSequenceRule
 + New configuration parameter `time-precision` witch is uses if the user has not specified a time precision
 + New configuration parameter `decimal-precision` witch is uses if the user has not specified a number precision
++ New parameter `hint` for verification event
 
 #### Changed:
-+ Migrated `common` version from `3.26.4` to `3.26.5`
++ Migrated `common` version from `3.26.4` to `3.28.0`
 + Migrated `grpc-check1` version from `3.4.2` to `3.5.0`
-+ Migrated `sailfish-utils` version from `3.9.1` to `3.10.1`
++ Migrated `sailfish-utils` version from `3.9.1` to `3.10.2`
   + Fixed conversion of `null` values
 + Corrected verification entry when the `null` value and string `"null"` looked the same for the expected value
 

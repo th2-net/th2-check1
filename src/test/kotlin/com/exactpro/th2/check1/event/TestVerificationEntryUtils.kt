@@ -20,8 +20,10 @@ import com.exactpro.th2.common.event.bean.VerificationEntry
 import com.exactpro.th2.common.grpc.ListValueFilter
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
+import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
@@ -29,6 +31,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.Arguments.arguments
+import org.junit.jupiter.params.provider.MethodSource
+import java.util.stream.Stream
 
 class TestVerificationEntryUtils {
     private val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
@@ -253,11 +260,87 @@ class TestVerificationEntryUtils {
         Assertions.assertNull(keyEntry.actual) { "Actual value should be null" }
     }
 
+    @ParameterizedTest
+    @MethodSource("unexpectedTypeMismatch")
+    fun `verify messages with different value type`(actualValue: Value, expectedValueFilter: ValueFilter, expectedHint: String?) {
+        val filter: RootMessageFilter = RootMessageFilter.newBuilder()
+                .setMessageType("Test")
+                .setMessageFilter(
+                        messageFilter().apply {
+                            putFields("A", "1".toValueFilter())
+                            putFields("B", expectedValueFilter)
+                        }.build())
+                .build()
+
+        val actual = message("Test").apply {
+            putFields("A", "1".toValue())
+            putFields("B", actualValue)
+        }.build()
+
+        val actualIMessage = converter.fromProtoMessage(actual, false)
+        val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
+        val result = MessageComparator.compare(
+                actualIMessage,
+                filterIMessage,
+                ComparatorSettings()
+        )
+
+        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val keyEntry = entry.fields["B"].assertNotNull { "The key 'B' is missing in ${entry.toDebugString()}" }
+        Assertions.assertEquals(expectedHint, keyEntry.hint, "Hint must be equals")
+    }
+
+
     companion object {
         private fun VerificationEntry.toDebugString(): String = ObjectMapper().writeValueAsString(this)
         private fun <T : Any> T?.assertNotNull(msg: () -> String): T {
             Assertions.assertNotNull(this, msg)
             return this!!
         }
+
+        @JvmStatic
+        fun unexpectedTypeMismatch(): Stream<Arguments> = Stream.of(
+                arguments("2".toValue(), "2".toValueFilter(), null),
+                arguments(
+                        "2".toValue(),
+                        messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
+                        "Value type mismatch - actual: String, expected: Message"
+                ),
+                arguments(
+                        "2".toValue(),
+                        ValueFilter.newBuilder()
+                                .setListFilter(ListValueFilter.newBuilder().apply {
+                                    addValues("2".toValueFilter())
+                                }).build(),
+                        "Value type mismatch - actual: String, expected: Collection of EqualityFilters"
+                ),
+                arguments(
+                        message().putFields("A", "1".toValue()).toValue(),
+                        "2".toValueFilter(),
+                        "Value type mismatch - actual: Message, expected: Long"
+                ),
+                arguments(
+                        listOf(
+                                message().putFields("A", "1".toValue()).build()
+                        ).toValue(),
+                        "2".toValueFilter(),
+                        "Value type mismatch - actual: Collection of Messages, expected: Long"
+                ),
+                arguments(
+                        listOf(
+                                message().putFields("A", "1".toValue()).build()
+                        ).toValue(),
+                        messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
+                        "Value type mismatch - actual: Collection of Messages, expected: Message"
+                ),
+                arguments(
+                        message().putFields("A", "1".toValue()).toValue(),
+                        ValueFilter.newBuilder()
+                                .setListFilter(ListValueFilter.newBuilder().apply {
+                                    addValues("2".toValueFilter())
+                                }).build(),
+                        "Value type mismatch - actual: Message, expected: Collection of EqualityFilters"
+                )
+        )
     }
 }
