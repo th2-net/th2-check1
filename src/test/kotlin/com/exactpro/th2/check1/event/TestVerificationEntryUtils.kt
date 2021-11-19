@@ -287,7 +287,7 @@ class TestVerificationEntryUtils {
 
         val entry = VerificationEntryUtils.createVerificationEntry(result)
         val keyEntry = entry.fields["B"].assertNotNull { "The key 'B' is missing in ${entry.toDebugString()}" }
-        Assertions.assertEquals(expectedHint, keyEntry.hint, "Hint must be equals")
+        Assertions.assertEquals(expectedHint, keyEntry.hint, "Hint must be equal")
     }
 
 
@@ -302,44 +302,54 @@ class TestVerificationEntryUtils {
         fun unexpectedTypeMismatch(): Stream<Arguments> = Stream.of(
                 arguments("2".toValue(), "2".toValueFilter(), null),
                 arguments(
+                        message().putFields("A", "1".toValue()).toValue(),
+                        messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
+                        null
+                ),
+                arguments(
+                        listOf("2".toValue()).toValue(),
+                        listOf("2".toValueFilter()).toValueFilter(),
+                        null
+                ),
+                arguments(
                         "2".toValue(),
                         messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
                         "Value type mismatch - actual: String, expected: Message"
                 ),
                 arguments(
                         "2".toValue(),
-                        ValueFilter.newBuilder()
-                                .setListFilter(ListValueFilter.newBuilder().apply {
-                                    addValues("2".toValueFilter())
-                                }).build(),
-                        "Value type mismatch - actual: String, expected: Collection of EqualityFilters"
+                        listOf(messageFilter().putFields("A", "1".toValueFilter())).toValueFilter(),
+                        "Value type mismatch - actual: String, expected: Collection of Messages"
+                ),
+                arguments(
+                        message().putFields("A", "1".toValue()).toValue(),
+                        listOf(messageFilter().putFields("A", "1".toValueFilter())).toValueFilter(),
+                        "Value type mismatch - actual: Message, expected: Collection of Messages"
+                ),
+                arguments(
+                        "2".toValue(),
+                        listOf("2".toValueFilter()).toValueFilter(),
+                        "Value type mismatch - actual: String, expected: Collection"
                 ),
                 arguments(
                         message().putFields("A", "1".toValue()).toValue(),
                         "2".toValueFilter(),
-                        "Value type mismatch - actual: Message, expected: Long"
+                        "Value type mismatch - actual: Message, expected: String"
                 ),
                 arguments(
-                        listOf(
-                                message().putFields("A", "1".toValue()).build()
-                        ).toValue(),
+                        listOf(message().putFields("A", "1".toValue()).build()).toValue(),
                         "2".toValueFilter(),
-                        "Value type mismatch - actual: Collection of Messages, expected: Long"
+                        "Value type mismatch - actual: Collection of Messages, expected: String"
                 ),
                 arguments(
-                        listOf(
-                                message().putFields("A", "1".toValue()).build()
-                        ).toValue(),
+                        listOf(message().putFields("A", "1".toValue()).build()).toValue(),
                         messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
                         "Value type mismatch - actual: Collection of Messages, expected: Message"
                 ),
                 arguments(
                         message().putFields("A", "1".toValue()).toValue(),
-                        ValueFilter.newBuilder()
-                                .setListFilter(ListValueFilter.newBuilder().apply {
-                                    addValues("2".toValueFilter())
-                                }).build(),
-                        "Value type mismatch - actual: Message, expected: Collection of EqualityFilters"
+                        listOf("2".toValueFilter()).toValueFilter(),
+                        "Value type mismatch - actual: Message, expected: Collection"
                 )
         )
     }
