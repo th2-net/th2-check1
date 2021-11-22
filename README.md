@@ -150,12 +150,12 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 #### Added:
 + Implemented NoMessageCheck rule task. Updated CheckRule and CheckSequence rule tasks
-+ New configuration parameter `rule-execution-timeout` witch is used if the user has not specified a timeout for the rule execution
++ New configuration parameter `rule-execution-timeout` which is used if the user has not specified a timeout for the rule execution
 + Auto silence check after the CheckSequenceRule.
 + `auto-silence-check-after-sequence-rule` to setup a default behavior for CheckSequenceRule
-+ New configuration parameter `time-precision` witch is uses if the user has not specified a time precision
-+ New configuration parameter `decimal-precision` witch is uses if the user has not specified a number precision
-+ New parameter `hint` for verification event
++ New configuration parameter `time-precision` which is uses if the user has not specified a time precision
++ New configuration parameter `decimal-precision` which is uses if the user has not specified a number precision
++ New parameter `hint` for verification event which is used to display the reason for the failed field comparison. For example the type mismatch of the compared values
 
 #### Changed:
 + Migrated `common` version from `3.26.4` to `3.28.0`
