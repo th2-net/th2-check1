@@ -15,8 +15,8 @@ package com.exactpro.th2.check1.metrics
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.configuration.Check1Configuration
-import com.exactpro.th2.common.metrics.DEFAULT_DIRECTION_LABEL_NAME
-import com.exactpro.th2.common.metrics.DEFAULT_SESSION_ALIAS_LABEL_NAME
+import com.exactpro.th2.common.metrics.DIRECTION_LABEL
+import com.exactpro.th2.common.metrics.SESSION_ALIAS_LABEL
 import io.prometheus.client.Counter
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
@@ -25,7 +25,7 @@ object BufferMetric {
 
     private val actualBufferCountMetric: Counter = Counter
             .build("th2_check1_actual_cache_number", "The actual number of messages in caches")
-            .labelNames(DEFAULT_SESSION_ALIAS_LABEL_NAME, DEFAULT_DIRECTION_LABEL_NAME)
+            .labelNames(SESSION_ALIAS_LABEL, DIRECTION_LABEL)
             .register()
 
     private val bufferMessagesSizeBySessionKey: MutableMap<SessionKey, Int> = ConcurrentHashMap()
