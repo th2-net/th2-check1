@@ -58,11 +58,6 @@ public class VerificationUtil {
 
     public static MetaContainer toMetaContainer(MessageFilter messageFilter, boolean listItemAsSeparate) {
         MetaContainer metaContainer = new MetaContainer();
-        Set<String> keyFields = new HashSet<>();
-
-        messageFilter.getFieldsMap().forEach((name, value) -> {
-            toMetaContainer(name, value, metaContainer, keyFields, listItemAsSeparate);
-        });
 
         if (messageFilter.hasComparisonSettings()) {
             FailUnexpected failUnexpected = messageFilter.getComparisonSettings().getFailUnexpected();
@@ -73,6 +68,13 @@ public class VerificationUtil {
                 metaContainer.setFailUnexpected(AMLLangConst.ALL);
             }
         }
+        
+        Set<String> keyFields = new HashSet<>();
+
+        messageFilter.getFieldsMap().forEach((name, value) -> {
+            toMetaContainer(name, value, metaContainer, keyFields, listItemAsSeparate);
+        });
+
 
         metaContainer.setKeyFields(keyFields);
 
@@ -96,13 +98,11 @@ public class VerificationUtil {
     }
 
     private static void convertList(MetaContainer parent, String fieldName, ListValueFilter listFilter) {
-        List<MetaContainer> result = new ArrayList<>();
         for (ValueFilter valueFilter : listFilter.getValuesList()) {
             if (valueFilter.hasMessageFilter()) {
-                result.add(toMetaContainer(valueFilter.getMessageFilter(), false));
+                parent.add(fieldName, toMetaContainer(valueFilter.getMessageFilter(), false));
             }
         }
-        parent.getChildren().put(fieldName, result);
     }
 
     private static void convertListAsSeparateContainers(MetaContainer parent, String fieldName,
