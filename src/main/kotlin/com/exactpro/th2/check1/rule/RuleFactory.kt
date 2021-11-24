@@ -13,7 +13,6 @@
 
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.check1.CheckTaskKey
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
@@ -30,7 +29,6 @@ import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SilenceCheckTask
 import com.exactpro.th2.common.event.Event
-import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.ComparisonSettings
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
@@ -49,22 +47,21 @@ import java.util.concurrent.ForkJoinPool
 class RuleFactory(
         configuration: Check1Configuration,
         private val streamObservable: Observable<StreamContainer>,
-        private val eventBatchRouter: MessageRouter<EventBatch>,
-        private val existedChainIds: Set<CheckTaskKey>
+        private val eventBatchRouter: MessageRouter<EventBatch>
 ) {
     private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
     private val defaultRuleExecutionTimeout = configuration.ruleExecutionTimeout
     private val timePrecision = configuration.timePrecision
     private val decimalPrecision = configuration.decimalPrecision
 
-    fun createCheckRule(request: CheckRuleRequest): CheckRuleTask =
+    fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean): CheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
                     check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey) }
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     check(request.kindCase != CheckRuleRequest.KindCase.KIND_NOT_SET) {
                         "Either old filter or root filter must be set"
@@ -100,14 +97,14 @@ class RuleFactory(
                 }
             }
 
-    fun createSequenceCheckRule(request: CheckSequenceRuleRequest): SequenceCheckRuleTask =
+    fun createSequenceCheckRule(request: CheckSequenceRuleRequest, isChainIdExist: Boolean): SequenceCheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
                     check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey) }
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     check((request.messageFiltersList.isEmpty() && request.rootMessageFiltersList.isNotEmpty())
                             || (request.messageFiltersList.isNotEmpty() && request.rootMessageFiltersList.isEmpty())) {
@@ -145,7 +142,7 @@ class RuleFactory(
                 }
             }
 
-    fun createNoMessageCheckRule(request: NoMessageCheckRequest): NoMessageCheckTask =
+    fun createNoMessageCheckRule(request: NoMessageCheckRequest, isChainIdExist: Boolean): NoMessageCheckTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -153,7 +150,7 @@ class RuleFactory(
                     val sessionAlias: String = request.connectivityId.sessionAlias
                     check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey) }
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     val ruleConfiguration = RuleConfiguration(
                             createTaskTimeout(request.timeout, request.messageTimeout),
@@ -275,9 +272,9 @@ class RuleFactory(
         }
     }
 
-    private fun checkCheckpoint(requestAdaptor: RequestAdaptor, sessionKey: SessionKey) {
+    private fun checkCheckpoint(requestAdaptor: RequestAdaptor, sessionKey: SessionKey, isChainIdExist: Boolean) {
         if (requestAdaptor.hasChainId) {
-            check(existedChainIds.contains(CheckTaskKey(requestAdaptor.chainId, requestAdaptor.connectionId))) {
+            check(isChainIdExist) {
                 "The request has an invalid chain id or connectivity id"
             }
             return // We should validate checkpoint only if the request doesn't contain a chain id

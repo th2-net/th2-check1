@@ -50,16 +50,6 @@ class RuleFactoryTest {
 
     @Test
     fun `failed rule creation because one of required fields is empty`() {
-        val existedChainIds = setOf(
-                CheckTaskKey(
-                        ChainID.newBuilder()
-                                .setId(EventUtils.generateUUID())
-                                .build(),
-                        ConnectionID.newBuilder()
-                                .setSessionAlias("test_alias")
-                                .build())
-        )
-
         val streams = createStreams(AbstractCheckTaskTest.SESSION_ALIAS, Direction.FIRST, listOf(
                 message(AbstractCheckTaskTest.MESSAGE_TYPE, Direction.FIRST, AbstractCheckTaskTest.SESSION_ALIAS)
                         .mergeMetadata(MessageMetadata.newBuilder()
@@ -69,14 +59,14 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
                 .setCheckpoint(Checkpoint.newBuilder().setId(EventUtils.generateUUID()).build()).build()
 
         assertThrows<RuleCreationException> {
-            ruleFactory.createCheckRule(request)
+            ruleFactory.createCheckRule(request, true)
         }
 
         val eventBatches = awaitEventBatchRequest(1000L, 1)
@@ -89,15 +79,6 @@ class RuleFactoryTest {
 
     @Test
     fun `success rule creation with missed checkpoint`() {
-        val existedChainIds = setOf(
-                CheckTaskKey(
-                        ChainID.newBuilder()
-                                .setId("test_chain_id")
-                                .build(),
-                        ConnectionID.newBuilder()
-                                .setSessionAlias("test_alias")
-                                .build())
-        )
         val streams = createStreams(AbstractCheckTaskTest.SESSION_ALIAS, Direction.FIRST, listOf(
                 message(AbstractCheckTaskTest.MESSAGE_TYPE, Direction.FIRST, AbstractCheckTaskTest.SESSION_ALIAS)
                         .mergeMetadata(MessageMetadata.newBuilder()
@@ -107,7 +88,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -122,22 +103,13 @@ class RuleFactoryTest {
                 .build()
 
         val createCheckRule = assertDoesNotThrow {
-            ruleFactory.createCheckRule(request)
+            ruleFactory.createCheckRule(request, true)
         }
         assertNotNull(createCheckRule) { "Rule cannot be null" }
     }
 
     @Test
     fun `failed rule creation with missed checkpoint and invalid chain id`() {
-        val existedChainIds = setOf(
-                CheckTaskKey(
-                        ChainID.newBuilder()
-                                .setId("diff_test_chain_id")
-                                .build(),
-                        ConnectionID.newBuilder()
-                                .setSessionAlias("diff_test_alias")
-                                .build())
-        )
         val streams = createStreams(AbstractCheckTaskTest.SESSION_ALIAS, Direction.FIRST, listOf(
                 message(AbstractCheckTaskTest.MESSAGE_TYPE, Direction.FIRST, AbstractCheckTaskTest.SESSION_ALIAS)
                         .mergeMetadata(MessageMetadata.newBuilder()
@@ -147,7 +119,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -162,7 +134,7 @@ class RuleFactoryTest {
                 .build()
 
         assertThrows<RuleCreationException> {
-            ruleFactory.createCheckRule(request)
+            ruleFactory.createCheckRule(request, false)
         }
 
         val eventBatches = awaitEventBatchRequest(1000L, 1)
@@ -184,7 +156,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, emptySet())
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -215,7 +187,7 @@ class RuleFactoryTest {
 
 
         val createCheckRule = assertDoesNotThrow {
-            ruleFactory.createCheckRule(request)
+            ruleFactory.createCheckRule(request, false)
         }
         assertNotNull(createCheckRule) { "Rule cannot be null" }
     }
