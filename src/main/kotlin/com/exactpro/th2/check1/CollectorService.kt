@@ -84,7 +84,7 @@ class CollectorService(
 
         checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
 
-        ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter)
+        ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter, eventIdToLastCheckTask.keys)
     }
 
     @Throws(InterruptedException::class)
@@ -133,10 +133,14 @@ class CollectorService(
         return chainID
     }
 
-    private fun AbstractCheckTask.addToChainOrBegin(
-            value: AbstractCheckTask?,
-            checkpoint: GrpcCheckpoint
-    ): Unit = value?.subscribeNextTask(this) ?: begin(checkpoint)
+    private fun AbstractCheckTask.addToChainOrBegin(value: AbstractCheckTask?, checkpoint: GrpcCheckpoint) {
+        val realCheckpoint = if (checkpoint === GrpcCheckpoint.getDefaultInstance()) {
+            null
+        } else {
+            checkpoint
+        }
+        value?.subscribeNextTask(this) ?: begin(realCheckpoint)
+    }
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
         return if (hasChainId()) {

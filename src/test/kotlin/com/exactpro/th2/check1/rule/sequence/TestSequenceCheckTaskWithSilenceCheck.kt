@@ -13,6 +13,7 @@
 
 package com.exactpro.th2.check1.rule.sequence
 
+import com.exactpro.th2.check1.CheckTaskKey
 import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
@@ -42,7 +43,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 .putFields("B", it.toValue())
                 .build()
         })
-        val factory = RuleFactory(Check1Configuration(), streams, clientStub)
+        val factory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
@@ -89,7 +90,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 .putFields("B", it.toValue())
                 .build()
         })
-        val factory = RuleFactory(Check1Configuration(), streams, clientStub)
+        val factory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
@@ -131,7 +132,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 .putFields("B", it.toValue())
                 .build()
         })
-        val factory = RuleFactory(Check1Configuration(), streams, clientStub)
+        val factory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
@@ -194,7 +195,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 .putFields("B", it.toValue())
                 .build()
         })
-        val factory = RuleFactory(Check1Configuration(), streams, clientStub)
+        val factory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
@@ -230,5 +231,10 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                     }
             }
         )
+    }
+
+
+    companion object {
+        private val existedChainIds = emptySet<CheckTaskKey>()
     }
 }

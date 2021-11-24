@@ -13,19 +13,24 @@
 
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.th2.check1.CheckTaskKey
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.exception.RuleCreationException
+import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Checkpoint
+import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageMetadata
+import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.message
+import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
@@ -34,14 +39,27 @@ import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
+import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 class RuleFactoryTest {
     private val clientStub: MessageRouter<EventBatch> = spy { }
 
     @Test
     fun `failed rule creation because one of required fields is empty`() {
+        val existedChainIds = setOf(
+                CheckTaskKey(
+                        ChainID.newBuilder()
+                                .setId(EventUtils.generateUUID())
+                                .build(),
+                        ConnectionID.newBuilder()
+                                .setSessionAlias("test_alias")
+                                .build())
+        )
+
         val streams = createStreams(AbstractCheckTaskTest.SESSION_ALIAS, Direction.FIRST, listOf(
                 message(AbstractCheckTaskTest.MESSAGE_TYPE, Direction.FIRST, AbstractCheckTaskTest.SESSION_ALIAS)
                         .mergeMetadata(MessageMetadata.newBuilder()
@@ -51,7 +69,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -67,6 +85,139 @@ class RuleFactoryTest {
             assertEquals(2, eventList.size)
             assertEquals(1, eventList.filter { it.type == "ruleCreationException" }.size)
         })
+    }
+
+    @Test
+    fun `success rule creation with missed checkpoint`() {
+        val existedChainIds = setOf(
+                CheckTaskKey(
+                        ChainID.newBuilder()
+                                .setId("test_chain_id")
+                                .build(),
+                        ConnectionID.newBuilder()
+                                .setSessionAlias("test_alias")
+                                .build())
+        )
+        val streams = createStreams(AbstractCheckTaskTest.SESSION_ALIAS, Direction.FIRST, listOf(
+                message(AbstractCheckTaskTest.MESSAGE_TYPE, Direction.FIRST, AbstractCheckTaskTest.SESSION_ALIAS)
+                        .mergeMetadata(MessageMetadata.newBuilder()
+                                .putProperties("keyProp", "42")
+                                .putProperties("notKeyProp", "2")
+                                .build())
+                        .build()
+        ))
+
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
+
+        val request = CheckRuleRequest.newBuilder()
+                .setParentEventId(EventID.newBuilder().setId("root").build())
+                .setConnectivityId(ConnectionID.newBuilder()
+                        .setSessionAlias("test_alias")
+                )
+                .setRootFilter(RootMessageFilter.newBuilder()
+                        .setMessageType("TestMsgType")
+                )
+                .setMessageTimeout(5)
+                .setChainId(ChainID.newBuilder().setId("test_chain_id"))
+                .build()
+
+        val createCheckRule = assertDoesNotThrow {
+            ruleFactory.createCheckRule(request)
+        }
+        assertNotNull(createCheckRule) { "Rule cannot be null" }
+    }
+
+    @Test
+    fun `failed rule creation with missed checkpoint and invalid chain id`() {
+        val existedChainIds = setOf(
+                CheckTaskKey(
+                        ChainID.newBuilder()
+                                .setId("diff_test_chain_id")
+                                .build(),
+                        ConnectionID.newBuilder()
+                                .setSessionAlias("diff_test_alias")
+                                .build())
+        )
+        val streams = createStreams(AbstractCheckTaskTest.SESSION_ALIAS, Direction.FIRST, listOf(
+                message(AbstractCheckTaskTest.MESSAGE_TYPE, Direction.FIRST, AbstractCheckTaskTest.SESSION_ALIAS)
+                        .mergeMetadata(MessageMetadata.newBuilder()
+                                .putProperties("keyProp", "42")
+                                .putProperties("notKeyProp", "2")
+                                .build())
+                        .build()
+        ))
+
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, existedChainIds)
+
+        val request = CheckRuleRequest.newBuilder()
+                .setParentEventId(EventID.newBuilder().setId("root").build())
+                .setConnectivityId(ConnectionID.newBuilder()
+                        .setSessionAlias("test_alias")
+                )
+                .setRootFilter(RootMessageFilter.newBuilder()
+                        .setMessageType("TestMsgType")
+                )
+                .setMessageTimeout(5)
+                .setChainId(ChainID.newBuilder().setId("test_chain_id"))
+                .build()
+
+        assertThrows<RuleCreationException> {
+            ruleFactory.createCheckRule(request)
+        }
+
+        val eventBatches = awaitEventBatchRequest(1000L, 1)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertAll({
+            assertEquals(2, eventList.size)
+            assertEquals(1, eventList.filter { it.type == "ruleCreationException" }.size)
+        })
+    }
+
+    @Test
+    fun `success rule creation with missed chain id`() {
+        val streams = createStreams(AbstractCheckTaskTest.SESSION_ALIAS, Direction.FIRST, listOf(
+                message(AbstractCheckTaskTest.MESSAGE_TYPE, Direction.FIRST, AbstractCheckTaskTest.SESSION_ALIAS)
+                        .mergeMetadata(MessageMetadata.newBuilder()
+                                .putProperties("keyProp", "42")
+                                .putProperties("notKeyProp", "2")
+                                .build())
+                        .build()
+        ))
+
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, emptySet())
+
+        val request = CheckRuleRequest.newBuilder()
+                .setParentEventId(EventID.newBuilder().setId("root").build())
+                .setConnectivityId(ConnectionID.newBuilder()
+                        .setSessionAlias("test_alias")
+                )
+                .setRootFilter(RootMessageFilter.newBuilder()
+                        .setMessageType("TestMsgType")
+                )
+                .setMessageTimeout(5)
+                .setCheckpoint(
+                        Checkpoint.newBuilder()
+                                .setId(EventUtils.generateUUID())
+                                .putSessionAliasToDirectionCheckpoint(
+                                        "test_alias",
+                                        Checkpoint.DirectionCheckpoint.newBuilder()
+                                                .putDirectionToCheckpointData(
+                                                        Direction.FIRST.number,
+                                                        Checkpoint.CheckpointData.newBuilder()
+                                                                .setSequence(1)
+                                                                .setTimestamp(Instant.now().toTimestamp())
+                                                                .build())
+                                                .build())
+                                .build()
+                )
+                .setDirection(Direction.FIRST)
+                .build()
+
+
+        val createCheckRule = assertDoesNotThrow {
+            ruleFactory.createCheckRule(request)
+        }
+        assertNotNull(createCheckRule) { "Rule cannot be null" }
     }
 
     private fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int): List<EventBatch> {
