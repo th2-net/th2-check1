@@ -163,6 +163,8 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Migrated `sailfish-utils` version from `3.9.1` to `3.10.2`
   + Fixed conversion of `null` values
 + Corrected verification entry when the `null` value and string `"null"` looked the same for the expected value
++ Migrated `sailfish-core` version to `3.2.1752`
+  + Fix incorrect matching in repeating groups with reordered messages
 
 ### 3.8.0
 
