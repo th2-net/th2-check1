@@ -273,13 +273,15 @@ class RuleFactory(
     }
 
     private fun checkCheckpoint(requestAdaptor: RequestAdaptor, sessionKey: SessionKey, isChainIdExist: Boolean) {
-        if (requestAdaptor.hasChainId) {
+        if (requestAdaptor.chainId != null) {
             check(isChainIdExist) {
-                "The request has an invalid chain id or connectivity id"
+                "The request has an invalid chain ID or connectivity ID. Please use checkpoint instead of chain ID"
             }
             return // We should validate checkpoint only if the request doesn't contain a chain id
         }
-        check(requestAdaptor.hasCheckpoint) { "Request doesn't contain a checkpoint" }
+        checkNotNull(requestAdaptor.checkpoint) {
+            "Request must contain a checkpoint, because the 'messageTimeout' is used and no chain ID is specified"
+        }
         with(sessionKey) {
             val directionCheckpoint = requestAdaptor.checkpoint.sessionAliasToDirectionCheckpointMap[sessionAlias]
             checkNotNull(directionCheckpoint) { "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'" }

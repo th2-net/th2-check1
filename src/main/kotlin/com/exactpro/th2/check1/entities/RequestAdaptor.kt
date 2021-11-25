@@ -20,42 +20,31 @@ import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.ConnectionID
 
-class RequestAdaptor {
-    var hasCheckpoint: Boolean = false
-    var hasChainId: Boolean = false
-    lateinit var chainId: ChainID
-    lateinit var checkpoint: Checkpoint
-    lateinit var connectionId: ConnectionID
+class RequestAdaptor(val chainId: ChainID?, val checkpoint: Checkpoint?, val connectionId: ConnectionID?) {
 
     companion object {
         fun from(request: CheckRuleRequest): RequestAdaptor {
-            return RequestAdaptor().apply {
-                hasCheckpoint = request.hasCheckpoint()
-                checkpoint = request.checkpoint
-                hasChainId = request.hasChainId()
-                chainId = request.chainId
-                connectionId = request.connectivityId
-            }
+            return RequestAdaptor(
+                    if (request.hasChainId()) request.chainId else null,
+                    if (request.hasCheckpoint()) request.checkpoint else null,
+                    if (request.hasConnectivityId()) request.connectivityId else null
+            )
         }
 
         fun from(request: CheckSequenceRuleRequest): RequestAdaptor {
-            return RequestAdaptor().apply {
-                hasCheckpoint = request.hasCheckpoint()
-                checkpoint = request.checkpoint
-                hasChainId = request.hasChainId()
-                chainId = request.chainId
-                connectionId = request.connectivityId
-            }
+            return RequestAdaptor(
+                    if (request.hasChainId()) request.chainId else null,
+                    if (request.hasCheckpoint()) request.checkpoint else null,
+                    if (request.hasConnectivityId()) request.connectivityId else null
+            )
         }
 
         fun from(request: NoMessageCheckRequest): RequestAdaptor {
-            return RequestAdaptor().apply {
-                hasCheckpoint = request.hasCheckpoint()
-                checkpoint = request.checkpoint
-                hasChainId = request.hasChainId()
-                chainId = request.chainId
-                connectionId = request.connectivityId
-            }
+            return RequestAdaptor(
+                    if (request.hasChainId()) request.chainId else null,
+                    if (request.hasCheckpoint()) request.checkpoint else null,
+                    if (request.hasConnectivityId()) request.connectivityId else null
+            )
         }
     }
 }

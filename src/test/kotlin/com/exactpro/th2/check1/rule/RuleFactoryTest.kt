@@ -13,7 +13,6 @@
 
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.check1.CheckTaskKey
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
@@ -65,9 +64,12 @@ class RuleFactoryTest {
                 .setParentEventId(EventID.newBuilder().setId("root").build())
                 .setCheckpoint(Checkpoint.newBuilder().setId(EventUtils.generateUUID()).build()).build()
 
-        assertThrows<RuleCreationException> {
+        val mainException = assertThrows<RuleCreationException> {
             ruleFactory.createCheckRule(request, true)
         }
+
+        assertEquals("An error occurred while creating rule", mainException.message)
+        assertEquals("Session alias cannot be empty", mainException.cause?.message)
 
         val eventBatches = awaitEventBatchRequest(1000L, 1)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
@@ -133,9 +135,12 @@ class RuleFactoryTest {
                 .setChainId(ChainID.newBuilder().setId("test_chain_id"))
                 .build()
 
-        assertThrows<RuleCreationException> {
+        val mainException = assertThrows<RuleCreationException> {
             ruleFactory.createCheckRule(request, false)
         }
+
+        assertEquals("An error occurred while creating rule", mainException.message)
+        assertEquals("The request has an invalid chain ID or connectivity ID. Please use checkpoint instead of chain ID", mainException.cause?.message)
 
         val eventBatches = awaitEventBatchRequest(1000L, 1)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)

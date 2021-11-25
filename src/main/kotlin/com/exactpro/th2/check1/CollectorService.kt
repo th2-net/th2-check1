@@ -93,8 +93,8 @@ class CollectorService(
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { key, value ->
-            val task = ruleFactory.createCheckRule(request, eventIdToLastCheckTask.containsKey(key))
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
@@ -113,8 +113,8 @@ class CollectorService(
             null
         }
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { key, value ->
-            val task = ruleFactory.createSequenceCheckRule(request, eventIdToLastCheckTask.containsKey(key))
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createSequenceCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
                 .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this }
         }
@@ -126,8 +126,8 @@ class CollectorService(
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { key, value ->
-            val task = ruleFactory.createNoMessageCheckRule(request, eventIdToLastCheckTask.containsKey(key))
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createNoMessageCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
