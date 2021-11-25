@@ -183,6 +183,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Migrated sailfish-utils from `3.7.0` to `3.8.1`
   + Now Check1 keep the order of repeating result groups by default
   + Fix IN, NOT_IN FilterOperation interaction
++ Fixed setting of the `failUnexpected` parameter while converting a message filter
 
 ### 3.7.2
 
