@@ -16,6 +16,7 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
+import com.exactpro.th2.check1.entities.RequestAdaptor
 import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.exception.RuleCreationException
@@ -28,7 +29,6 @@ import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SilenceCheckTask
 import com.exactpro.th2.common.event.Event
-import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.ComparisonSettings
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
@@ -54,14 +54,14 @@ class RuleFactory(
     private val timePrecision = configuration.timePrecision
     private val decimalPrecision = configuration.decimalPrecision
 
-    fun createCheckRule(request: CheckRuleRequest): CheckRuleTask =
+    fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean): CheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
-                    check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
+                    check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     check(request.kindCase != CheckRuleRequest.KindCase.KIND_NOT_SET) {
                         "Either old filter or root filter must be set"
@@ -97,14 +97,14 @@ class RuleFactory(
                 }
             }
 
-    fun createSequenceCheckRule(request: CheckSequenceRuleRequest): SequenceCheckRuleTask =
+    fun createSequenceCheckRule(request: CheckSequenceRuleRequest, isChainIdExist: Boolean): SequenceCheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
-                    check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
+                    check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     check((request.messageFiltersList.isEmpty() && request.rootMessageFiltersList.isNotEmpty())
                             || (request.messageFiltersList.isNotEmpty() && request.rootMessageFiltersList.isEmpty())) {
@@ -142,15 +142,15 @@ class RuleFactory(
                 }
             }
 
-    fun createNoMessageCheckRule(request: NoMessageCheckRequest): NoMessageCheckTask =
+    fun createNoMessageCheckRule(request: NoMessageCheckRequest, isChainIdExist: Boolean): NoMessageCheckTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     val parentEventID: EventID = request.parentEventId
-                    check(request.connectivityId.sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
+                    check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                     val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(request.checkpoint, sessionKey) }
+                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     val ruleConfiguration = RuleConfiguration(
                             createTaskTimeout(request.timeout, request.messageTimeout),
@@ -272,10 +272,18 @@ class RuleFactory(
         }
     }
 
-    private fun checkCheckpoint(checkpoint: Checkpoint, sessionKey: SessionKey) {
-        check(checkpoint !== Checkpoint.getDefaultInstance()) { "Request doesn't contain a checkpoint" }
+    private fun checkCheckpoint(requestAdaptor: RequestAdaptor, sessionKey: SessionKey, isChainIdExist: Boolean) {
+        if (requestAdaptor.chainId != null) {
+            check(isChainIdExist) {
+                "The request has an invalid chain ID or connectivity ID. Please use checkpoint instead of chain ID"
+            }
+            return // We should validate checkpoint only if the request doesn't contain a chain id
+        }
+        checkNotNull(requestAdaptor.checkpoint) {
+            "Request must contain a checkpoint, because the 'messageTimeout' is used and no chain ID is specified"
+        }
         with(sessionKey) {
-            val directionCheckpoint = checkpoint.sessionAliasToDirectionCheckpointMap[sessionAlias]
+            val directionCheckpoint = requestAdaptor.checkpoint.sessionAliasToDirectionCheckpointMap[sessionAlias]
             checkNotNull(directionCheckpoint) { "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'" }
             val checkpointData = directionCheckpoint.directionToCheckpointDataMap[direction.number]
             checkNotNull(checkpointData) { "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'" }

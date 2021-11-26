@@ -90,11 +90,11 @@ class CollectorService(
     @Throws(InterruptedException::class)
     fun verifyCheckRule(request: CheckRuleRequest): ChainID {
         val chainID = request.getChainIdOrGenerate()
-        val task = ruleFactory.createCheckRule(request)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
@@ -103,7 +103,6 @@ class CollectorService(
     @Throws(InterruptedException::class)
     fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): ChainID {
         val chainID = request.getChainIdOrGenerate()
-        val task = ruleFactory.createSequenceCheckRule(request)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
         val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
@@ -115,6 +114,7 @@ class CollectorService(
         }
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createSequenceCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
                 .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this }
         }
@@ -123,20 +123,24 @@ class CollectorService(
 
     fun verifyNoMessageCheck(request: NoMessageCheckRequest): ChainID {
         val chainID = request.getChainIdOrGenerate()
-        val task = ruleFactory.createNoMessageCheckRule(request)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createNoMessageCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
     }
 
-    private fun AbstractCheckTask.addToChainOrBegin(
-            value: AbstractCheckTask?,
-            checkpoint: GrpcCheckpoint
-    ): Unit = value?.subscribeNextTask(this) ?: begin(checkpoint)
+    private fun AbstractCheckTask.addToChainOrBegin(value: AbstractCheckTask?, checkpoint: GrpcCheckpoint) {
+        val realCheckpoint = if (checkpoint === GrpcCheckpoint.getDefaultInstance()) {
+            null
+        } else {
+            checkpoint
+        }
+        value?.subscribeNextTask(this) ?: begin(realCheckpoint)
+    }
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
         return if (hasChainId()) {
