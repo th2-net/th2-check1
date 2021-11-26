@@ -45,9 +45,9 @@ import java.time.Instant
 import java.util.concurrent.ForkJoinPool
 
 class RuleFactory(
-        configuration: Check1Configuration,
-        private val streamObservable: Observable<StreamContainer>,
-        private val eventBatchRouter: MessageRouter<EventBatch>
+    configuration: Check1Configuration,
+    private val streamObservable: Observable<StreamContainer>,
+    private val eventBatchRouter: MessageRouter<EventBatch>
 ) {
     private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
     private val defaultRuleExecutionTimeout = configuration.ruleExecutionTimeout

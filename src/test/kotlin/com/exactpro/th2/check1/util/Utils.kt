@@ -17,6 +17,8 @@ import com.exactpro.th2.common.event.bean.VerificationEntry
 import com.exactpro.th2.common.event.bean.VerificationStatus
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.MetadataFilter
+import org.junit.jupiter.api.assertThrows
+import kotlin.test.assertEquals
 
 fun String.toSimpleFilter(op: FilterOperation, key: Boolean = false): MetadataFilter.SimpleFilter = MetadataFilter.SimpleFilter.newBuilder()
     .setOperation(op)
@@ -31,4 +33,15 @@ fun createVerificationEntry(status: VerificationStatus): VerificationEntry = Ver
 
 fun createVerificationEntry(vararg verificationEntries: Pair<String, VerificationEntry>): VerificationEntry = VerificationEntry().apply {
     fields = linkedMapOf(*verificationEntries)
+}
+
+inline fun <reified T : Throwable> assertThrowsWithMessages(vararg exceptionMessages: String?, crossinline action: () -> Unit) {
+    val exception = assertThrows<T> {
+        action()
+    }
+    var currentException: Throwable? = exception
+    for (exceptionMessage in exceptionMessages) {
+        assertEquals(exceptionMessage, currentException?.message)
+        currentException = currentException?.cause
+    }
 }
