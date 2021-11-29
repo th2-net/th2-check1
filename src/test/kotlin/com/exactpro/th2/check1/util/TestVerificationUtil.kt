@@ -27,6 +27,7 @@ import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.message.messageFilter
+import com.exactpro.th2.common.value.nullValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
@@ -57,15 +59,15 @@ internal class TestVerificationUtil {
     @MethodSource("failUnexpectedByFieldsAndMessages")
     fun `fail unexpected test`(valueFilter: ValueFilter, value: Value) {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
-                .setMessageType("Test")
-                .setMessageFilter(MessageFilter.newBuilder()
-                        .putFields("A", valueFilter)
-                        .setComparisonSettings(ComparisonSettings.newBuilder()
-                                .setFailUnexpected(FailUnexpected.FIELDS_AND_MESSAGES)
-                                .build()
-                        )
-                        .build())
-                .build()
+            .setMessageType("Test")
+            .setMessageFilter(MessageFilter.newBuilder()
+                .putFields("A", valueFilter)
+                .setComparisonSettings(ComparisonSettings.newBuilder()
+                    .setFailUnexpected(FailUnexpected.FIELDS_AND_MESSAGES)
+                    .build()
+                )
+                .build())
+            .build()
 
         val actual = message("Test").apply {
             putFields("A", value)
@@ -78,9 +80,9 @@ internal class TestVerificationUtil {
         val actualIMessage = converter.fromProtoMessage(actual, false)
         val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
         val result = MessageComparator.compare(
-                actualIMessage,
-                filterIMessage,
-                settings
+            actualIMessage,
+            filterIMessage,
+            settings
         )
 
         Assertions.assertNotNull(result) { "Result cannot be null" }
@@ -88,53 +90,59 @@ internal class TestVerificationUtil {
     }
 
     companion object {
-        private val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
+        private val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null,
+            ProtoToIMessageConverter.createParameters().setUseMarkerForNullsInMessage(true)
+        )
 
         @JvmStatic
         fun failUnexpectedByFieldsAndMessages(): Stream<Arguments> = Stream.of(
-                Arguments.arguments(
-                        listOf(
-                                messageFilter().putFields("A1", "1".toValueFilter())
-                        ).toValueFilter(),
-                        listOf(
-                                message().putFields("A1", "1".toValue()).putFields("B1", "2".toValue()).build()
-                        ).toValue()
-                ),
-                Arguments.arguments(
-                        messageFilter().putFields("A1", "1".toValueFilter()).toValueFilter(),
-                        message().putFields("A1", "1".toValue()).putFields("B1", "2".toValue()).build().toValue()
-                ),
-                Arguments.arguments(
-                        messageFilter().putFields(
-                                "A1", listOf("1", "2").toValueFilter()
-                        ).toValueFilter(),
-                        message().putFields(
-                                "A1",
-                                listOf("1", "2", "3").toValue()
-                        ).build().toValue()
-                ),
-                Arguments.arguments(
-                        messageFilter().putFields(
-                                "A1",
-                                messageFilter().putFields("A2", "1".toValueFilter()).toValueFilter()
-                        ).toValueFilter(),
-                        message().putFields(
-                                "A1",
-                                message()
-                                        .putFields("A2", "1".toValue())
-                                        .putFields("B2", "2".toValue())
-                                        .build().toValue()
-                        ).build().toValue()
-                ),
-                Arguments.arguments(
-                        listOf(
-                                "1".toValueFilter()
-                        ).toValueFilter(),
-                        listOf(
-                                "1".toValue(),
-                                "2".toValue()
-                        ).toValue()
-                )
+            arguments(
+                listOf(
+                    messageFilter().putFields("A1", "1".toValueFilter())
+                ).toValueFilter(),
+                listOf(
+                    message().putFields("A1", "1".toValue()).putFields("B1", "2".toValue()).build()
+                ).toValue()
+            ),
+            arguments(
+                messageFilter().putFields("A1", "1".toValueFilter()).toValueFilter(),
+                message().putFields("A1", "1".toValue()).putFields("B1", "2".toValue()).build().toValue()
+            ),
+            arguments(
+                messageFilter().putFields(
+                    "A1", listOf("1", "2").toValueFilter()
+                ).toValueFilter(),
+                message().putFields(
+                    "A1",
+                    listOf("1", "2", "3").toValue()
+                ).build().toValue()
+            ),
+            arguments(
+                messageFilter().putFields(
+                    "A1",
+                    messageFilter().putFields("A2", "1".toValueFilter()).toValueFilter()
+                ).toValueFilter(),
+                message().putFields(
+                    "A1",
+                    message()
+                        .putFields("A2", "1".toValue())
+                        .putFields("B2", "2".toValue())
+                        .build().toValue()
+                ).build().toValue()
+            ),
+            arguments(
+                listOf(
+                    "1".toValueFilter()
+                ).toValueFilter(),
+                listOf(
+                    "1".toValue(),
+                    "2".toValue()
+                ).toValue()
+            ),
+            arguments(
+                messageFilter().putFields("A", 42.toValueFilter()).toValueFilter(),
+                message().putFields("A", 42.toValue()).putFields("B", nullValue()).toValue()
+            )
         )
     }
 }
