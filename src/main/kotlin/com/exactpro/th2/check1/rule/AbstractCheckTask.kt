@@ -85,8 +85,6 @@ abstract class AbstractCheckTask(
     private val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
 
     protected var handledMessageCounter: Long = 0
-
-    protected val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null, createParameters().setUseMarkerForNullsInMessage(true))
     protected val rootEvent: Event = Event.from(submitTime).description(description)
 
     private val sequenceSubject = SingleSubject.create<Legacy>()
@@ -539,6 +537,8 @@ abstract class AbstractCheckTask(
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
+        @JvmField
+        val CONVERTER = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null, createParameters().setUseMarkerForNullsInMessage(true))
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
@@ -649,7 +649,7 @@ abstract class AbstractCheckTask(
     }
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
-        map { message -> MessageContainer(message, converter.fromProtoMessage(message, false)) }
+        map { message -> MessageContainer(message, CONVERTER.fromProtoMessage(message, false)) }
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then

@@ -15,6 +15,7 @@ package com.exactpro.th2.check1.event
 
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.MessageComparator
+import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.bean.VerificationEntry
 import com.exactpro.th2.common.grpc.FilterOperation
@@ -41,9 +42,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
 class TestVerificationEntryUtils {
-    private val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null,
-        createParameters().setUseMarkerForNullsInMessage(true)
-    )
+    private val converter = AbstractCheckTask.CONVERTER
 
     @Test
     fun `null value in message`() {

@@ -17,6 +17,7 @@ import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.ComparisonUtil
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
+import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.common.grpc.ComparisonSettings
 import com.exactpro.th2.common.grpc.FailUnexpected
 import com.exactpro.th2.common.grpc.FilterOperation
@@ -90,9 +91,7 @@ internal class TestVerificationUtil {
     }
 
     companion object {
-        private val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null,
-            ProtoToIMessageConverter.createParameters().setUseMarkerForNullsInMessage(true)
-        )
+        private val converter = AbstractCheckTask.CONVERTER
 
         @JvmStatic
         fun failUnexpectedByFieldsAndMessages(): Stream<Arguments> = Stream.of(

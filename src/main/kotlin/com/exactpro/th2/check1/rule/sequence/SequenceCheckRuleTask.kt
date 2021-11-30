@@ -71,12 +71,12 @@ class SequenceCheckRuleTask(
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
-        converter.fromProtoPreFilter(protoPreMessageFilter),
+        CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
         protoPreMessageFilter.toCompareSettings()
     )
     private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
             SailfishFilter(
-                converter.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
                 it.toComparisonSettings()
             )
     }
@@ -104,9 +104,9 @@ class SequenceCheckRuleTask(
         messageFilters = protoMessageFilters.map {
             MessageFilterContainer(
                 it,
-                SailfishFilter(converter.fromProtoPreFilter(it), it.toCompareSettings()),
+                SailfishFilter(CONVERTER.fromProtoPreFilter(it), it.toCompareSettings()),
                 it.metadataFilterOrNull()?.let { metadataFilter ->
-                    SailfishFilter(converter.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
+                    SailfishFilter(CONVERTER.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
                         metadataFilter.toComparisonSettings())
                 }
             )
