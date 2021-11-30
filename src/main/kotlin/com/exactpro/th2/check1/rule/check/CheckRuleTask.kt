@@ -46,12 +46,12 @@ class CheckRuleTask(
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val messageFilter: SailfishFilter = SailfishFilter(
-        converter.fromProtoPreFilter(protoMessageFilter),
+        CONVERTER.fromProtoPreFilter(protoMessageFilter),
         protoMessageFilter.toCompareSettings()
     )
     private val metadataFilter: SailfishFilter? = protoMessageFilter.metadataFilterOrNull()?.let {
         SailfishFilter(
-            converter.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
+            CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
     }

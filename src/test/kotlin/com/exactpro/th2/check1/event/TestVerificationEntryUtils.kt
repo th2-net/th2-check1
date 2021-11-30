@@ -15,8 +15,10 @@ package com.exactpro.th2.check1.event
 
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.sf.comparison.MessageComparator
+import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.bean.VerificationEntry
+import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.ListValueFilter
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -24,9 +26,11 @@ import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.message.messageFilter
+import com.exactpro.th2.common.value.nullValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
+import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter.createParameters
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -38,7 +42,40 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
 class TestVerificationEntryUtils {
-    private val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
+    private val converter = AbstractCheckTask.CONVERTER
+
+    @Test
+    fun `null value in message`() {
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType("test")
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putFields("A", ValueFilter.newBuilder().setOperation(FilterOperation.EMPTY).build())
+            ).build()
+
+        val message = message("test").putFields("A", nullValue()).putFields("B", nullValue()).build()
+
+        val expected = converter.fromProtoFilter(filter.messageFilter, "test")
+        val actual = converter.fromProtoMessage(message, false)
+        val settings = ComparatorSettings().apply {
+            isKeepResultGroupOrder = true
+        }
+
+        val result = MessageComparator.compare(actual, expected, settings).assertNotNull {
+            "Result must not be null"
+        }
+        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        entry.fields["A"].assertNotNull { "Field A must be set in entry: ${entry.toDebugString()}" }
+            .also {
+                Assertions.assertEquals("#", it.expected) { "Expected value is different in entry: ${it.toDebugString()}" }
+                Assertions.assertNull(it.actual) { "Actual value must be null in entry: ${it.toDebugString()}" }
+            }
+        entry.fields["B"].assertNotNull { "Field B must be set in entry: ${entry.toDebugString()}" }
+            .also {
+                Assertions.assertNull(it.expected) { "Expected value must be null in entry: ${it.toDebugString()}" }
+                Assertions.assertNull(it.actual) { "Actual value must be null in entry: ${it.toDebugString()}" }
+            }
+    }
 
     @Test
     fun `key field in reordered collection`() {

@@ -16,7 +16,6 @@ package com.exactpro.th2.check1.rule.sequence
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.RuleConfiguration
-import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.MessageContainer
@@ -46,12 +45,12 @@ class SilenceCheckTask(
 ) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
-        converter.fromProtoPreFilter(protoPreMessageFilter),
+        CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
         protoPreMessageFilter.toCompareSettings()
     )
     private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
         SailfishFilter(
-            converter.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+            CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
     }

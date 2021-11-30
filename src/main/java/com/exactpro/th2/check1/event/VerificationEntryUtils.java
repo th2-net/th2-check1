@@ -20,6 +20,8 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.exactpro.sf.aml.scriptutil.StaticUtil.IFilter;
 import com.exactpro.sf.comparison.ComparisonResult;
 import com.exactpro.sf.comparison.Formatter;
@@ -28,12 +30,13 @@ import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
 import com.exactpro.th2.common.grpc.FilterOperation;
 import com.exactpro.th2.sailfish.utils.filter.IOperationFilter;
+import com.exactpro.th2.sailfish.utils.filter.util.FilterUtils;
 
 public class VerificationEntryUtils {
 
     public static VerificationEntry createVerificationEntry(ComparisonResult result) {
         VerificationEntry verificationEntry = new VerificationEntry();
-        verificationEntry.setActual(Objects.toString(result.getActual(), null));
+        verificationEntry.setActual(convertActual(result));
         verificationEntry.setExpected(convertExpectedResult(result));
         verificationEntry.setStatus(toVerificationStatus(result.getStatus()));
         verificationEntry.setKey(result.isKey());
@@ -52,6 +55,15 @@ public class VerificationEntryUtils {
         }
 
         return verificationEntry;
+    }
+
+    @Nullable
+    private static String convertActual(ComparisonResult result) {
+        Object actual = result.getActual();
+        if (actual == FilterUtils.NULL_VALUE) {
+            return null;
+        }
+        return Objects.toString(actual, null);
     }
 
     private static String resolveOperation(ComparisonResult result) {
