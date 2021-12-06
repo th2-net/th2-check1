@@ -75,13 +75,17 @@ class SilenceCheckTask(
             cancel()
             return
         }
-        preFilterEvent = Event.start()
+        preFilterEvent = Event
+            .start()
+            .bookName(parentEventID.bookName)
             .type("preFiltering")
             .bodyData(protoPreMessageFilter.toReadableBodyCollection())
 
         rootEvent.addSubEvent(preFilterEvent)
 
-        resultEvent = Event.start()
+        resultEvent = Event
+            .start()
+            .bookName(parentEventID.bookName)
             .type("noMessagesCheckResult")
         rootEvent.addSubEvent(resultEvent)
     }

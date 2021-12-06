@@ -114,7 +114,9 @@ class SequenceCheckRuleTask(
 
         matchedByKeys = HashSet(messageFilters.size)
 
-        preFilterEvent = Event.start()
+        preFilterEvent = Event
+            .start()
+            .bookName(parentEventID.bookName)
             .type("preFiltering")
             .bodyData(protoPreMessageFilter.toReadableBodyCollection())
 
@@ -186,7 +188,9 @@ class SequenceCheckRuleTask(
      * Creates events for check messages
      */
     private fun fillCheckMessagesEvent() {
-        val checkMessagesEvent = rootEvent.addSubEventWithSamePeriod()
+        val checkMessagesEvent = rootEvent
+            .addSubEventWithSamePeriod()
+            .bookName(parentEventID.bookName)
             .name("Check messages")
             .type(CHECK_MESSAGES_TYPE)
             .appendEventWithVerificationsAndFilters(protoMessageFilters, messageFilteringResults.values)
@@ -216,7 +220,9 @@ class SequenceCheckRuleTask(
             sequenceTable.row(CheckSequenceUtils.createOnlyExpectedSide(messageFilter.protoMessageFilter, sessionKey.sessionAlias))
         }
 
-        rootEvent.addSubEventWithSamePeriod()
+        rootEvent
+            .addSubEventWithSamePeriod()
+            .bookName(parentEventID.bookName)
             .name("Check sequence (expected ${protoMessageFilters.size} / actual ${preFilteringResults.size} , check order $checkOrder)")
             .type("checkSequence")
             .status(if (protoMessageFilters.size == preFilteringResults.size

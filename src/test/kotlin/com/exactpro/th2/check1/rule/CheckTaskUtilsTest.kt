@@ -12,6 +12,7 @@
  */
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.event.EventUtils.createMessageBean
@@ -24,12 +25,11 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class CheckTaskUtilsTest {
 
     //FIXME: correct the contract in the EventUtils.toEventID method
-    private val parentEventId: EventID = EventUtils.toEventID("parentEventId")!!
+    private val parentEventId: EventID = EventUtils.toEventID(BOOK_NAME, "parentEventId")!!
     private val data = createMessageBean("0123456789".repeat(20))
     private val dataSize = OBJECT_MAPPER.writeValueAsBytes(listOf(data)).size
     private val bigData = createMessageBean("0123456789".repeat(30))
@@ -37,7 +37,9 @@ class CheckTaskUtilsTest {
 
         @Test
     fun `negative or zero max size`() {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(BOOK_NAME)
         assertAll(
             { assertThrows(IllegalArgumentException::class.java) { rootEvent.disperseToBatches(-1, parentEventId) } },
             { assertThrows(IllegalArgumentException::class.java) { rootEvent.disperseToBatches(0, parentEventId) } }
@@ -46,7 +48,9 @@ class CheckTaskUtilsTest {
 
     @Test
     fun `too low max size`() {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(BOOK_NAME)
             .bodyData(data)
 
         assertAll(
@@ -56,11 +60,15 @@ class CheckTaskUtilsTest {
 
     @Test
     fun `every event to distinct batch`() {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(BOOK_NAME)
             .bodyData(data).apply {
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data)
                     .addSubEventWithSamePeriod()
+                        .bookName(bookName)
                         .bodyData(data)
             }
 
@@ -71,11 +79,15 @@ class CheckTaskUtilsTest {
 
     @Test
     fun `problem events`() {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(BOOK_NAME)
             .bodyData(data).apply {
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data)
                     .addSubEventWithSamePeriod()
+                        .bookName(bookName)
                         .bodyData(bigData)
             }
 
@@ -86,15 +98,21 @@ class CheckTaskUtilsTest {
 
     @Test
     fun `several events at the end of hierarchy`() {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(BOOK_NAME)
             .bodyData(data).apply {
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data)
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(bigData)
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data)
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data)
             }
 
@@ -117,11 +135,17 @@ class CheckTaskUtilsTest {
 
     @Test
     fun `batch structure`() {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(BOOK_NAME)
             .bodyData(data)
-        val subEvent1 = rootEvent.addSubEventWithSamePeriod()
+        val subEvent1 = rootEvent
+            .addSubEventWithSamePeriod()
+            .bookName(BOOK_NAME)
             .bodyData(data)
-        val subEvent2 = rootEvent.addSubEventWithSamePeriod()
+        val subEvent2 = rootEvent
+            .addSubEventWithSamePeriod()
+            .bookName(BOOK_NAME)
             .bodyData(data)
 
         val batches = rootEvent.disperseToBatches(1024 * 1024, parentEventId)
@@ -141,13 +165,18 @@ class CheckTaskUtilsTest {
 
     @Test
     fun `event with children is after the event without children`() {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(BOOK_NAME)
             .bodyData(data).apply {
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data)
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data).apply {
                         addSubEventWithSamePeriod()
+                            .bookName(bookName)
                             .bodyData(data)
                     }
             }
@@ -159,14 +188,19 @@ class CheckTaskUtilsTest {
 
     @Test
     fun `event with children is before the event without children`() {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(BOOK_NAME)
             .bodyData(data).apply {
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data).apply {
                         addSubEventWithSamePeriod()
+                            .bookName(bookName)
                             .bodyData(data)
                     }
                 addSubEventWithSamePeriod()
+                    .bookName(bookName)
                     .bodyData(data)
             }
 

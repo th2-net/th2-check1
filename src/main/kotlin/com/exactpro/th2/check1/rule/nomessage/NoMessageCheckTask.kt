@@ -64,11 +64,15 @@ class NoMessageCheckTask(
 
     override fun onStart() {
         super.onStart()
-        preFilterEvent = Event.start()
+        preFilterEvent = Event
+            .start()
+            .bookName(parentEventID.bookName)
             .type("preFiltering")
             .bodyData(protoPreMessageFilter.toTreeTable())
         rootEvent.addSubEvent(preFilterEvent)
-        resultEvent = Event.start()
+        resultEvent = Event
+            .start()
+            .bookName(parentEventID.bookName)
             .type("noMessagesCheckResult")
         rootEvent.addSubEvent(resultEvent)
     }
@@ -107,9 +111,11 @@ class NoMessageCheckTask(
         }
 
         if (taskState == State.TIMEOUT || taskState == State.STREAM_COMPLETED) {
-            val executionStopEvent = Event.start()
-                    .name("Task has been completed because: ${taskState.name}")
-                    .type("noMessageCheckExecutionStop")
+            val executionStopEvent = Event
+                .start()
+                .bookName(parentEventID.bookName)
+                .name("Task has been completed because: ${taskState.name}")
+                .type("noMessageCheckExecutionStop")
             if (taskState != State.TIMEOUT || !isCheckpointLastReceivedMessage()) {
                 executionStopEvent.status(Event.Status.FAILED)
             }

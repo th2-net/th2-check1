@@ -195,7 +195,7 @@ class CollectorService(
 
         val batch = EventBatch.newBuilder()
             .setParentEventId(parentEventID)
-            .addAllEvents(event.toProtoEvents(parentEventID.id))
+            .addAllEvents(event.toListProto(parentEventID))
             .build()
 
         ForkJoinPool.commonPool().execute {
@@ -211,7 +211,9 @@ class CollectorService(
     }
 
     fun createCheckpoint(request: CheckpointRequestOrBuilder): Checkpoint {
-        val rootEvent = Event.start()
+        val rootEvent = Event
+            .start()
+            .bookName(request.parentEventId.bookName)
             .name("Checkpoint")
             .type("Checkpoint")
             .description(request.description)
@@ -223,7 +225,8 @@ class CollectorService(
                 val messageID = sessionKey.toMessageID(checkpointData.sequence)
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()
-                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '${checkpointData.sequence}'")
+                    .bookName(request.parentEventId.bookName)
+                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
                     .type("Checkpoint for session")
                     .messageID(messageID)
             }

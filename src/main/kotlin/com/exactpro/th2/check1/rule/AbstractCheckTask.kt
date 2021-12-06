@@ -76,7 +76,7 @@ abstract class AbstractCheckTask(
     private val ruleConfiguration: RuleConfiguration,
     submitTime: Instant,
     protected val sessionKey: SessionKey,
-    private val parentEventID: EventID,
+    protected val parentEventID: EventID,
     private val messageStream: Observable<StreamContainer>,
     private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
@@ -85,7 +85,10 @@ abstract class AbstractCheckTask(
     private val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
 
     protected var handledMessageCounter: Long = 0
-    protected val rootEvent: Event = Event.from(submitTime).description(description)
+    protected val rootEvent: Event = Event
+        .from(submitTime)
+        .bookName(parentEventID.bookName)
+        .description(description)
 
     private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
@@ -313,11 +316,13 @@ abstract class AbstractCheckTask(
                     .subscribe(this)
         } catch (exception: Exception) {
             LOGGER.error("An internal error occurred while executing rule", exception)
-            rootEvent.addSubEventWithSamePeriod()
-                    .name("An error occurred while executing rule")
-                    .type("internalError")
-                    .status(FAILED)
-                    .exception(exception, true)
+            rootEvent
+                .addSubEventWithSamePeriod()
+                .bookName(parentEventID.bookName)
+                .name("An error occurred while executing rule")
+                .type("internalError")
+                .status(FAILED)
+                .exception(exception, true)
             taskFinished()
             throw RuleInternalException("An internal error occurred while executing rule", exception)
         }
@@ -337,13 +342,17 @@ abstract class AbstractCheckTask(
             LOGGER.error(message, ex)
             eventBatchRouter.send(EventBatch.newBuilder()
                 .setParentEventId(parentEventID)
-                .addEvents(Event.start()
-                    .name("Check rule $description problem")
-                    .type("Exception")
-                    .status(FAILED)
-                    .bodyData(EventUtils.createMessageBean(message))
-                    .bodyData(EventUtils.createMessageBean(ex.message))
-                    .toProto(parentEventID))
+                .addEvents(
+                    Event
+                        .start()
+                        .bookName(parentEventID.bookName)
+                        .name("Check rule $description problem")
+                        .type("Exception")
+                        .status(FAILED)
+                        .bodyData(EventUtils.createMessageBean(message))
+                        .bodyData(EventUtils.createMessageBean(ex.message))
+                        .toProto(parentEventID)
+                )
                 .build())
         } finally {
             RuleMetric.decrementActiveRule(type())
@@ -433,12 +442,14 @@ abstract class AbstractCheckTask(
             false
         } catch (e: Exception) {
             LOGGER.error("Result event cannot be completed", e)
-            rootEvent.addSubEventWithSamePeriod()
-                    .name("Check result event cannot build completely")
-                    .type("eventNotComplete")
-                    .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
-                    .bodyData(EventUtils.createMessageBean(e.message))
-                    .status(FAILED)
+            rootEvent
+                .addSubEventWithSamePeriod()
+                .bookName(parentEventID.bookName)
+                .name("Check result event cannot build completely")
+                .type("eventNotComplete")
+                .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
+                .bodyData(EventUtils.createMessageBean(e.message))
+                .status(FAILED)
             true
         }
     }
@@ -462,7 +473,9 @@ abstract class AbstractCheckTask(
 
     private fun fillUntrustedExecutionEvent() {
         rootEvent.addSubEvent(
-            Event.start()
+            Event
+                .start()
+                .bookName(parentEventID.bookName)
                 .name("The current check is untrusted because the start point of the check interval has been selected approximately")
                 .status(FAILED)
                 .type("untrustedExecution")
@@ -471,7 +484,9 @@ abstract class AbstractCheckTask(
 
     private fun fillMissedStartMessageAndMessagesInIntervalEvent() {
         rootEvent.addSubEvent(
-            Event.start()
+            Event
+                .start()
+                .bookName(parentEventID.bookName)
                 .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval with sequence '$lastSequence' and checkpoint timestamp '${checkpointTimeout?.toJson()}'")
                 .status(FAILED)
                 .type("missedMessagesInInterval")
@@ -480,7 +495,9 @@ abstract class AbstractCheckTask(
 
     private fun fillEmptyStartMessageEvent() {
         rootEvent.addSubEvent(
-            Event.start()
+            Event
+                .start()
+                .bookName(parentEventID.bookName)
                 .name("Buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' doesn't contain starting message, but contains several messages in the requested check interval")
                 .status(FAILED)
                 .type("missedStartMessage")
@@ -572,11 +589,12 @@ abstract class AbstractCheckTask(
         }
 
         with(protoMessage.metadata) {
+            bookName(parentEventID.bookName)
             name("Verification '${messageType}' message")
-                .type("Verification")
-                .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
-                .messageID(id)
-                .bodyData(verificationComponent.build())
+            type("Verification")
+            status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
+            messageID(id)
+            bodyData(verificationComponent.build())
             if (protoFilter.hasDescription()) {
                 description(protoFilter.description.value)
             }
@@ -591,11 +609,12 @@ abstract class AbstractCheckTask(
         }
 
         with(metadata) {
+            bookName(parentEventID.bookName)
             name("Verification '${messageType}' metadata")
-                    .type("Verification")
-                    .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
-                    .messageID(id)
-                    .bodyData(verificationComponent.build())
+            type("Verification")
+            status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
+            messageID(id)
+            bodyData(verificationComponent.build())
         }
         return this
     }
@@ -612,6 +631,7 @@ abstract class AbstractCheckTask(
 
     protected fun Event.appendEventsWithFilter(rootMessageFilter: RootMessageFilter): Event = this.apply {
         addSubEventWithSamePeriod()
+            .bookName(parentEventID.bookName)
             .name("Message filter")
             .type("Filter")
             .status(FAILED)

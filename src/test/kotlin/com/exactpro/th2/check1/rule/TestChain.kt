@@ -40,8 +40,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TestChain: AbstractCheckTaskTest() {
-
-    private val eventID = EventID.newBuilder().setId("root").build()
+    private val eventID = createEvent("root")
     private val preFilter = PreFilter.newBuilder()
         .putFields(KEY_FIELD, ValueFilter.newBuilder().setKey(true).setOperation(FilterOperation.NOT_EMPTY).build())
         .build()

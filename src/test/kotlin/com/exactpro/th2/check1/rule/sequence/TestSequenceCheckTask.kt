@@ -14,12 +14,13 @@ package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
-import com.exactpro.th2.check1.exception.RuleInternalException
 import com.exactpro.th2.check1.entities.TaskTimeout
+import com.exactpro.th2.check1.exception.RuleInternalException
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_SEQUENCE_TYPE
+import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Direction
@@ -740,15 +741,20 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `failed rule creation due to invalid regex operation in the message filter`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                        .mergeMetadata(MessageMetadata.newBuilder()
-                                .putProperties("keyProp", "42")
-                                .putProperties("notKeyProp", "2")
-                                .build())
-                        .build()
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .build())
+                .build()
         ))
 
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createEvent("root")
         val filter = RootMessageFilter.newBuilder()
                 .setMessageType(MESSAGE_TYPE)
                 .setMetadataFilter(MetadataFilter.newBuilder()

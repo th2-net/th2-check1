@@ -93,9 +93,11 @@ class RuleFactory(
                     )
                 }
                 onErrorEvent {
-                    Event.start()
-                            .name("Check rule cannot be created")
-                            .type("checkRuleCreation")
+                    Event
+                        .start()
+                        .bookName(request.parentEventId.bookName)
+                        .name("Check rule cannot be created")
+                        .type("checkRuleCreation")
                 }
             }
 
@@ -139,9 +141,11 @@ class RuleFactory(
                     )
                 }
                 onErrorEvent {
-                    Event.start()
-                            .name("Sequence check rule cannot be created")
-                            .type("sequenceCheckRuleCreation")
+                    Event
+                        .start()
+                        .bookName(request.parentEventId.bookName)
+                        .name("Sequence check rule cannot be created")
+                        .type("sequenceCheckRuleCreation")
                 }
             }
 
@@ -175,9 +179,11 @@ class RuleFactory(
                     )
                 }
                 onErrorEvent {
-                    Event.start()
-                            .name("Check rule cannot be created")
-                            .type("checkRuleCreation")
+                    Event
+                        .start()
+                        .bookName(request.parentEventId.bookName)
+                        .name("Check rule cannot be created")
+                        .type("checkRuleCreation")
                 }
             }
 
@@ -211,7 +217,9 @@ class RuleFactory(
                 )
             }
             onErrorEvent {
-                Event.start()
+                Event
+                    .start()
+                    .bookName(request.parentEventId.bookName)
                     .name("Auto silence check rule cannot be created")
                     .type("checkRuleCreation")
             }
@@ -226,11 +234,13 @@ class RuleFactory(
             throw e
         } catch (e: Exception) {
             val rootEvent = ruleCreationContext.event()
-            rootEvent.addSubEventWithSamePeriod()
-                    .name("An error occurred while creating rule")
-                    .type("ruleCreationException")
-                    .exception(e, true)
-                    .status(Event.Status.FAILED)
+            rootEvent
+                .addSubEventWithSamePeriod()
+                .bookName(parentEventId.bookName)
+                .name("An error occurred while creating rule")
+                .type("ruleCreationException")
+                .exception(e, true)
+                .status(Event.Status.FAILED)
             publishEvents(rootEvent, parentEventId)
             throw RuleCreationException("An error occurred while creating rule", e)
         }

@@ -17,6 +17,7 @@ import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
+import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.check1.util.createVerificationEntry
 import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.event.bean.VerificationStatus
@@ -74,7 +75,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @Test
     fun `success verification`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -100,7 +106,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @Test
     internal fun `very little value of max event batch content size`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -126,7 +137,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @Test
     internal fun `exceeds max event batch content size`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -152,7 +168,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @Test
     internal fun findsMessageByMetadata() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -182,7 +203,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @Test
     internal fun ignoresMessageIfMetadataDoesNotMatchByKeys() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -213,12 +239,17 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @ValueSource(longs = [0, -1])
     fun `handle error if the timeout is zero or negative`(timeout: Long) {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                        .mergeMetadata(MessageMetadata.newBuilder()
-                                .putProperties("keyProp", "42")
-                                .putProperties("notKeyProp", "2")
-                                .build())
-                        .build()
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .build())
+                .build()
         ))
 
         val eventID = createEvent("root")
@@ -237,20 +268,35 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @Test
     fun `check that the order is kept in repeating groups`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                        .putFields("legs", listValue()
-                                .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                                        .putAllFields(mapOf(
-                                                "A" to "1".toValue(),
-                                                "B" to "1".toValue()
-                                        )))
-                                .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                                        .putAllFields(mapOf(
-                                                "A" to "2".toValue(),
-                                                "B" to "2".toValue()
-                                        )))
-                                .toValue())
-                        .build()
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
+                .putFields("legs", listValue()
+                    .add(message(
+                        BOOK_NAME,
+                        MESSAGE_TYPE,
+                        Direction.FIRST,
+                        SESSION_ALIAS
+                    )
+                        .putAllFields(mapOf(
+                            "A" to "1".toValue(),
+                            "B" to "1".toValue()
+                        )))
+                    .add(message(
+                        BOOK_NAME,
+                        MESSAGE_TYPE,
+                        Direction.FIRST,
+                        SESSION_ALIAS
+                    )
+                        .putAllFields(mapOf(
+                            "A" to "2".toValue(),
+                            "B" to "2".toValue()
+                        )))
+                    .toValue())
+                .build()
         ))
 
         val messageFilterForCheckOrder: RootMessageFilter = rootMessageFilter(MESSAGE_TYPE).apply {
@@ -311,9 +357,14 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @ValueSource(booleans = [true, false])
     fun `check verification description`(includeDescription: Boolean) {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                        .putFields("A", "1".toValue())
-                        .build()
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
+                .putFields("A", "1".toValue())
+                .build()
         ))
         val messageFilterForCheckOrder: RootMessageFilter = RootMessageFilter.newBuilder().apply {
             messageType = MESSAGE_TYPE
@@ -322,7 +373,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 description = StringValue.of(VERIFICATION_DESCRIPTION)
             }
         }.build()
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createEvent("root")
 
         checkTask(messageFilterForCheckOrder, eventID, streams).begin()
 
@@ -341,7 +392,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `success verification with message timeout`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -349,7 +405,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                     .setId(MessageID.newBuilder().setSequence(0L))
                     .build())
                 .build(),
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -378,7 +439,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `success verification, but failed event because missed start message`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -408,7 +474,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `failed verification with expired message timeout`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -416,7 +487,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                     .setId(MessageID.newBuilder().setSequence(0L))
                     .build())
                 .build(),
-            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
@@ -444,20 +520,35 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     @Test
     fun `verify repeating groups according to defined filters`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-                message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                        .putFields("legs", listValue()
-                                .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                                        .putAllFields(mapOf(
-                                                "A" to "1".toValue(),
-                                                "B" to "2".toValue()
-                                        )))
-                                .add(message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
-                                        .putAllFields(mapOf(
-                                                "C" to "3".toValue(),
-                                                "D" to "4".toValue()
-                                        )))
-                                .toValue())
-                        .build()
+            message(
+                BOOK_NAME,
+                MESSAGE_TYPE,
+                Direction.FIRST,
+                SESSION_ALIAS
+            )
+                .putFields("legs", listValue()
+                    .add(message(
+                        BOOK_NAME,
+                        MESSAGE_TYPE,
+                        Direction.FIRST,
+                        SESSION_ALIAS
+                    )
+                        .putAllFields(mapOf(
+                            "A" to "1".toValue(),
+                            "B" to "2".toValue()
+                        )))
+                    .add(message(
+                        BOOK_NAME,
+                        MESSAGE_TYPE,
+                        Direction.FIRST,
+                        SESSION_ALIAS
+                    )
+                        .putAllFields(mapOf(
+                            "C" to "3".toValue(),
+                            "D" to "4".toValue()
+                        )))
+                    .toValue())
+                .build()
         ))
 
         val messageFilterForCheckOrder: RootMessageFilter = rootMessageFilter(MESSAGE_TYPE).apply {
@@ -487,7 +578,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             }.build()
         }.build()
 
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createEvent("root")
 
         checkTask(messageFilterForCheckOrder, eventID, streams).begin()
 
