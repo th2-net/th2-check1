@@ -18,9 +18,9 @@ Available requests are described in [this repository](https://gitlab.exactpro.co
 
 - CheckSequenceRuleRequest - prefilters the messages and verify all of them by filter. Order checking configured from request.
   Depending on the request and check1 configuration **SilenceCheckRule** can be added after the CheckSequenceRule.
-  It verifies that there were not any messages matches the pre-filter in original request.
+  It verifies that there were not any messages matching the pre-filter in the original request.
   It awaits for realtime timeout that is equal to clean-up timeout.
-  Report about unexpected messages only after the timeout exceeds. Reports nothing if any task is added to the chain.
+  Reports about unexpected messages only after the timeout is exceeded. Reports nothing if any task is added to the chain.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
 - NoMessageCheckRequest - prefilters messages and verifies that no other messages have been received.
 
@@ -56,7 +56,7 @@ Available requests are described in [this repository](https://gitlab.exactpro.co
   (please note, that the `message_filters` parameter is deprecated and will be removed in the future releases)
 
 #### Optional
-* **pre_filter** - pre-filtering for messages. Only messages passed the filter will be checked by main filters.
+* **pre_filter** - pre-filtering for messages. Only messages that passed the filter will be checked by the main filters.
 * **check_order** - enables order validation in message's collections
 * **silence_check** - enables auto-check for messages that match the `pre_filter` after the rule has finished
 
@@ -150,13 +150,13 @@ Defines a default behavior for creating CheckSequenceRule if `silence_check` par
 The time precision is used to compare two time values. It is based on the `ISO-8601` duration format `PnDTnHnMn.nS` with days considered to be exactly 24 hours. Additional information can be found [here](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/Duration.html#parse(java.lang.CharSequence))
 
 #### decimal-precision
-The decimal precision is used to compare two number values. Can be specified in number or string format. For example `0.0001`, `0.125`, `125E-3`
+The decimal precision is used to compare the value of two numbers. Can be specified in number or string format. For example `0.0001`, `0.125`, `125E-3`
 
 ## Required pins
 
 The Check1 component has two types of pin:
 * gRPC server pin: it allows other components to connect via `com.exactpro.th2.check1.grpc.Check1Service` class.
-* MQ pin: it is used for listening to parsed messages. You can link several sources with different directions and session alises to it.
+* MQ pin: it is used for listening to parsed messages. You can link several sources with different directions and session aliases to it.
 
 ```yaml
 apiVersion: th2.exactpro.com/v1
@@ -194,8 +194,8 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + New configuration parameter `rule-execution-timeout` which is used if the user has not specified a timeout for the rule execution
 + Auto silence check after the CheckSequenceRule.
 + `auto-silence-check-after-sequence-rule` to setup a default behavior for CheckSequenceRule
-+ New configuration parameter `time-precision` which is uses if the user has not specified a time precision
-+ New configuration parameter `decimal-precision` which is uses if the user has not specified a number precision
++ New configuration parameter `time-precision` which is used if the user has not specified a time precision
++ New configuration parameter `decimal-precision` which is used if the user has not specified a number precision
 + New parameter `hint` for verification event which is used to display the reason for the failed field comparison. For example the type mismatch of the compared values
 
 #### Changed:
