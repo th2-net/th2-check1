@@ -155,8 +155,7 @@ The decimal precision is used to compare the value of two numbers. Can be specif
 
 #### check-null-value-as-empty
 `check-null-value-as-empty` is used for `EMPTY` and `NOT_EMPTY` operations to check if `NULL_VALUE` value is empty. For example, if the `checkNullValueAsEmpty` parameter is:
-+ `true`, then `NULL_VALUE` is equal to `EMPTY` and `NULL_VALUE` is not equal to `NOT_EMPTY`
-+ otherwise `NULL_VALUE` is not equal `EMPTY` and `NULL_VALUE` is equal to `NOT_EMPTY`
++ `true`, then `NULL_VALUE` is equal to `EMPTY`, otherwise `NULL_VALUE` is equal to `NOT_EMPTY`
 
 ## Required pins
 
