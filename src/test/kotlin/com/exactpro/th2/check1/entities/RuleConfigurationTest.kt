@@ -23,7 +23,12 @@ class RuleConfigurationTest {
     @Test
     fun `check that time precision is negative`() {
         val exception = assertThrows<IllegalArgumentException> {
-            RuleConfiguration(TaskTimeout(0, 0), null, Duration.ofSeconds(-1), 0.005, 1)
+            RuleConfiguration(
+                    TaskTimeout(0, 0), null, Duration.ofSeconds(-1),
+                    0.005,
+                    1,
+                    true
+            )
         }
         assertEquals(exception.message, "Time precision cannot be negative")
     }
@@ -31,7 +36,12 @@ class RuleConfigurationTest {
     @Test
     fun `check that decimal precision is negative`() {
         val exception = assertThrows<IllegalArgumentException> {
-            RuleConfiguration(TaskTimeout(0, 0), null, Duration.ofSeconds(1), -0.005, 1)
+            RuleConfiguration(
+                    TaskTimeout(0, 0), null, Duration.ofSeconds(1),
+                    -0.005,
+                    1,
+                    true
+            )
         }
         assertEquals(exception.message, "Decimal precision cannot be negative")
     }
@@ -41,7 +51,14 @@ class RuleConfigurationTest {
         val maxEventBatchContentSize = -1
 
         val exception = assertThrows<IllegalArgumentException> {
-            RuleConfiguration(TaskTimeout(0, 0), null, Duration.ofSeconds(1), 0.005, maxEventBatchContentSize)
+            RuleConfiguration(
+                    TaskTimeout(0, 0),
+                    null,
+                    Duration.ofSeconds(1),
+                    0.005,
+                    maxEventBatchContentSize,
+                    true
+            )
         }
         assertEquals(exception.message, "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize")
     }
@@ -51,7 +68,14 @@ class RuleConfigurationTest {
         val timeout = -1L
 
         val exception = assertThrows<IllegalArgumentException> {
-            RuleConfiguration(TaskTimeout(timeout, 0), null, Duration.ofSeconds(1), 0.005, 1)
+            RuleConfiguration(
+                    TaskTimeout(timeout, 0),
+                    null,
+                    Duration.ofSeconds(1),
+                    0.005,
+                    1,
+                    true
+            )
         }
         assertEquals(exception.message, "'timeout' should be set or be greater than zero, actual: $timeout")
     }

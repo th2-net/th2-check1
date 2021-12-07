@@ -53,6 +53,7 @@ class RuleFactory(
     private val defaultRuleExecutionTimeout = configuration.ruleExecutionTimeout
     private val timePrecision = configuration.timePrecision
     private val decimalPrecision = configuration.decimalPrecision
+    private val isCheckNullValueAsEmpty = configuration.isCheckNullValueAsEmpty
 
     fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean): CheckRuleTask =
             ruleCreation(request.parentEventId) {
@@ -77,7 +78,8 @@ class RuleFactory(
                             request.description,
                             timePrecision,
                             decimalPrecision,
-                            maxEventBatchContentSize
+                            maxEventBatchContentSize,
+                            isCheckNullValueAsEmpty
                     )
 
                     CheckRuleTask(
@@ -120,7 +122,8 @@ class RuleFactory(
                             request.description,
                             timePrecision,
                             decimalPrecision,
-                            maxEventBatchContentSize
+                            maxEventBatchContentSize,
+                            isCheckNullValueAsEmpty
                     )
 
                     SequenceCheckRuleTask(
@@ -157,7 +160,8 @@ class RuleFactory(
                             request.description,
                             timePrecision,
                             decimalPrecision,
-                            maxEventBatchContentSize
+                            maxEventBatchContentSize,
+                            isCheckNullValueAsEmpty
                     )
 
                     NoMessageCheckTask(
@@ -192,7 +196,8 @@ class RuleFactory(
                         request.description.takeIf(String::isNotEmpty),
                         timePrecision,
                         decimalPrecision,
-                        maxEventBatchContentSize
+                        maxEventBatchContentSize,
+                        isCheckNullValueAsEmpty
                 )
 
                 SilenceCheckTask(

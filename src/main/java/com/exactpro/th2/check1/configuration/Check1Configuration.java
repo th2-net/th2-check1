@@ -49,6 +49,9 @@ public class Check1Configuration {
     @JsonDeserialize(using = DurationDeserializer.class)
     @JsonPropertyDescription("The default time precision value uses java duration format")
     private Duration timePrecision = Duration.parse("PT0.000000001S");
+    
+    @JsonProperty(value = "check-null-value-as-empty")
+    private boolean checkNullValueAsEmpty = true;
 
     public int getMessageCacheSize() {
         return messageCacheSize;
@@ -80,5 +83,9 @@ public class Check1Configuration {
 
     public Duration getTimePrecision() {
         return timePrecision;
+    }
+
+    public boolean isCheckNullValueAsEmpty() {
+        return checkNullValueAsEmpty;
     }
 }

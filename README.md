@@ -121,7 +121,8 @@ This block describes the configuration for check1.
   "rule-execution-timeout": 5000,
   "auto-silence-check-after-sequence-rule": false,
   "time-precision": "PT0.000000001S",
-  "decimal-precision": 0.00001
+  "decimal-precision": 0.00001,
+  "check-null-value-as-empty": true
 }
 ```
 
@@ -151,6 +152,11 @@ The time precision is used to compare two time values. It is based on the `ISO-8
 
 #### decimal-precision
 The decimal precision is used to compare the value of two numbers. Can be specified in number or string format. For example `0.0001`, `0.125`, `125E-3`
+
+#### check-null-value-as-empty
+`check-null-value-as-empty` is used for `EMPTY` and `NOT_EMPTY` operations to check if `NULL_VALUE` value is empty. For example, if the `checkNullValueAsEmpty` parameter is:
++ `true`, then `NULL_VALUE` is equal to `EMPTY` and `NULL_VALUE` is not equal to `NOT_EMPTY`
++ otherwise `NULL_VALUE` is not equal `EMPTY` and `NULL_VALUE` is equal to `NOT_EMPTY`
 
 ## Required pins
 
@@ -197,14 +203,16 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + New configuration parameter `time-precision` which is used if the user has not specified a time precision
 + New configuration parameter `decimal-precision` which is used if the user has not specified a number precision
 + New parameter `hint` for verification event which is used to display the reason for the failed field comparison. For example the type mismatch of the compared values
++ New configuration parameter `check-null-value-as-empty` witch us used to configure the `EMPTY` and `NOT_EMPTY` operations
 
 #### Changed:
 + Migrated `common` version from `3.26.4` to `3.31.3`
 + Migrated `grpc-check1` version from `3.4.2` to `3.5.1`
-+ Migrated `sailfish-utils` version from `3.9.1` to `3.12.1`
++ Migrated `sailfish-utils` version from `3.9.1` to `3.12.2`
   + Fixed conversion of `null` values
   + Add marker for `null` values to determine whether the field was set with `null` value or was not set at all
-  + Allow checking for exact `null` value in message.
+  + Allow checking for exact `null` value in message
+  + Added new parameter `checkNullValueAsEmpty` in the `FilterSettings`
 + Corrected verification entry when the `null` value and string `"null"` looked the same for the expected value
 + Fixed setting of the `failUnexpected` parameter while converting a message filter
 + Migrated `sailfish-core` version to `3.2.1752`
