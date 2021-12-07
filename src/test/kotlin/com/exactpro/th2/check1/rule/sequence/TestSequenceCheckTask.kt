@@ -115,7 +115,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `messages in right order passes`(checkOrder: Boolean) {
         val messages = Observable.fromIterable(messagesInCorrectOrder)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin()
@@ -235,7 +235,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder, filtersParam = messageFilters).begin()
@@ -301,7 +301,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, true, filtersParam = messageFilters).begin()
@@ -373,7 +373,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(
@@ -629,7 +629,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
@@ -715,7 +715,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
-        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(SESSION_ALIAS, Direction.FIRST), 10, messages))
+        val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
         val parentEventID = createEvent(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
@@ -790,7 +790,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         return SequenceCheckRuleTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
-            sessionKey = SessionKey(SESSION_ALIAS, Direction.FIRST),
+            sessionKey = SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST),
             protoPreFilter = preFilterParam,
             protoMessageFilters = filtersParam,
             checkOrder = checkOrder,

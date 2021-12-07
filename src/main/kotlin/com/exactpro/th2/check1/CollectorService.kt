@@ -76,7 +76,7 @@ class CollectorService(
         streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
                 .groupBy { message ->
                     message.metadata.id.run {
-                        SessionKey(connectionId.sessionAlias, direction)
+                        SessionKey(message.parentEventId.bookName, connectionId.sessionAlias, direction)
                     }.also(BufferMetric::processMessage)
                 }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
@@ -226,7 +226,7 @@ class CollectorService(
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()
                     .bookName(request.parentEventId.bookName)
-                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
+                    .name("Checkpoint for book name '${sessionKey.bookName}', session alias '${sessionKey.sessionAlias}', direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
                     .type("Checkpoint for session")
                     .messageID(messageID)
             }
@@ -259,9 +259,13 @@ class CollectorService(
     }
 
     private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
-        .setConnectionId(ConnectionID.newBuilder()
-            .setSessionAlias(sessionAlias)
-            .build())
+        .setBookName(bookName)
+        .setConnectionId(
+            ConnectionID
+                .newBuilder()
+                .setSessionAlias(sessionAlias)
+                .build()
+        )
         .setSequence(sequence)
         .setDirection(direction)
         .build()

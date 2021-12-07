@@ -21,11 +21,14 @@ import io.prometheus.client.Counter
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 
+// TODO Add to common near SESSION_ALIAS_LABEL and DIRECTION_LABEL
+private const val BOOK_NAME_LABEL = "book_name"
+
 object BufferMetric {
 
     private val actualBufferCountMetric: Counter = Counter
             .build("th2_check1_actual_cache_number", "The actual number of messages in caches")
-            .labelNames(SESSION_ALIAS_LABEL, DIRECTION_LABEL)
+            .labelNames(BOOK_NAME_LABEL, SESSION_ALIAS_LABEL, DIRECTION_LABEL)
             .register()
 
     private val bufferMessagesSizeBySessionKey: MutableMap<SessionKey, Int> = ConcurrentHashMap()
@@ -36,12 +39,12 @@ object BufferMetric {
     }
 
     fun processMessage(sessionKey: SessionKey) {
-        val labels = arrayOf(sessionKey.sessionAlias, sessionKey.direction.name)
-
         bufferMessagesSizeBySessionKey.compute(sessionKey) { _, old ->
             min(maxBufferSize, (old ?: 0) + 1).also {
                 if (it != old) {
-                    actualBufferCountMetric.labels(*labels).inc()
+                    actualBufferCountMetric
+                        .labels(sessionKey.bookName, sessionKey.sessionAlias, sessionKey.direction.name)
+                        .inc()
                 }
             }
         }

@@ -478,7 +478,7 @@ class RuleFactoryTest {
 
     private fun createStreams(alias: String = SESSION_ALIAS, direction: Direction = Direction.FIRST, messages: List<Message>): Observable<StreamContainer> {
         return Observable.just(
-                StreamContainer(SessionKey(alias, direction), messages.size + 1, Observable.fromIterable(messages))
+                StreamContainer(SessionKey(BOOK_NAME, alias, direction), messages.size + 1, Observable.fromIterable(messages))
         )
     }
 }

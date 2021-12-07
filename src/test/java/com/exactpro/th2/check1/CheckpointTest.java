@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -12,48 +12,47 @@
  */
 package com.exactpro.th2.check1;
 
+import java.util.Map;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
 import com.exactpro.th2.check1.entities.Checkpoint;
 import com.exactpro.th2.check1.entities.CheckpointData;
 import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 import com.exactpro.th2.common.grpc.Direction;
 import com.google.protobuf.Timestamp;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 
-import java.util.Map;
+import static com.exactpro.th2.check1.util.UtilsKt.BOOK_NAME;
+import static java.util.Map.entry;
 
 public class CheckpointTest {
+    private static final String BOOK_NAME_1 = BOOK_NAME + "_1";
+    private static final String BOOK_NAME_2 = BOOK_NAME + "_2";
+
+    private static final String SESSION_ALIAS_A = "A";
+    private static final String SESSION_ALIAS_B = "B";
 
     @Test
     public void testConvertation() {
-        var origCheckpoint = new Checkpoint(Map.of(
-                new SessionKey("A", Direction.FIRST), generateCheckpointData(1L),
-                new SessionKey("A", Direction.SECOND), generateCheckpointData(2L),
-                new SessionKey("B", Direction.FIRST), generateCheckpointData(3L),
-                new SessionKey("B", Direction.SECOND), generateCheckpointData(4L)
+        var origCheckpoint = new Checkpoint(Map.ofEntries(
+                entry(new SessionKey(BOOK_NAME_1, SESSION_ALIAS_A, Direction.FIRST), generateCheckpointData(1L)),
+                entry(new SessionKey(BOOK_NAME_1, SESSION_ALIAS_A, Direction.SECOND), generateCheckpointData(2L)),
+                entry(new SessionKey(BOOK_NAME_1, SESSION_ALIAS_B, Direction.FIRST), generateCheckpointData(3L)),
+                entry(new SessionKey(BOOK_NAME_1, SESSION_ALIAS_B, Direction.SECOND), generateCheckpointData(4L)),
+                entry(new SessionKey(BOOK_NAME_2, SESSION_ALIAS_A, Direction.FIRST), generateCheckpointData(5L)),
+                entry(new SessionKey(BOOK_NAME_2, SESSION_ALIAS_A, Direction.SECOND), generateCheckpointData(6L)),
+                entry(new SessionKey(BOOK_NAME_2, SESSION_ALIAS_B, Direction.FIRST), generateCheckpointData(7L)),
+                entry(new SessionKey(BOOK_NAME_2, SESSION_ALIAS_B, Direction.SECOND), generateCheckpointData(8L))
         ));
-
-        var protoCheckpoint = ProtoMessageUtilsKt.convert(origCheckpoint);
-
-        var parsedCheckpoint = ProtoMessageUtilsKt.convert(protoCheckpoint);
-
-        Assertions.assertEquals(origCheckpoint, parsedCheckpoint);
+        Assertions.assertEquals(origCheckpoint, ProtoMessageUtilsKt.convert(ProtoMessageUtilsKt.convert(origCheckpoint)));
     }
 
-    private Checkpoint generateCheckpoint() {
-        return new Checkpoint(Map.of(
-                new SessionKey("A", Direction.FIRST), generateCheckpointData(1L),
-                new SessionKey("A", Direction.FIRST), generateCheckpointData(2L),
-                new SessionKey("B", Direction.SECOND), generateCheckpointData(3L),
-                new SessionKey("B", Direction.SECOND), generateCheckpointData(4L)
-        ));
+    private CheckpointData generateCheckpointData(Long sequence) {
+        return generateCheckpointData(sequence, Timestamp.getDefaultInstance());
     }
 
     private CheckpointData generateCheckpointData(Long sequence, Timestamp timestamp) {
         return new CheckpointData(sequence, timestamp);
-    }
-    
-    private CheckpointData generateCheckpointData(Long sequence) {
-        return generateCheckpointData(sequence, Timestamp.getDefaultInstance());
     }
 }

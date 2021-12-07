@@ -181,7 +181,7 @@ class SequenceCheckRuleTask(
     override fun type(): String = "checkSequenceRule"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
+        rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)" }}"))
     }
 
     /**

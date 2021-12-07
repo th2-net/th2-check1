@@ -20,6 +20,7 @@ import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Checkpoint.CheckpointData
 import com.exactpro.th2.common.grpc.Checkpoint.DirectionCheckpoint
+import com.exactpro.th2.common.grpc.Checkpoint.SessionAliasToDirectionCheckpoint
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -57,42 +58,47 @@ fun InternalCheckpointData.convert(): CheckpointData {
 }
 
 fun InternalCheckpoint.convert(): Checkpoint {
-    val intermediateMap: MutableMap<String, DirectionCheckpoint.Builder> = HashMap()
+    val intermediateMap: MutableMap<String, MutableMap<String, DirectionCheckpoint.Builder>> = HashMap()
     sessionKeyToCheckpointData.forEach { (sessionKey, checkpointData) ->
-        intermediateMap.computeIfAbsent(sessionKey.sessionAlias) {
-            DirectionCheckpoint.newBuilder()
-        }.apply {
-            sessionKey.direction.number.run {
-                putDirectionToCheckpointData(this, checkpointData.convert())
-                putDirectionToSequence(this, checkpointData.sequence)
+        intermediateMap
+            .computeIfAbsent(sessionKey.bookName) { HashMap() }
+            .computeIfAbsent(sessionKey.sessionAlias) { DirectionCheckpoint.newBuilder() }
+            .apply {
+                sessionKey.direction.number.run {
+                    putDirectionToCheckpointData(this, checkpointData.convert())
+                    putDirectionToSequence(this, checkpointData.sequence)
+                }
             }
-        }
     }
 
     val checkpointBuilder = Checkpoint.newBuilder().setId(id)
-    intermediateMap.forEach { (sessionAlias, directionCheckpoint) ->
-        checkpointBuilder.putSessionAliasToDirectionCheckpoint(sessionAlias, directionCheckpoint.build())
+    intermediateMap.forEach { (bookName, aliasToDirectionCheckpoint) ->
+        val builder = SessionAliasToDirectionCheckpoint.newBuilder()
+        aliasToDirectionCheckpoint.forEach { (alias, directionCheckpointBuilder) ->
+            builder.putSessionAliasToDirectionCheckpoint(alias, directionCheckpointBuilder.build()).build()
+        }
+        checkpointBuilder.putBookNameToSessionAliasToDirectionCheckpoint(bookName, builder.build())
     }
-
     return checkpointBuilder.build()
 }
 
 fun Checkpoint.convert(): InternalCheckpoint {
     val sessionKeyToSequence: MutableMap<SessionKey, InternalCheckpointData> = HashMap()
-    sessionAliasToDirectionCheckpointMap.forEach { (sessionAlias, directionCheckpoint) ->
-        if (directionCheckpoint.run { directionToCheckpointDataCount != 0 && directionToSequenceCount != 0 }) {
-            LOGGER.warn("Session alias '{}' contains both of these fields: 'direction to checkpoint data' and 'direction to sequence'. Please use 'direction to checkpoint data' instead", sessionAlias)
-        }
-        if (directionCheckpoint.directionToCheckpointDataCount == 0) {
-            directionCheckpoint.directionToSequenceMap.forEach { (directionNumber, sequence) ->
-                val sessionKey = SessionKey(sessionAlias, Direction.forNumber(directionNumber))
-                sessionKeyToSequence[sessionKey] = InternalCheckpointData(sequence, null)
+    bookNameToSessionAliasToDirectionCheckpointMap.forEach { (bookName, aliasToDirectionCheckpoint) ->
+        aliasToDirectionCheckpoint.sessionAliasToDirectionCheckpointMap.forEach { (sessionAlias, directionCheckpoint) ->
+            if (directionCheckpoint.run { directionToCheckpointDataCount != 0 && directionToSequenceCount != 0 }) {
+                LOGGER.warn("Session alias '{}' contains both of these fields: 'direction to checkpoint data' and 'direction to sequence'. Please use 'direction to checkpoint data' instead", sessionAlias)
             }
-        } else {
-            directionCheckpoint.directionToCheckpointDataMap.forEach { (directionNumber, checkpointData) ->
-                val sessionKey = SessionKey(sessionAlias, Direction.forNumber(directionNumber))
-                sessionKeyToSequence[sessionKey] = checkpointData.convert()
-
+            if (directionCheckpoint.directionToCheckpointDataCount == 0) {
+                directionCheckpoint.directionToSequenceMap.forEach { (directionNumber, sequence) ->
+                    val sessionKey = SessionKey(bookName, sessionAlias, Direction.forNumber(directionNumber))
+                    sessionKeyToSequence[sessionKey] = InternalCheckpointData(sequence, null)
+                }
+            } else {
+                directionCheckpoint.directionToCheckpointDataMap.forEach { (directionNumber, checkpointData) ->
+                    val sessionKey = SessionKey(bookName, sessionAlias, Direction.forNumber(directionNumber))
+                    sessionKeyToSequence[sessionKey] = checkpointData.convert()
+                }
             }
         }
     }

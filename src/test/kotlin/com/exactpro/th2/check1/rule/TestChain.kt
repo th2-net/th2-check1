@@ -20,6 +20,7 @@ import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
+import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.common.grpc.Direction.FIRST
 import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventBatch
@@ -277,7 +278,7 @@ class TestChain: AbstractCheckTaskTest() {
         return SequenceCheckRuleTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
-            sessionKey = SessionKey(SESSION_ALIAS, FIRST),
+            sessionKey = SessionKey(BOOK_NAME, SESSION_ALIAS, FIRST),
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),
             checkOrder = checkOrder,
@@ -295,7 +296,7 @@ class TestChain: AbstractCheckTaskTest() {
     ) = CheckRuleTask(
         createRuleConfiguration(taskTimeout, SESSION_ALIAS),
         Instant.now(),
-        SessionKey(SESSION_ALIAS, FIRST),
+        SessionKey(BOOK_NAME, SESSION_ALIAS, FIRST),
         createMessageFilter(sequence),
         parentEventID,
         messageStream,
@@ -311,7 +312,7 @@ class TestChain: AbstractCheckTaskTest() {
         return NoMessageCheckTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
-            sessionKey = SessionKey(SESSION_ALIAS, FIRST),
+            sessionKey = SessionKey(BOOK_NAME, SESSION_ALIAS, FIRST),
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,
             messageStream = messageStream,

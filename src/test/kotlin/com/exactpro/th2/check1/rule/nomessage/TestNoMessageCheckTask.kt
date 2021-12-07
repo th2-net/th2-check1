@@ -18,6 +18,7 @@ import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
+import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
@@ -200,7 +201,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         return NoMessageCheckTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
-            sessionKey = SessionKey(SESSION_ALIAS, Direction.FIRST),
+            sessionKey = SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST),
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,
             messageStream = messageStream,
