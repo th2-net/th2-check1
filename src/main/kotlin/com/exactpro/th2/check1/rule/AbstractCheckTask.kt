@@ -642,6 +642,7 @@ abstract class AbstractCheckTask(
                 } else {
                     ruleConfiguration.timePrecision
                 }
+                isCheckNullValueAsEmpty = ruleConfiguration.isCheckNullValueAsEmpty
             }
         }
 

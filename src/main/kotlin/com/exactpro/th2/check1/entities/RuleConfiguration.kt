@@ -20,7 +20,8 @@ data class RuleConfiguration(
     val description: String?,
     val timePrecision: Duration,
     val decimalPrecision: Double,
-    val maxEventBatchContentSize: Int
+    val maxEventBatchContentSize: Int,
+    val isCheckNullValueAsEmpty: Boolean
 ) {
     init {
         require(!timePrecision.isNegative) { "Time precision cannot be negative" }
