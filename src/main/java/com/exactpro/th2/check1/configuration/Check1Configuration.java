@@ -51,7 +51,7 @@ public class Check1Configuration {
     private Duration timePrecision = Duration.parse("PT0.000000001S");
     
     @JsonProperty(value = "check-null-value-as-empty")
-    private boolean checkNullValueAsEmpty = true;
+    private boolean checkNullValueAsEmpty = false;
 
     public int getMessageCacheSize() {
         return messageCacheSize;
