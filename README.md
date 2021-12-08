@@ -154,7 +154,7 @@ The time precision is used to compare two time values. It is based on the `ISO-8
 The decimal precision is used to compare the value of two numbers. Can be specified in number or string format. For example `0.0001`, `0.125`, `125E-3`
 
 #### check-null-value-as-empty
-`check-null-value-as-empty` is used for `EMPTY` and `NOT_EMPTY` operations to check if `NULL_VALUE` value is empty. For example, if the `checkNullValueAsEmpty` parameter is:
+`check-null-value-as-empty` is used for `EMPTY` and `NOT_EMPTY` operations to check if `NULL_VALUE` value is empty. By default, this parameter is set to `false`. For example, if the `checkNullValueAsEmpty` parameter is:
 + `true`, then `NULL_VALUE` is equal to `EMPTY`, otherwise `NULL_VALUE` is equal to `NOT_EMPTY`
 
 ## Required pins
