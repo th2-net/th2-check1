@@ -122,7 +122,7 @@ This block describes the configuration for check1.
   "auto-silence-check-after-sequence-rule": false,
   "time-precision": "PT0.000000001S",
   "decimal-precision": 0.00001,
-  "check-null-value-as-empty": true
+  "check-null-value-as-empty": false
 }
 ```
 
