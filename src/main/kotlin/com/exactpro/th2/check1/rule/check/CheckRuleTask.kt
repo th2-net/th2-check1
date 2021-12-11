@@ -15,6 +15,7 @@ package com.exactpro.th2.check1.rule.check
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
@@ -35,24 +36,22 @@ import java.time.Instant
  * This rule checks for the presence of a single message in the messages stream.
  */
 class CheckRuleTask(
-    description: String?,
+    ruleConfiguration: RuleConfiguration,
     startTime: Instant,
     sessionKey: SessionKey,
-    timeout: Long,
-    maxEventBatchContentSize: Int,
     private val protoMessageFilter: RootMessageFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
-) : AbstractCheckTask(description, timeout, maxEventBatchContentSize, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val messageFilter: SailfishFilter = SailfishFilter(
-        converter.fromProtoPreFilter(protoMessageFilter),
+        CONVERTER.fromProtoPreFilter(protoMessageFilter),
         protoMessageFilter.toCompareSettings()
     )
     private val metadataFilter: SailfishFilter? = protoMessageFilter.metadataFilterOrNull()?.let {
         SailfishFilter(
-            converter.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
+            CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
     }

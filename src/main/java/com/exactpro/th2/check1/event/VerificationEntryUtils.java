@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.exactpro.sf.aml.scriptutil.StaticUtil.IFilter;
 import com.exactpro.sf.comparison.ComparisonResult;
 import com.exactpro.sf.comparison.Formatter;
@@ -28,16 +30,18 @@ import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
 import com.exactpro.th2.common.grpc.FilterOperation;
 import com.exactpro.th2.sailfish.utils.filter.IOperationFilter;
+import com.exactpro.th2.sailfish.utils.filter.util.FilterUtils;
 
 public class VerificationEntryUtils {
 
     public static VerificationEntry createVerificationEntry(ComparisonResult result) {
         VerificationEntry verificationEntry = new VerificationEntry();
-        verificationEntry.setActual(Objects.toString(result.getActual(), null));
-        verificationEntry.setExpected(Formatter.formatExpected(result));
+        verificationEntry.setActual(convertActual(result));
+        verificationEntry.setExpected(convertExpectedResult(result));
         verificationEntry.setStatus(toVerificationStatus(result.getStatus()));
         verificationEntry.setKey(result.isKey());
         verificationEntry.setOperation(resolveOperation(result));
+        verificationEntry.setHint(extractHint(result));
         if (result.hasResults()) {
             verificationEntry.setFields(result.getResults().entrySet().stream()
                     .collect(Collectors.toMap(
@@ -51,6 +55,15 @@ public class VerificationEntryUtils {
         }
 
         return verificationEntry;
+    }
+
+    @Nullable
+    private static String convertActual(ComparisonResult result) {
+        Object actual = result.getActual();
+        if (actual == FilterUtils.NULL_VALUE) {
+            return null;
+        }
+        return Objects.toString(actual, null);
     }
 
     private static String resolveOperation(ComparisonResult result) {
@@ -88,5 +101,14 @@ public class VerificationEntryUtils {
         default:
             throw new IllegalArgumentException("Unsupported status type '" + statusType + '\'');
         }
+    }
+
+    private static String convertExpectedResult(ComparisonResult result) {
+        return result.getExpected() == null ? null : Formatter.formatExpected(result);
+    }
+
+    private static String extractHint(ComparisonResult result) {
+        Exception exception = result.getException();
+        return exception == null ? null : exception.getMessage();
     }
 }

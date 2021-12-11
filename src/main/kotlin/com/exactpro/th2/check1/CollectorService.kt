@@ -13,11 +13,14 @@
 package com.exactpro.th2.check1
 
 import com.exactpro.th2.check1.configuration.Check1Configuration
+import com.exactpro.th2.check1.entities.Checkpoint
+import com.exactpro.th2.check1.entities.CheckpointData
 import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
 import com.exactpro.th2.check1.metrics.BufferMetric
+import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.common.event.Event
@@ -40,6 +43,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
+import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 
 class CollectorService(
     private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: Check1Configuration
@@ -58,8 +62,8 @@ class CollectorService(
 
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
-    private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
-    
+    private val defaultAutoSilenceCheck: Boolean = configuration.isAutoSilenceCheckAfterSequenceRule
+
     private var ruleFactory: RuleFactory
 
     init {
@@ -80,17 +84,17 @@ class CollectorService(
 
         checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
 
-        ruleFactory = RuleFactory(maxEventBatchContentSize, streamObservable, eventBatchRouter)
+        ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter)
     }
 
     @Throws(InterruptedException::class)
     fun verifyCheckRule(request: CheckRuleRequest): ChainID {
         val chainID = request.getChainIdOrGenerate()
-        val task = ruleFactory.createCheckRule(request)
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
@@ -99,20 +103,44 @@ class CollectorService(
     @Throws(InterruptedException::class)
     fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): ChainID {
         val chainID = request.getChainIdOrGenerate()
-        val task = ruleFactory.createSequenceCheckRule(request)
+
+        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+        val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
+
+        val silenceCheckTask: AbstractCheckTask? = if (silenceCheck) {
+            ruleFactory.createSilenceCheck(request, olderThanTimeUnit.duration.toMillis() * olderThanDelta)
+        } else {
+            null
+        }
+
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createSequenceCheckRule(request, value != null)
+            task.apply { addToChainOrBegin(value, request.checkpoint) }
+                .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this }
+        }
+        return chainID
+    }
+
+    fun verifyNoMessageCheck(request: NoMessageCheckRequest): ChainID {
+        val chainID = request.getChainIdOrGenerate()
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
+            val task = ruleFactory.createNoMessageCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
     }
 
-    private fun AbstractCheckTask.addToChainOrBegin(
-            value: AbstractCheckTask?,
-            checkpoint: com.exactpro.th2.common.grpc.Checkpoint
-    ): Unit = value?.subscribeNextTask(this) ?: begin(checkpoint)
+    private fun AbstractCheckTask.addToChainOrBegin(value: AbstractCheckTask?, checkpoint: GrpcCheckpoint) {
+        val realCheckpoint = if (checkpoint === GrpcCheckpoint.getDefaultInstance()) {
+            null
+        } else {
+            checkpoint
+        }
+        value?.subscribeNextTask(this) ?: begin(realCheckpoint)
+    }
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
         return if (hasChainId()) {
@@ -123,6 +151,14 @@ class CollectorService(
     }
 
     private fun CheckSequenceRuleRequest.getChainIdOrGenerate(): ChainID {
+        return if (hasChainId()) {
+            chainId
+        } else {
+            generateChainID()
+        }
+    }
+
+    private fun NoMessageCheckRequest.getChainIdOrGenerate(): ChainID {
         return if (hasChainId()) {
             chainId
         } else {
@@ -183,11 +219,11 @@ class CollectorService(
             val checkpoint = checkpointSubscriber.createCheckpoint()
             rootEvent.endTimestamp()
                 .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
-            checkpoint.asMap().forEach { (sessionKey: SessionKey, sequence: Long) ->
-                val messageID = sessionKey.toMessageID(sequence)
+            checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
+                val messageID = sessionKey.toMessageID(checkpointData.sequence)
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()
-                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '$sequence'")
+                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '${checkpointData.sequence}'")
                     .type("Checkpoint for session")
                     .messageID(messageID)
             }
