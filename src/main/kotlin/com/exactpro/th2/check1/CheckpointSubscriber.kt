@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,6 +13,8 @@
 
 package com.exactpro.th2.check1
 
+import com.exactpro.th2.check1.entities.Checkpoint
+import com.exactpro.th2.check1.entities.CheckpointData
 import java.util.concurrent.ConcurrentHashMap
 
 class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
@@ -22,7 +24,13 @@ class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
         sessionSet += item
     }
 
-    fun createCheckpoint() : Checkpoint = Checkpoint(sessionSet.associateBy(
+    fun createCheckpoint(): Checkpoint = Checkpoint(
+        sessionKeyToCheckpointData = sessionSet.associateBy(
             { session -> session.sessionKey },
-            { session -> session.lastMessage.metadata.id.sequence }))
+            { session ->
+                session.lastMessage.metadata.run {
+                    CheckpointData(id.sequence, timestamp)
+                }
+            })
+    )
 }

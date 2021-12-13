@@ -21,10 +21,16 @@ import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.AbstractSessionObserver
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.CheckpointData
+import com.exactpro.th2.check1.entities.RuleConfiguration
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.event.bean.builder.VerificationBuilder
 import com.exactpro.th2.check1.exception.RuleInternalException
 import com.exactpro.th2.check1.metrics.RuleMetric
 import com.exactpro.th2.check1.util.VerificationUtil
+import com.exactpro.th2.check1.utils.convert
+import com.exactpro.th2.check1.utils.getStatusType
+import com.exactpro.th2.check1.utils.isAfter
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
@@ -37,11 +43,17 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.message.toJavaDuration
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.sailfish.utils.FilterSettings
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
+import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter.createParameters
 import com.google.protobuf.TextFormat.shortDebugString
+import com.google.protobuf.Timestamp
+import com.google.protobuf.util.Durations
+import com.google.protobuf.util.Timestamps
 import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.disposables.Disposable
@@ -61,9 +73,7 @@ import java.util.concurrent.atomic.AtomicReference
  * **Class in not thread-safe**
  */
 abstract class AbstractCheckTask(
-    val description: String?,
-    private val timeout: Long,
-    private val maxEventBatchContentSize: Int,
+    private val ruleConfiguration: RuleConfiguration,
     submitTime: Instant,
     protected val sessionKey: SessionKey,
     private val parentEventID: EventID,
@@ -71,23 +81,21 @@ abstract class AbstractCheckTask(
     private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
 
-    init {
-        require(maxEventBatchContentSize > 0) {
-            "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize"
-        }
-        require(timeout > 0) {
-            "'timeout' should be set or be greater than zero, actual: $timeout"
-        }
-    }
+    val description: String? = ruleConfiguration.description
+    private val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
 
     protected var handledMessageCounter: Long = 0
-
-    protected val converter = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null)
     protected val rootEvent: Event = Event.from(submitTime).description(description)
 
     private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
     private val taskState = AtomicReference(State.CREATED)
+    @Volatile
+    private var streamCompletedState = State.STREAM_COMPLETED
+    @Volatile
+    private var completed = false
+    protected var isParentCompleted: Boolean? = null
+        private set
 
     /**
      * Used for observe messages in one thread.
@@ -100,18 +108,27 @@ abstract class AbstractCheckTask(
     val endTime: Instant?
         get() = _endTime
 
-    protected enum class State {
-        CREATED,
-        BEGIN,
-        TIMEOUT,
-        COMPLETED,
-        PUBLISHED
+    protected enum class State(val callOnTimeoutCallback: Boolean) {
+        CREATED(false),
+        BEGIN(false),
+        TIMEOUT(true),
+        MESSAGE_TIMEOUT(true),
+        TASK_COMPLETED(false),
+        STREAM_COMPLETED(true),
+        PUBLISHED(false),
+        ERROR(false)
     }
 
     @Volatile
     private lateinit var endFuture: Disposable
 
     private var lastSequence = DEFAULT_SEQUENCE
+    private var checkpointTimeout: Timestamp? = null
+    private var lastMessageTimestamp: Timestamp? = null
+    private var untrusted: Boolean = false
+    private var hasMessagesInTimeoutInterval: Boolean = false
+    private var bufferContainsStartMessage: Boolean = false
+    private var isDefaultSequence: Boolean = false
 
     override fun onStart() {
         super.onStart()
@@ -125,7 +142,7 @@ abstract class AbstractCheckTask(
 
         rootEvent.status(FAILED)
             .bodyData(EventUtils.createMessageBean(e.message))
-        end("Error ${e.message} received in message stream")
+        end(State.ERROR, "Error ${e.message} received in message stream")
     }
 
     /**
@@ -151,15 +168,18 @@ abstract class AbstractCheckTask(
      */
     fun subscribeNextTask(checkTask: AbstractCheckTask) {
         if (hasNextTask.compareAndSet(false, true)) {
+            onChainedTaskSubscription()
             sequenceSubject.subscribe { legacy ->
                 val executor = if (legacy.executorService.isShutdown) {
-                        LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
-                        createExecutorService()
-                    } else {
-                        legacy.executorService
-                    }
-                checkTask.begin(legacy.lastSequence, executor)
-             }
+                    LOGGER.warn("Executor has been shutdown before next task has been subscribed. Create a new one")
+                    createExecutorService()
+                } else {
+                    legacy.executorService
+                }
+                legacy.sequenceData.apply {
+                    checkTask.begin(lastSequence, lastMessageTimestamp, executor, PreviousExecutionData(untrusted, completed))
+                }
+            }
             LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
         } else {
             throw IllegalStateException("Subscription to last sequence for task $description (${hashCode()}) is already executed, subscriber ${checkTask.description} (${checkTask.hashCode()})")
@@ -170,12 +190,18 @@ abstract class AbstractCheckTask(
      * Observe a message sequence from the checkpoint.
      * Task subscribe to messages stream with its sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
-     * @param checkpoint message sequence from previous task.
+     * @param checkpoint message sequence and checkpoint timestamp from previous task.
      * @throws IllegalStateException when method is called more than once.
      */
     fun begin(checkpoint: Checkpoint? = null) {
-        begin(checkpoint?.getSequence(sessionKey) ?: DEFAULT_SEQUENCE)
+        val checkpointData = checkpoint?.getCheckpointData(sessionKey)
+        begin(checkpointData?.sequence ?: DEFAULT_SEQUENCE, checkpointData?.timestamp)
     }
+
+    /**
+     * Callback when another task is subscribed to the result of the current task
+     */
+    protected open fun onChainedTaskSubscription() {}
 
     /**
      * It is called when the timeout is over and the task is not complete yet
@@ -183,20 +209,31 @@ abstract class AbstractCheckTask(
     protected open fun onTimeout() {}
 
     /**
-     * Marks the task as successfully completed. If the task timeout had been exited and then the task was marked as successfully completed
-     * the task will be considered as successfully completed because it had actually found that it should
+     * Marks the task as successfully completed. If the task timeout, message timeout or stream had been exited and then
+     * the task was marked as successfully completed the task will be considered as successfully completed because
+     * it had actually found that it should
      */
     protected fun checkComplete() {
 
         LOGGER.info("Check completed for session alias '{}' with sequence '{}'", sessionKey, lastSequence)
-        val prevValue = taskState.getAndSet(State.COMPLETED)
+        val prevValue = taskState.getAndSet(State.TASK_COMPLETED)
         dispose()
         endFuture.dispose()
+        completed = true
 
-        if (prevValue == State.TIMEOUT) {
-            LOGGER.info("Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed", description, sessionKey)
-        } else {
-            LOGGER.debug("Task '{}' for session alias '{}' is completed normally", description, sessionKey)
+        when (prevValue) {
+            State.TIMEOUT -> {
+                LOGGER.info("Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed", description, sessionKey)
+            }
+            State.MESSAGE_TIMEOUT -> {
+                LOGGER.info("Task '{}' for session alias '{}' is completed right after message timeout exited. Consider it as completed", description, sessionKey)
+            }
+            State.STREAM_COMPLETED -> {
+                LOGGER.info("Task '{}' for session alias '{}' is completed right after the end of streaming messages. Consider it as completed", description, sessionKey)
+            }
+            else -> {
+                LOGGER.debug("Task '{}' for session alias '{}' is completed normally", description, sessionKey)
+            }
         }
     }
 
@@ -204,6 +241,12 @@ abstract class AbstractCheckTask(
      * Provides a feature to define custom filter for observe.
      */
     protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
+
+    /**
+     * @return `true` if another task has been subscribed to the result of the current task.
+     * Otherwise, returns `false`
+     */
+    protected fun hasNextTask(): Boolean = hasNextTask.get()
 
     protected abstract fun name(): String
     protected abstract fun type(): String
@@ -214,22 +257,34 @@ abstract class AbstractCheckTask(
      * Task subscribe to messages stream with sequence after call.
      * This method should be called only once otherwise it throws IllegalStateException.
      * @param sequence message sequence from the previous task.
+     * @param checkpointTimestamp checkpoint timestamp from the previous task
      * @param executorService executor to schedule pipeline execution.
+     * @param untrusted flag is guarantee that the previous sequence data is correct
+     * @param parentTaskCompleted indicates whether the parent task was completed normally. `null` if no parent task exists.
      * @throws IllegalStateException when method is called more than once.
      */
-    private fun begin(sequence: Long = DEFAULT_SEQUENCE, executorService: ExecutorService = createExecutorService()) {
+    private fun begin(
+        sequence: Long = DEFAULT_SEQUENCE,
+        checkpointTimestamp: Timestamp? = null,
+        executorService: ExecutorService = createExecutorService(),
+        previousExecutionData: PreviousExecutionData = PreviousExecutionData.DEFAULT
+    ) {
         configureRootEvent()
+        isParentCompleted = previousExecutionData.completed
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             throw IllegalStateException("Task $description already has been started")
         }
-        LOGGER.info("Check begin for session alias '{}' with sequence '{}' timeout '{}'", sessionKey, sequence, timeout)
+        LOGGER.info("Check begin for session alias '{}' with sequence '{}' and task timeout '{}'", sessionKey, sequence, taskTimeout)
         RuleMetric.incrementActiveRule(type())
         this.lastSequence = sequence
         this.executorService = executorService
+        this.untrusted = previousExecutionData.untrusted
+        this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
+        this.isDefaultSequence = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
 
-        endFuture = Single.timer(timeout, MILLISECONDS, Schedulers.computation())
-            .subscribe { _ -> end("Timeout is exited") }
+        endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
+            .subscribe { _ -> end(State.TIMEOUT, "Timeout is exited") }
 
         try {
             messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
@@ -252,6 +307,7 @@ abstract class AbstractCheckTask(
                             rootEvent.messageID(this)
                         }
                     }
+                    .takeWhileMessagesInTimeout()
                     .mapToMessageContainer()
                     .taskPipeline()
                     .subscribe(this)
@@ -270,8 +326,8 @@ abstract class AbstractCheckTask(
     private fun taskFinished() {
         try {
             val currentState = taskState.get()
-            LOGGER.info("Finishes task '$description' in state $currentState")
-            if (currentState == State.TIMEOUT) {
+            LOGGER.info("Finishes task '$description' in state ${currentState.name}")
+            if (currentState.callOnTimeoutCallback) {
                 callOnTimeoutCallback()
             }
             publishEvent()
@@ -291,7 +347,7 @@ abstract class AbstractCheckTask(
                 .build())
         } finally {
             RuleMetric.decrementActiveRule(type())
-            sequenceSubject.onSuccess(Legacy(executorService, lastSequence))
+            sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }
     }
 
@@ -309,10 +365,11 @@ abstract class AbstractCheckTask(
      * Disposes the task when the timeout is over or the message stream is completed normally or with an exception.
      * Task unsubscribe from the message stream.
      *
+     * @param state of the stopped task
      * @param reason the cause why a task must be stopped
      */
-    private fun end(reason: String) {
-        if (taskState.compareAndSet(State.BEGIN, State.TIMEOUT)) {
+    private fun end(state: State, reason: String) {
+        if (taskState.compareAndSet(State.BEGIN, state)) {
             LOGGER.info("Stop task for session alias '{}' with sequence '{}' because: {}", sessionKey, lastSequence, reason)
             dispose()
             endFuture.dispose()
@@ -323,14 +380,18 @@ abstract class AbstractCheckTask(
 
     override fun onComplete() {
         super.onComplete()
-        end("Message stream is completed")
+        end(streamCompletedState, "Message stream is completed")
     }
 
     /**
      * Prepare the root event or children events for publication.
      * This method is invoked in [State.PUBLISHED] state.
      */
-    protected open fun completeEvent(canceled: Boolean) {}
+    protected open fun completeEvent(taskState: State) {}
+
+    protected open val skipPublication: Boolean = false
+
+    protected fun isCheckpointLastReceivedMessage(): Boolean = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
 
     /**
      * Publishes the event to [eventBatchRouter].
@@ -338,10 +399,14 @@ abstract class AbstractCheckTask(
     private fun publishEvent() {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         if (prevState != State.PUBLISHED) {
-            completeEventOrReportError(prevState)
+            val hasError = completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
-            val batches = rootEvent.disperseToBatches(maxEventBatchContentSize, parentEventID)
+            if (skipPublication && !hasError) {
+                LOGGER.info("Skip event publication for task ${type()} '$description' (${hashCode()})")
+                return
+            }
+            val batches = rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
 
             RESPONSE_EXECUTOR.execute {
                 batches.forEach { batch ->
@@ -361,9 +426,11 @@ abstract class AbstractCheckTask(
         }
     }
 
-    private fun completeEventOrReportError(prevState: State) {
-        try {
-            completeEvent(prevState == State.TIMEOUT)
+    private fun completeEventOrReportError(prevState: State): Boolean {
+        return try {
+            completeEvent(prevState)
+            doAfterCompleteEvent()
+            false
         } catch (e: Exception) {
             LOGGER.error("Result event cannot be completed", e)
             rootEvent.addSubEventWithSamePeriod()
@@ -372,6 +439,7 @@ abstract class AbstractCheckTask(
                     .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
                     .bodyData(EventUtils.createMessageBean(e.message))
                     .status(FAILED)
+            true
         }
     }
 
@@ -380,7 +448,46 @@ abstract class AbstractCheckTask(
         setup(rootEvent)
     }
 
-    protected fun matchFilter(
+    private fun doAfterCompleteEvent() {
+        if (untrusted) {
+            fillUntrustedExecutionEvent()
+        } else if (!isDefaultSequence && !bufferContainsStartMessage) {
+            if (hasMessagesInTimeoutInterval) {
+                fillEmptyStartMessageEvent()
+            } else {
+                fillMissedStartMessageAndMessagesInIntervalEvent()
+            }
+        }
+    }
+
+    private fun fillUntrustedExecutionEvent() {
+        rootEvent.addSubEvent(
+            Event.start()
+                .name("The current check is untrusted because the start point of the check interval has been selected approximately")
+                .status(FAILED)
+                .type("untrustedExecution")
+        )
+    }
+
+    private fun fillMissedStartMessageAndMessagesInIntervalEvent() {
+        rootEvent.addSubEvent(
+            Event.start()
+                .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval with sequence '$lastSequence' and checkpoint timestamp '${checkpointTimeout?.toJson()}'")
+                .status(FAILED)
+                .type("missedMessagesInInterval")
+        )
+    }
+
+    private fun fillEmptyStartMessageEvent() {
+        rootEvent.addSubEvent(
+            Event.start()
+                .name("Buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' doesn't contain starting message, but contains several messages in the requested check interval")
+                .status(FAILED)
+                .type("missedStartMessage")
+        )
+    }
+
+    internal fun matchFilter(
         messageContainer: MessageContainer,
         messageFilter: SailfishFilter,
         metadataFilter: SailfishFilter?,
@@ -416,7 +523,10 @@ abstract class AbstractCheckTask(
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
             if (significant) {
-                lastSequence = messageContainer.protoMessage.metadata.id.sequence
+                messageContainer.protoMessage.metadata.apply {
+                    lastSequence = id.sequence
+                    lastMessageTimestamp = timestamp
+                }
             }
             AggregatedFilterResult(comparisonResult, metadataComparisonResult)
         } else {
@@ -427,6 +537,8 @@ abstract class AbstractCheckTask(
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
+        @JvmField
+        val CONVERTER = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null, createParameters().setUseMarkerForNullsInMessage(true))
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
@@ -518,11 +630,27 @@ abstract class AbstractCheckTask(
 
     protected fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter,
                                                               messageName: String = protoPreMessageFilter.messageType): IMessage {
-        return fromProtoFilter(protoPreMessageFilter.messageFilter, messageName)
+        val filterSettings = protoPreMessageFilter.comparisonSettings.run {
+            FilterSettings().apply {
+                decimalPrecision = if (this@run.decimalPrecision.isBlank()) {
+                    ruleConfiguration.decimalPrecision
+                } else {
+                    this@run.decimalPrecision.toDouble()
+                }
+                timePrecision = if (this@run.hasTimePrecision()) {
+                    this@run.timePrecision.toJavaDuration()
+                } else {
+                    ruleConfiguration.timePrecision
+                }
+                isCheckNullValueAsEmpty = ruleConfiguration.isCheckNullValueAsEmpty
+            }
+        }
+
+        return fromProtoFilter(protoPreMessageFilter.messageFilter, filterSettings, messageName)
     }
 
     private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
-        map { message -> MessageContainer(message, converter.fromProtoMessage(message, false)) }
+        map { message -> MessageContainer(message, CONVERTER.fromProtoMessage(message, false)) }
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then
@@ -531,22 +659,78 @@ abstract class AbstractCheckTask(
     private fun Observable<StreamContainer>.continueObserve(sessionKey: SessionKey, sequence: Long): Observable<Message> =
         filter { streamContainer -> streamContainer.sessionKey == sessionKey }
             .flatMap(StreamContainer::bufferedMessages)
-            .filter { message -> message.metadata.id.sequence > sequence }
-
-    private fun Checkpoint.getSequence(sessionKey: SessionKey): Long {
-        val sequence = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
-            ?.directionToSequenceMap?.get(sessionKey.direction.number)
-
-        if (sequence == null) {
-            if (LOGGER.isWarnEnabled) {
-                LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", shortDebugString(this), sessionKey)
+            .filter { message ->
+                if (message.metadata.id.sequence == sequence) {
+                    bufferContainsStartMessage = true
+                }
+                message.metadata.id.sequence > sequence
             }
-        } else {
-            LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionKey)
+
+    private fun Checkpoint.getCheckpointData(sessionKey: SessionKey): CheckpointData {
+        val checkpointData = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
+            ?.directionToCheckpointDataMap?.get(sessionKey.direction.number)
+
+        if (checkpointData == null) {
+            if (LOGGER.isWarnEnabled) {
+                LOGGER.warn("Checkpoint '{}' doesn't contain checkpoint data for session '{}'", this.toJson(), sessionKey)
+            }
+            val sequence = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
+                ?.directionToSequenceMap?.get(sessionKey.direction.number)
+            if (sequence == null) {
+                if (LOGGER.isWarnEnabled) {
+                    LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", this.toJson(), sessionKey)
+                }
+                return CheckpointData(DEFAULT_SEQUENCE)
+            }
+            return CheckpointData(sequence)
         }
 
-        return sequence ?: DEFAULT_SEQUENCE
+        return checkpointData.convert().apply {
+            LOGGER.info("Use sequence '{}' from checkpoint for session '{}'", sequence, sessionKey)
+        }
     }
 
-    private data class Legacy(val executorService: ExecutorService, val lastSequence: Long)
+    private fun checkOnMessageTimeout(timestamp: Timestamp): Boolean {
+        return checkpointTimeout == null || checkpointTimeout!!.isAfter(timestamp) || checkpointTimeout == timestamp
+    }
+
+    /**
+     * Provides the ability to stop observing if a message timeout is set.
+     */
+    private fun Observable<Message>.takeWhileMessagesInTimeout() : Observable<Message> =
+        takeWhile {
+            checkOnMessageTimeout(it.metadata.timestamp).also { continueObservation ->
+                hasMessagesInTimeoutInterval = hasMessagesInTimeoutInterval or continueObservation
+                if (!continueObservation) {
+                    streamCompletedState = State.MESSAGE_TIMEOUT
+                }
+            }
+        }
+
+    private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long): Timestamp? =
+        if (timestamp != null && messageTimeout > 0) {
+            Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
+        } else {
+            null
+        }
+
+
+    private data class Legacy(val executorService: ExecutorService, val sequenceData: SequenceData)
+    private data class SequenceData(val lastSequence: Long, val lastMessageTimestamp: Timestamp?, val untrusted: Boolean)
+    private data class PreviousExecutionData(
+        /**
+         * `true` if the previous rule in the chain marked as untrusted
+         */
+        val untrusted: Boolean = false,
+        /**
+         * `true` if previous rule has been completed normally. Otherwise, `false`
+         *
+         * `null` if there is no previous rule in chain
+         */
+        val completed: Boolean? = null
+    ) {
+        companion object {
+            val DEFAULT = PreviousExecutionData()
+        }
+    }
 }

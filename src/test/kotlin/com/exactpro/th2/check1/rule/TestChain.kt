@@ -14,8 +14,10 @@ package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
+import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
 import com.exactpro.th2.common.grpc.Direction.FIRST
@@ -32,8 +34,10 @@ import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
 import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class TestChain: AbstractCheckTaskTest() {
 
@@ -131,6 +135,113 @@ class TestChain: AbstractCheckTaskTest() {
         assertEquals(listOf(1L, 2L, 3L, 4L), eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList).map(MessageID::getSequence))
     }
 
+    @Test
+    fun `sequence rules - untrusted execution`() {
+        val checkpointTimestamp = Instant.now()
+        val streams = createStreams(messages = (1..5L).map {
+            constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                .putAllFields(
+                    mapOf(
+                        KEY_FIELD to "$KEY_FIELD$it".toValue(),
+                        NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
+                    )
+                ).build()
+        })
+
+        val task = sequenceCheckRuleTask(
+            listOf(1, 2),
+            eventID,
+            streams,
+            taskTimeout = TaskTimeout(2000L, 500)
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        var eventsList = awaitEventBatchAndGetEvents(4, 4)
+        assertAll({
+            val rootEvent = eventsList.first()
+            assertEquals(FAILED, rootEvent.status, "Event status should be failed")
+            assertTrue(rootEvent.attachedMessageIdsCount == 1)
+        })
+
+        sequenceCheckRuleTask(
+            listOf(3, 4),
+            eventID,
+            streams,
+            taskTimeout = TaskTimeout(2000L, 1500L)
+        ).also { task.subscribeNextTask(it) }
+        eventsList = awaitEventBatchAndGetEvents(10, 6)
+        assertEquals(UNTRUSTED_EXECUTION_EVENT_NAME, eventsList.last().name)
+    }
+
+    @Test
+    fun `no messages sequence rules - untrusted execution`() {
+        val checkpointTimestamp = Instant.now()
+        val streams = createStreams(messages = (1..5L).map {
+            constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                .putAllFields(
+                    mapOf(
+                        KEY_FIELD to "$KEY_FIELD$it".toValue(),
+                        NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
+                    )
+                ).build()
+        })
+
+        val task = noMessageCheckTask(
+            eventID,
+            streams,
+            taskTimeout = TaskTimeout(2000L, 500),
+            preFilterParam = createPreFilter("E", "5", FilterOperation.EQUAL)
+            ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        var eventsList = awaitEventBatchAndGetEvents(2, 2)
+        assertAll({
+            val rootEvent = eventsList.first()
+            assertEquals(FAILED, rootEvent.status, "Event status should be failed")
+            assertTrue(rootEvent.attachedMessageIdsCount == 1)
+        })
+
+        noMessageCheckTask(
+            eventID,
+            streams,
+            taskTimeout = TaskTimeout(2000L, 1500L),
+            preFilterParam = createPreFilter("E", "5", FilterOperation.EQUAL)
+        ).also { task.subscribeNextTask(it) }
+        eventsList = awaitEventBatchAndGetEvents(6, 4)
+        assertEquals(UNTRUSTED_EXECUTION_EVENT_NAME, eventsList.last().name)
+    }
+
+    @Test
+    fun `simple rules - ignored untrusted execution`() {
+        val checkpointTimestamp = Instant.now()
+        val streams = createStreams(messages = (1..5L).map {
+            constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                .putAllFields(
+                    mapOf(
+                        KEY_FIELD to "$KEY_FIELD$it".toValue(),
+                        NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
+                    )
+                ).build()
+        })
+
+        val task = checkRuleTask(
+            1, eventID, streams, taskTimeout = TaskTimeout(2000L, 500)
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        var eventsList = awaitEventBatchAndGetEvents(2, 2)
+        assertAll({
+            val rootEvent = eventsList.first()
+            assertEquals(FAILED, rootEvent.status, "Event status should be failed")
+            assertTrue(rootEvent.attachedMessageIdsCount == 1)
+        })
+
+        checkRuleTask(3, eventID, streams).also { task.subscribeNextTask(it) }
+        eventsList = awaitEventBatchAndGetEvents(4, 2)
+        assertAll({
+            val rootEvent = eventsList.first()
+            assertEquals(FAILED, rootEvent.status)
+            assertEquals(3, rootEvent.attachedMessageIdsCount)
+            assertEquals(1, eventsList[2].attachedMessageIdsCount)
+            assertEquals(FAILED, eventsList.last().status)
+        })
+    }
+
+
     private fun awaitEventBatchAndGetEvents(times: Int, last: Int): List<Event> =
         awaitEventBatchRequest(1000L, times).drop(times - last).flatMap(EventBatch::getEventsList)
 
@@ -162,14 +273,12 @@ class TestChain: AbstractCheckTaskTest() {
         messageStream: Observable<StreamContainer>,
         checkOrder: Boolean = true,
         preFilterParam: PreFilter = preFilter,
-        maxEventBatchContentSize: Int = 1024 * 1024
+        taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ): SequenceCheckRuleTask {
         return SequenceCheckRuleTask(
-            description = "Test",
+            ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
             sessionKey = SessionKey(SESSION_ALIAS, FIRST),
-            timeout = 1000L,
-            maxEventBatchContentSize = maxEventBatchContentSize,
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),
             checkOrder = checkOrder,
@@ -183,18 +292,33 @@ class TestChain: AbstractCheckTaskTest() {
         sequence: Int,
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
-        maxEventBatchContentSize: Int = 1024 * 1024
+        taskTimeout: TaskTimeout = TaskTimeout(1000L)
     ) = CheckRuleTask(
-        SESSION_ALIAS,
+        createRuleConfiguration(taskTimeout, SESSION_ALIAS),
         Instant.now(),
         SessionKey(SESSION_ALIAS, FIRST),
-        1000,
-        maxEventBatchContentSize,
         createMessageFilter(sequence),
         parentEventID,
         messageStream,
         clientStub
     )
+
+    private fun noMessageCheckTask(
+        parentEventID: EventID,
+        messageStream: Observable<StreamContainer>,
+        preFilterParam: PreFilter,
+        taskTimeout: TaskTimeout = TaskTimeout(5000L, 3500L)
+    ): NoMessageCheckTask {
+        return NoMessageCheckTask(
+            ruleConfiguration = createRuleConfiguration(taskTimeout),
+            startTime = Instant.now(),
+            sessionKey = SessionKey(SESSION_ALIAS, FIRST),
+            protoPreFilter = preFilterParam,
+            parentEventID = parentEventID,
+            messageStream = messageStream,
+            eventBatchRouter = clientStub
+        )
+    }
 
     private fun createMessage(sequence: Int) = constructMessage(sequence.toLong())
         .putAllFields(mapOf(
@@ -215,5 +339,6 @@ class TestChain: AbstractCheckTaskTest() {
     companion object {
         private const val KEY_FIELD = "key"
         private const val NOT_KEY_FIELD = "not_key"
+        private const val UNTRUSTED_EXECUTION_EVENT_NAME: String = "The current check is untrusted because the start point of the check interval has been selected approximately"
     }
 }
