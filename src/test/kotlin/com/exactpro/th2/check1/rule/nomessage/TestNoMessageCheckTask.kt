@@ -18,7 +18,6 @@ import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
-import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
@@ -53,7 +52,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             )
         )
 
-        val eventID = createEvent("root")
+        val eventID = createRootEventId()
         val task = noMessageCheckTask(
             eventID,
             streams,
@@ -100,7 +99,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
                 )
         )
 
-        val eventID = createEvent("root")
+        val eventID = createRootEventId()
         val task = noMessageCheckTask(
             eventID,
             streams,
@@ -146,7 +145,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             )
         )
 
-        val eventID = createEvent("root")
+        val eventID = createRootEventId()
         val task = noMessageCheckTask(
             eventID,
             streams,

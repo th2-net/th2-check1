@@ -52,7 +52,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 ).build()
         }
         val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -99,7 +99,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 ).build()
         }
         val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -141,7 +141,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 ).build()
         }
         val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -204,7 +204,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 ).build()
         }
         val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))

@@ -19,9 +19,10 @@ import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.exception.RuleCreationException
 import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
+import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.BOOK_NAME
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.MESSAGE_TYPE
+import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.ROOT_ID
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.SESSION_ALIAS
-import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.check1.util.assertThrowsWithMessages
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Checkpoint
@@ -49,27 +50,32 @@ import kotlin.test.assertNotNull
 
 class RuleFactoryTest {
     private val clientStub: MessageRouter<EventBatch> = spy { }
+    private val ruleFactory = RuleFactory(
+        Check1Configuration(),
+        createStreams(
+            SESSION_ALIAS,
+            Direction.FIRST,
+            listOf(
+                message(
+                    BOOK_NAME,
+                    MESSAGE_TYPE,
+                    Direction.FIRST,
+                    SESSION_ALIAS
+                )
+                    .mergeMetadata(MessageMetadata.newBuilder()
+                        .putProperties("keyProp", "42")
+                        .putProperties("notKeyProp", "2")
+                        .build())
+                    .build()
+            )
+        ),
+        clientStub
+    )
 
     @Test
     fun `failed rule creation because session alias is empty`() {
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
         val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
+                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).build())
                 .setCheckpoint(Checkpoint.newBuilder().setId(EventUtils.generateUUID()).build()).build()
 
         assertThrowsWithMessages<RuleCreationException>(
@@ -82,24 +88,8 @@ class RuleFactoryTest {
 
     @Test
     fun `success rule creation with missed checkpoint`() {
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
         val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
+                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).build())
                 .setConnectivityId(ConnectionID.newBuilder()
                         .setSessionAlias("test_alias")
                 )
@@ -118,24 +108,8 @@ class RuleFactoryTest {
 
     @Test
     fun `failed rule creation with missed checkpoint and invalid chain id`() {
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
         val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
+                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).build())
                 .setConnectivityId(ConnectionID.newBuilder()
                         .setSessionAlias("test_alias")
                 )
@@ -156,130 +130,46 @@ class RuleFactoryTest {
 
     @Test
     fun `success rule creation with missed chain id`() {
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
-        val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
-                .setConnectivityId(ConnectionID.newBuilder()
-                        .setSessionAlias("test_alias")
-                )
-                .setRootFilter(RootMessageFilter.newBuilder()
-                        .setMessageType("TestMsgType")
-                )
-                .setMessageTimeout(5)
-                .setCheckpoint(
-                        Checkpoint.newBuilder()
-                                .setId(EventUtils.generateUUID())
-                                .putSessionAliasToDirectionCheckpoint(
-                                        "test_alias",
-                                        Checkpoint.DirectionCheckpoint.newBuilder()
-                                                .putDirectionToCheckpointData(
-                                                        Direction.FIRST.number,
-                                                        Checkpoint.CheckpointData.newBuilder()
-                                                                .setSequence(1)
-                                                                .setTimestamp(Instant.now().toTimestamp())
-                                                                .build())
-                                                .build())
-                                .build()
-                )
-                .setDirection(Direction.FIRST)
-                .build()
-
-
         val createCheckRule = assertDoesNotThrow {
-            ruleFactory.createCheckRule(request, false)
+            ruleFactory.createCheckRule(createCheckRuleRequest(), false)
         }
         assertNotNull(createCheckRule) { "Rule cannot be null" }
     }
 
     @Test
-    fun `failed rule creation because direction checkpoint is missed`() {
-        val sessionAlias = "diff_test_alias"
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
-        val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
-                .setConnectivityId(ConnectionID.newBuilder()
-                        .setSessionAlias(sessionAlias)
-                )
-                .setRootFilter(RootMessageFilter.newBuilder()
-                        .setMessageType("TestMsgType")
-                )
-                .setMessageTimeout(5)
-                .setCheckpoint(
-                        Checkpoint.newBuilder()
-                                .setId(EventUtils.generateUUID())
-                                .putSessionAliasToDirectionCheckpoint(
-                                        "test_alias",
-                                        Checkpoint.DirectionCheckpoint.newBuilder()
-                                                .putDirectionToCheckpointData(
-                                                        Direction.FIRST.number,
-                                                        Checkpoint.CheckpointData.newBuilder()
-                                                                .setSequence(1)
-                                                                .setTimestamp(Instant.now().toTimestamp())
-                                                                .build())
-                                                .build())
-                                .build()
-                )
-                .setDirection(Direction.FIRST)
-                .build()
-
+    fun `failed rule creation because direction checkpoint book name is missed`() {
+        val bookName = "diff_book_name"
         assertThrowsWithMessages<RuleCreationException>(
-                "An error occurred while creating rule",
-                "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'"
-        ) { ruleFactory.createCheckRule(request, true) }
+            "An error occurred while creating rule",
+            "The checkpoint doesn't contain a direction checkpoint with book name '$bookName'"
+        ) {
+            ruleFactory.createCheckRule(
+                createCheckRuleRequest(bookName, SESSION_ALIAS),
+                true
+            )
+        }
+        assertEvents()
+    }
 
+    @Test
+    fun `failed rule creation because direction checkpoint session alias is missed`() {
+        val sessionAlias = "diff_test_alias"
+        assertThrowsWithMessages<RuleCreationException>(
+            "An error occurred while creating rule",
+            "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'"
+        ) {
+            ruleFactory.createCheckRule(
+                createCheckRuleRequest(BOOK_NAME, sessionAlias),
+                true
+            )
+        }
         assertEvents()
     }
 
     @Test
     fun `failed rule creation because checkpoint is missed`() {
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
         val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
+                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).build())
                 .setConnectivityId(ConnectionID.newBuilder()
                         .setSessionAlias("test_alias")
                 )
@@ -300,164 +190,45 @@ class RuleFactoryTest {
 
     @Test
     fun `failed rule creation because checkpoint data is missed`() {
-        val sessionAlias = "test_alias"
         val direction = Direction.SECOND
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
-        val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
-                .setConnectivityId(ConnectionID.newBuilder()
-                        .setSessionAlias(sessionAlias)
-                )
-                .setRootFilter(RootMessageFilter.newBuilder()
-                        .setMessageType("TestMsgType")
-                )
-                .setMessageTimeout(5)
-                .setCheckpoint(
-                        Checkpoint.newBuilder()
-                                .setId(EventUtils.generateUUID())
-                                .putSessionAliasToDirectionCheckpoint(
-                                        sessionAlias,
-                                        Checkpoint.DirectionCheckpoint.newBuilder()
-                                                .putDirectionToCheckpointData(
-                                                        Direction.FIRST.number,
-                                                        Checkpoint.CheckpointData.newBuilder()
-                                                                .setSequence(1)
-                                                                .setTimestamp(Instant.now().toTimestamp())
-                                                                .build())
-                                                .build())
-                                .build()
-                )
-                .setDirection(direction)
-                .build()
-
         assertThrowsWithMessages<RuleCreationException>(
-                "An error occurred while creating rule",
-                "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'"
-        ) { ruleFactory.createCheckRule(request, true) }
-
+            "An error occurred while creating rule",
+            "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'"
+        ) {
+            ruleFactory.createCheckRule(
+                createCheckRuleRequest(BOOK_NAME, SESSION_ALIAS, true, 1, direction),
+                true
+            )
+        }
         assertEvents()
     }
 
     @Test
     fun `failed rule creation because checkpoint data has incorrect sequence number`() {
-        val sessionAlias = "test_alias"
         val sequence: Long = -1
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
-        val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
-                .setConnectivityId(ConnectionID.newBuilder()
-                        .setSessionAlias(sessionAlias)
-                )
-                .setRootFilter(RootMessageFilter.newBuilder()
-                        .setMessageType("TestMsgType")
-                )
-                .setMessageTimeout(5)
-                .setCheckpoint(
-                        Checkpoint.newBuilder()
-                                .setId(EventUtils.generateUUID())
-                                .putSessionAliasToDirectionCheckpoint(
-                                        sessionAlias,
-                                        Checkpoint.DirectionCheckpoint.newBuilder()
-                                                .putDirectionToCheckpointData(
-                                                        Direction.FIRST.number,
-                                                        Checkpoint.CheckpointData.newBuilder()
-                                                                .setSequence(sequence)
-                                                                .setTimestamp(Instant.now().toTimestamp())
-                                                                .build())
-                                                .build())
-                                .build()
-                )
-                .setDirection(Direction.FIRST)
-                .build()
-
         assertThrowsWithMessages<RuleCreationException>(
-                "An error occurred while creating rule",
-                "The checkpoint data has incorrect sequence number '$sequence'"
-        ) { ruleFactory.createCheckRule(request, true) }
-
+            "An error occurred while creating rule",
+            "The checkpoint data has incorrect sequence number '$sequence'"
+        ) {
+            ruleFactory.createCheckRule(
+                createCheckRuleRequest(BOOK_NAME, SESSION_ALIAS, true, sequence),
+                true
+            )
+        }
         assertEvents()
     }
 
     @Test
     fun `failed rule creation because checkpoint data missed timestamp`() {
-        val sessionAlias = "test_alias"
-        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
-                .mergeMetadata(MessageMetadata.newBuilder()
-                    .putProperties("keyProp", "42")
-                    .putProperties("notKeyProp", "2")
-                    .build())
-                .build()
-        ))
-
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
-
-        val request = CheckRuleRequest.newBuilder()
-                .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
-                .setConnectivityId(ConnectionID.newBuilder()
-                        .setSessionAlias(sessionAlias)
-                )
-                .setRootFilter(RootMessageFilter.newBuilder()
-                        .setMessageType("TestMsgType")
-                )
-                .setMessageTimeout(5)
-                .setCheckpoint(
-                        Checkpoint.newBuilder()
-                                .setId(EventUtils.generateUUID())
-                                .putSessionAliasToDirectionCheckpoint(
-                                        sessionAlias,
-                                        Checkpoint.DirectionCheckpoint.newBuilder()
-                                                .putDirectionToCheckpointData(
-                                                        Direction.FIRST.number,
-                                                        Checkpoint.CheckpointData.newBuilder()
-                                                                .setSequence(1)
-                                                                .build())
-                                                .build())
-                                .build()
-                )
-                .setDirection(Direction.FIRST)
-                .build()
-
         assertThrowsWithMessages<RuleCreationException>(
-                "An error occurred while creating rule",
-                "The checkpoint data doesn't contain timestamp"
-        ) { ruleFactory.createCheckRule(request, true) }
-
+            "An error occurred while creating rule",
+            "The checkpoint data doesn't contain timestamp"
+        ) {
+            ruleFactory.createCheckRule(
+                createCheckRuleRequest(BOOK_NAME, SESSION_ALIAS, false, 1, Direction.FIRST),
+                true
+            )
+        }
         assertEvents()
     }
 
@@ -480,5 +251,47 @@ class RuleFactoryTest {
         return Observable.just(
                 StreamContainer(SessionKey(BOOK_NAME, alias, direction), messages.size + 1, Observable.fromIterable(messages))
         )
+    }
+
+    private fun createCheckRuleRequest(
+        parentBookName: String = BOOK_NAME,
+        connectivitySessionAlias: String = SESSION_ALIAS,
+        withTimestamp: Boolean = true,
+        sequence: Long = 1,
+        checkRuleDirection: Direction = Direction.FIRST,
+    ): CheckRuleRequest {
+        val checkpointDataBuilder: Checkpoint.CheckpointData.Builder = Checkpoint.CheckpointData
+            .newBuilder()
+            .setSequence(sequence)
+        if (withTimestamp) {
+            checkpointDataBuilder.timestamp = Instant.now().toTimestamp()
+        }
+        return CheckRuleRequest
+            .newBuilder()
+            .setParentEventId(EventID.newBuilder().setBookName(parentBookName).setId(ROOT_ID).build())
+            .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(connectivitySessionAlias))
+            .setRootFilter(RootMessageFilter.newBuilder().setMessageType(MESSAGE_TYPE))
+            .setMessageTimeout(5)
+            .setCheckpoint(Checkpoint
+                .newBuilder()
+                .setId(EventUtils.generateUUID())
+                .putBookNameToSessionAliasToDirectionCheckpoint(
+                    BOOK_NAME,
+                    Checkpoint.SessionAliasToDirectionCheckpoint
+                        .newBuilder()
+                        .putSessionAliasToDirectionCheckpoint(
+                            SESSION_ALIAS,
+                            Checkpoint.DirectionCheckpoint
+                                .newBuilder()
+                                .putDirectionToCheckpointData(
+                                    Direction.FIRST.number,
+                                    checkpointDataBuilder.build()
+                                )
+                                .build()
+                        )
+                        .build()
+                ))
+            .setDirection(checkRuleDirection)
+            .build()
     }
 }

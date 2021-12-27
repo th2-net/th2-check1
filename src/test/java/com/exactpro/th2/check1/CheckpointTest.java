@@ -23,7 +23,7 @@ import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 import com.exactpro.th2.common.grpc.Direction;
 import com.google.protobuf.Timestamp;
 
-import static com.exactpro.th2.check1.util.UtilsKt.BOOK_NAME;
+import static com.exactpro.th2.check1.rule.AbstractCheckTaskTest.BOOK_NAME;
 import static java.util.Map.entry;
 
 public class CheckpointTest {

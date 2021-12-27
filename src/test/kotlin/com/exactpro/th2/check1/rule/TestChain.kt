@@ -20,7 +20,6 @@ import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
-import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.common.grpc.Direction.FIRST
 import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventBatch
@@ -41,7 +40,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TestChain: AbstractCheckTaskTest() {
-    private val eventID = createEvent("root")
+    private val eventID = createRootEventId()
     private val preFilter = PreFilter.newBuilder()
         .putFields(KEY_FIELD, ValueFilter.newBuilder().setKey(true).setOperation(FilterOperation.NOT_EMPTY).build())
         .build()

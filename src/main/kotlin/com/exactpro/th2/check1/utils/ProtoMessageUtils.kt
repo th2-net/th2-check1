@@ -66,7 +66,6 @@ fun InternalCheckpoint.convert(): Checkpoint {
             .apply {
                 sessionKey.direction.number.run {
                     putDirectionToCheckpointData(this, checkpointData.convert())
-                    putDirectionToSequence(this, checkpointData.sequence)
                 }
             }
     }
@@ -86,19 +85,8 @@ fun Checkpoint.convert(): InternalCheckpoint {
     val sessionKeyToSequence: MutableMap<SessionKey, InternalCheckpointData> = HashMap()
     bookNameToSessionAliasToDirectionCheckpointMap.forEach { (bookName, aliasToDirectionCheckpoint) ->
         aliasToDirectionCheckpoint.sessionAliasToDirectionCheckpointMap.forEach { (sessionAlias, directionCheckpoint) ->
-            if (directionCheckpoint.run { directionToCheckpointDataCount != 0 && directionToSequenceCount != 0 }) {
-                LOGGER.warn("Session alias '{}' contains both of these fields: 'direction to checkpoint data' and 'direction to sequence'. Please use 'direction to checkpoint data' instead", sessionAlias)
-            }
-            if (directionCheckpoint.directionToCheckpointDataCount == 0) {
-                directionCheckpoint.directionToSequenceMap.forEach { (directionNumber, sequence) ->
-                    val sessionKey = SessionKey(bookName, sessionAlias, Direction.forNumber(directionNumber))
-                    sessionKeyToSequence[sessionKey] = InternalCheckpointData(sequence, null)
-                }
-            } else {
-                directionCheckpoint.directionToCheckpointDataMap.forEach { (directionNumber, checkpointData) ->
-                    val sessionKey = SessionKey(bookName, sessionAlias, Direction.forNumber(directionNumber))
-                    sessionKeyToSequence[sessionKey] = checkpointData.convert()
-                }
+            directionCheckpoint.directionToCheckpointDataMap.forEach { (directionNumber, checkpointData) ->
+                sessionKeyToSequence[SessionKey(bookName, sessionAlias, Direction.forNumber(directionNumber))] = checkpointData.convert()
             }
         }
     }

@@ -20,8 +20,6 @@ import com.exactpro.th2.common.grpc.MetadataFilter
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 
-const val BOOK_NAME = "test_book_name"
-
 fun String.toSimpleFilter(op: FilterOperation, key: Boolean = false): MetadataFilter.SimpleFilter = MetadataFilter.SimpleFilter.newBuilder()
     .setOperation(op)
     .setValue(this)

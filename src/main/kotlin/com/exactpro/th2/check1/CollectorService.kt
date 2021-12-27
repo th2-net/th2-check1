@@ -211,9 +211,7 @@ class CollectorService(
     }
 
     fun createCheckpoint(request: CheckpointRequestOrBuilder): Checkpoint {
-        val rootEvent = Event
-            .start()
-            .bookName(request.parentEventId.bookName)
+        val rootEvent = Event.start()
             .name("Checkpoint")
             .type("Checkpoint")
             .description(request.description)
@@ -225,7 +223,6 @@ class CollectorService(
                 val messageID = sessionKey.toMessageID(checkpointData.sequence)
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()
-                    .bookName(request.parentEventId.bookName)
                     .name("Checkpoint for book name '${sessionKey.bookName}', session alias '${sessionKey.sessionAlias}', direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
                     .type("Checkpoint for session")
                     .messageID(messageID)

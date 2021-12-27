@@ -29,7 +29,7 @@ class CheckpointSubscriber : AbstractSessionObserver<StreamContainer>() {
             { session -> session.sessionKey },
             { session ->
                 session.lastMessage.metadata.run {
-                    CheckpointData(id.sequence, timestamp)
+                    CheckpointData(id.sequence, id.timestamp)
                 }
             })
     )

@@ -59,9 +59,7 @@ class CheckRuleTask(
     override fun onStart() {
         super.onStart()
 
-        val subEvent = Event
-            .start()
-            .bookName(parentEventID.bookName)
+        val subEvent = Event.start()
             .endTimestamp()
             .name("Message filter")
             .type("Filter")
@@ -83,9 +81,7 @@ class CheckRuleTask(
     }
 
     override fun onTimeout() {
-        rootEvent
-            .addSubEventWithSamePeriod()
-            .bookName(parentEventID.bookName)
+        rootEvent.addSubEventWithSamePeriod()
             .name("No message found by target keys")
             .type("Check failed")
             .status(FAILED)

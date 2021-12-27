@@ -20,7 +20,6 @@ import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_SEQUENCE_TYPE
-import com.exactpro.th2.check1.util.BOOK_NAME
 import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Direction
@@ -116,7 +115,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesInCorrectOrder)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder).begin()
 
@@ -176,7 +175,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         }
 
         val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesUnordered)
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
@@ -236,7 +235,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, checkOrder, filtersParam = messageFilters).begin()
 
@@ -302,7 +301,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, true, filtersParam = messageFilters).begin()
 
@@ -374,7 +373,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(
             parentEventID,
@@ -448,7 +447,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         )
 
         val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesWithKeyFields)
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(
             parentEventID,
@@ -511,7 +510,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         )
 
         val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesWithKeyFields)
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(
             parentEventID,
@@ -574,7 +573,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         )
 
         val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesWithKeyFields)
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(
             parentEventID,
@@ -630,7 +629,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, true).begin()
 
@@ -662,7 +661,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         }
 
         val messageStream = createStreams(SESSION_ALIAS, Direction.FIRST, messagesUnordered)
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
@@ -716,7 +715,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messages = Observable.fromIterable(messagesWithKeyFields)
 
         val messageStream: Observable<StreamContainer> = Observable.just(StreamContainer(SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST), 10, messages))
-        val parentEventID = createEvent(EventUtils.generateUUID())
+        val parentEventID = createEventId(EventUtils.generateUUID())
 
         sequenceCheckRuleTask(parentEventID, messageStream, false).begin()
 
@@ -754,7 +753,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 .build()
         ))
 
-        val eventID = createEvent("root")
+        val eventID = createRootEventId()
         val filter = RootMessageFilter.newBuilder()
                 .setMessageType(MESSAGE_TYPE)
                 .setMetadataFilter(MetadataFilter.newBuilder()
