@@ -42,6 +42,7 @@ import com.exactpro.th2.common.value.listValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
 import com.google.protobuf.StringValue
+import com.google.protobuf.TextFormat
 import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -145,6 +146,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
+                    .putProperties("notKeyProp2", "2") // for excess max event batch content size and have 2 failed events 
                     .build())
                 .build()
         ))
@@ -155,7 +157,12 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
             .build()
-        val task = checkTask(filter, eventID, streams, 200)
+        val task = checkTask(
+            filter,
+            eventID,
+            streams,
+            200 + TextFormat.shortDebugString(eventID).length // EventID now contains book_name, scope and start_timestamp
+        )
         task.begin()
 
         val eventBatches = awaitEventBatchRequest(1000L, 3)
