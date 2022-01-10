@@ -24,6 +24,7 @@ import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.MESSAGE_TYPE
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.ROOT_ID
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.SESSION_ALIAS
 import com.exactpro.th2.check1.util.assertThrowsWithMessages
+import com.exactpro.th2.check1.util.createDefaultMessage
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.ConnectionID
@@ -33,7 +34,6 @@ import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.RootMessageFilter
-import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.nhaarman.mockitokotlin2.argumentCaptor
@@ -56,12 +56,7 @@ class RuleFactoryTest {
             SESSION_ALIAS,
             Direction.FIRST,
             listOf(
-                message(
-                    BOOK_NAME,
-                    MESSAGE_TYPE,
-                    Direction.FIRST,
-                    SESSION_ALIAS
-                )
+                createDefaultMessage()
                     .mergeMetadata(MessageMetadata.newBuilder()
                         .putProperties("keyProp", "42")
                         .putProperties("notKeyProp", "2")

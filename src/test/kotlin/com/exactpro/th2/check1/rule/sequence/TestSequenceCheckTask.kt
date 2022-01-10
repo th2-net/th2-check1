@@ -20,6 +20,7 @@ import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_MESSAGES_TYPE
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask.Companion.CHECK_SEQUENCE_TYPE
+import com.exactpro.th2.check1.util.createDefaultMessage
 import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Direction
@@ -35,7 +36,6 @@ import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
-import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.message.messageFilter
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
@@ -740,12 +740,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `failed rule creation due to invalid regex operation in the message filter`() {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
-            message(
-                BOOK_NAME,
-                MESSAGE_TYPE,
-                Direction.FIRST,
-                SESSION_ALIAS
-            )
+            createDefaultMessage()
                 .mergeMetadata(MessageMetadata.newBuilder()
                     .putProperties("keyProp", "42")
                     .putProperties("notKeyProp", "2")
