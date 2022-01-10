@@ -101,7 +101,7 @@ class SilenceCheckTask(
     override fun type(): String = "AutoSilenceCheck"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(createMessageBean("AutoSilenceCheck for session ${sessionKey.run { "$sessionAlias ($direction)" }}"))
+        rootEvent.bodyData(createMessageBean("AutoSilenceCheck for session ${sessionKey.run { "$bookName $sessionAlias ($direction)" }}"))
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =

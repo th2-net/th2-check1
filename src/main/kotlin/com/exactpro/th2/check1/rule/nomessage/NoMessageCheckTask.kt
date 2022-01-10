@@ -86,7 +86,7 @@ class NoMessageCheckTask(
     override fun type(): String = "noMessageCheck"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(EventUtils.createMessageBean("No message check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)" }}"))
+        rootEvent.bodyData(EventUtils.createMessageBean("No message check rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)" }}"))
     }
 
     override fun onNext(messageContainer: MessageContainer) {
