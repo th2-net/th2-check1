@@ -199,6 +199,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + `book_name` to `SessionKey` and `th2_check1_actual_cache_number` metric
 
 #### Changed:
++ Migrated to books/pages cradle 4.0.0
 + Migrated `common` version from `3.31.3` to `4.0.0-th2-2150-books-pages-1606747040-SNAPSHOT`
 + Migrated `grpc-check1` version from `3.5.1` to `4.0.0-th2-2150-books-pages-1628253419-SNAPSHOT`
 
