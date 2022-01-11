@@ -50,7 +50,7 @@ inline fun <reified T : Throwable> assertThrowsWithMessages(vararg exceptionMess
     }
 }
 
-fun createDefaultMessage(): Message.Builder = message(
+fun createDefaultMessage() = message(
     AbstractCheckTaskTest.BOOK_NAME,
     AbstractCheckTaskTest.MESSAGE_TYPE,
     Direction.FIRST,
