@@ -76,7 +76,7 @@ class CollectorService(
         streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
                 .groupBy { message ->
                     message.metadata.id.run {
-                        SessionKey(message.parentEventId.bookName, connectionId.sessionAlias, direction)
+                        SessionKey(message.metadata.id.bookName, connectionId.sessionAlias, direction)
                     }.also(BufferMetric::processMessage)
                 }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
