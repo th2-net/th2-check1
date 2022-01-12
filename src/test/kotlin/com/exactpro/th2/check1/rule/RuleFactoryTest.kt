@@ -139,7 +139,7 @@ class RuleFactoryTest {
             "The checkpoint doesn't contain a direction checkpoint with book name '$bookName'"
         ) {
             ruleFactory.createCheckRule(
-                createCheckRuleRequest(bookName, SESSION_ALIAS),
+                createCheckRuleRequest(parentBookName = bookName, SESSION_ALIAS, bookName = bookName),
                 true
             )
         }
@@ -254,6 +254,7 @@ class RuleFactoryTest {
         withTimestamp: Boolean = true,
         sequence: Long = 1,
         checkRuleDirection: Direction = Direction.FIRST,
+        bookName: String = BOOK_NAME,
     ): CheckRuleRequest {
         val checkpointDataBuilder: Checkpoint.CheckpointData.Builder = Checkpoint.CheckpointData
             .newBuilder()
@@ -287,6 +288,7 @@ class RuleFactoryTest {
                         .build()
                 ))
             .setDirection(checkRuleDirection)
+            .setBookName(bookName)
             .build()
     }
 }

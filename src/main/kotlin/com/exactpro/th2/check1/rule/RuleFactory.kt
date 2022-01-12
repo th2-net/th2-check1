@@ -58,7 +58,7 @@ class RuleFactory(
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
                     check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
-                    val sessionKey = SessionKey(request.parentEventId.bookName, sessionAlias, directionOrDefault(request.direction))
+                    val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
                     checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     val filter = request.rootFilter.also { it.validateRootMessageFilter() }
@@ -95,7 +95,7 @@ class RuleFactory(
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
                     val sessionAlias: String = request.connectivityId.sessionAlias
                     check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
-                    val sessionKey = SessionKey(request.parentEventId.bookName, sessionAlias, directionOrDefault(request.direction))
+                    val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
                     checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     val protoMessageFilters = request.rootMessageFiltersList.onEach { it.validateRootMessageFilter() }
@@ -135,7 +135,7 @@ class RuleFactory(
                     val parentEventID: EventID = request.parentEventId
                     val sessionAlias: String = request.connectivityId.sessionAlias
                     check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
-                    val sessionKey = SessionKey(request.parentEventId.bookName, sessionAlias, directionOrDefault(request.direction))
+                    val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
                     checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     val ruleConfiguration = RuleConfiguration(
@@ -172,7 +172,7 @@ class RuleFactory(
             checkAndCreateRule {
                 check(timeout > 0) { "timeout must be greater that zero" }
                 val sessionAlias: String = request.connectivityId.sessionAlias
-                val sessionKey = SessionKey(request.parentEventId.bookName, sessionAlias, directionOrDefault(request.direction))
+                val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
 
                 val ruleConfiguration = RuleConfiguration(
                         createTaskTimeout(timeout),
