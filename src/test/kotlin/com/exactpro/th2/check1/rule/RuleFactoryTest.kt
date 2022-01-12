@@ -139,7 +139,7 @@ class RuleFactoryTest {
             "The checkpoint doesn't contain a direction checkpoint with book name '$bookName'"
         ) {
             ruleFactory.createCheckRule(
-                createCheckRuleRequest(parentBookName = bookName, SESSION_ALIAS, bookName = bookName),
+                createCheckRuleRequest(parentBookName = bookName, bookName = bookName),
                 true
             )
         }
@@ -154,7 +154,7 @@ class RuleFactoryTest {
             "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'"
         ) {
             ruleFactory.createCheckRule(
-                createCheckRuleRequest(BOOK_NAME, sessionAlias),
+                createCheckRuleRequest(connectivitySessionAlias = sessionAlias),
                 true
             )
         }
@@ -191,7 +191,7 @@ class RuleFactoryTest {
             "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'"
         ) {
             ruleFactory.createCheckRule(
-                createCheckRuleRequest(BOOK_NAME, SESSION_ALIAS, true, 1, direction),
+                createCheckRuleRequest(checkRuleDirection = direction),
                 true
             )
         }
@@ -206,7 +206,7 @@ class RuleFactoryTest {
             "The checkpoint data has incorrect sequence number '$sequence'"
         ) {
             ruleFactory.createCheckRule(
-                createCheckRuleRequest(BOOK_NAME, SESSION_ALIAS, true, sequence),
+                createCheckRuleRequest(sequence = sequence),
                 true
             )
         }
@@ -220,7 +220,7 @@ class RuleFactoryTest {
             "The checkpoint data doesn't contain timestamp"
         ) {
             ruleFactory.createCheckRule(
-                createCheckRuleRequest(BOOK_NAME, SESSION_ALIAS, false, 1, Direction.FIRST),
+                createCheckRuleRequest(withTimestamp = false),
                 true
             )
         }
