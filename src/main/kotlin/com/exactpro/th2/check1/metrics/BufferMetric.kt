@@ -15,14 +15,12 @@ package com.exactpro.th2.check1.metrics
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.configuration.Check1Configuration
+import com.exactpro.th2.common.metrics.BOOK_NAME_LABEL
 import com.exactpro.th2.common.metrics.DIRECTION_LABEL
 import com.exactpro.th2.common.metrics.SESSION_ALIAS_LABEL
 import io.prometheus.client.Counter
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
-
-// TODO Add to common near SESSION_ALIAS_LABEL and DIRECTION_LABEL
-private const val BOOK_NAME_LABEL = "book_name"
 
 object BufferMetric {
 
