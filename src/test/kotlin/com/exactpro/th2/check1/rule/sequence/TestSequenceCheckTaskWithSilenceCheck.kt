@@ -52,7 +52,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 ).build()
         }
         val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -61,6 +61,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .addAllRootMessageFilters(filters)
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
+            .setBookName(BOOK_NAME)
             .build()
         val sequenceRule = factory.createSequenceCheckRule(request, true)
         val silenceCheck = factory.createSilenceCheck(request, 1000)
@@ -99,7 +100,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 ).build()
         }
         val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -108,6 +109,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .addAllRootMessageFilters(filters)
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
+            .setBookName(BOOK_NAME)
             .build()
         val sequenceRule = factory.createSequenceCheckRule(request, true)
         val silenceCheck = factory.createSilenceCheck(request, 1000)
@@ -141,7 +143,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 ).build()
         }
         val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -151,6 +153,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .addAllRootMessageFilters(filters)
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
+            .setBookName(BOOK_NAME)
             .build()
         val anotherRequest = request.toBuilder()
             .clearRootMessageFilters()
@@ -204,7 +207,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 ).build()
         }
         val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -214,6 +217,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .addAllRootMessageFilters(filters)
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
+            .setBookName(BOOK_NAME)
             .build()
         val silenceCheck = factory.createSilenceCheck(request, 1000)
         val sequenceRule = factory.createSequenceCheckRule(request.toBuilder().setDescription("2").build(), true)

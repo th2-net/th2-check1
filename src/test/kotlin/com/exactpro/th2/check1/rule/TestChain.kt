@@ -40,8 +40,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TestChain: AbstractCheckTaskTest() {
-
-    private val eventID = EventID.newBuilder().setId("root").build()
+    private val eventID = createRootEventId()
     private val preFilter = PreFilter.newBuilder()
         .putFields(KEY_FIELD, ValueFilter.newBuilder().setKey(true).setOperation(FilterOperation.NOT_EMPTY).build())
         .build()
@@ -278,7 +277,7 @@ class TestChain: AbstractCheckTaskTest() {
         return SequenceCheckRuleTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
-            sessionKey = SessionKey(SESSION_ALIAS, FIRST),
+            sessionKey = SessionKey(BOOK_NAME, SESSION_ALIAS, FIRST),
             protoPreFilter = preFilterParam,
             protoMessageFilters = sequence.map(::createMessageFilter).toList(),
             checkOrder = checkOrder,
@@ -296,7 +295,7 @@ class TestChain: AbstractCheckTaskTest() {
     ) = CheckRuleTask(
         createRuleConfiguration(taskTimeout, SESSION_ALIAS),
         Instant.now(),
-        SessionKey(SESSION_ALIAS, FIRST),
+        SessionKey(BOOK_NAME, SESSION_ALIAS, FIRST),
         createMessageFilter(sequence),
         parentEventID,
         messageStream,
@@ -312,7 +311,7 @@ class TestChain: AbstractCheckTaskTest() {
         return NoMessageCheckTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
-            sessionKey = SessionKey(SESSION_ALIAS, FIRST),
+            sessionKey = SessionKey(BOOK_NAME, SESSION_ALIAS, FIRST),
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,
             messageStream = messageStream,

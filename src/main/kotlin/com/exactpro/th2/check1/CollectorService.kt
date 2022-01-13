@@ -76,7 +76,7 @@ class CollectorService(
         streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
                 .groupBy { message ->
                     message.metadata.id.run {
-                        SessionKey(connectionId.sessionAlias, direction)
+                        SessionKey(message.metadata.id.bookName, connectionId.sessionAlias, direction)
                     }.also(BufferMetric::processMessage)
                 }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
@@ -195,7 +195,7 @@ class CollectorService(
 
         val batch = EventBatch.newBuilder()
             .setParentEventId(parentEventID)
-            .addAllEvents(event.toProtoEvents(parentEventID.id))
+            .addAllEvents(event.toListProto(parentEventID))
             .build()
 
         ForkJoinPool.commonPool().execute {
@@ -223,7 +223,7 @@ class CollectorService(
                 val messageID = sessionKey.toMessageID(checkpointData.sequence)
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()
-                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '${checkpointData.sequence}'")
+                    .name("Checkpoint for book name '${sessionKey.bookName}', session alias '${sessionKey.sessionAlias}', direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
                     .type("Checkpoint for session")
                     .messageID(messageID)
             }
@@ -256,9 +256,13 @@ class CollectorService(
     }
 
     private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
-        .setConnectionId(ConnectionID.newBuilder()
-            .setSessionAlias(sessionAlias)
-            .build())
+        .setBookName(bookName)
+        .setConnectionId(
+            ConnectionID
+                .newBuilder()
+                .setSessionAlias(sessionAlias)
+                .build()
+        )
         .setSequence(sequence)
         .setDirection(direction)
         .build()

@@ -1,4 +1,4 @@
-# th2 check1 (3.9.1)
+# th2 check1 (4.0.0)
 
 ## Overview
 
@@ -184,13 +184,24 @@ The Check1 component publishes Prometheus metrics to observe the actual state of
 * `th2_check1_actual_cache_number` - actual number of messages in caches
 * `th2_check1_active_tasks_number` - actual number of currently working rules
 
-The `th2_check1_actual_cache_number` metric separate messages with two labels:
+The `th2_check1_actual_cache_number` metric separate messages with three labels:
+* `book_name` - book name of received message
 * `session_alias` - session alias of received message
 * `direction` - direction of received message
 
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 4.0.0
+
+#### Added:
++ `book_name` entity has been added to the `SessionKey` class as a property and into the `th2_check1_actual_cache_number` metric as a label
+
+#### Changed:
++ Migrated to books/pages cradle 4.0.0
+  + Migrated `common` version from `3.31.3` to `4.0.0`
+  + Migrated `grpc-check1` version from `3.5.1` to `4.0.0`
 
 ### 3.9.1
 

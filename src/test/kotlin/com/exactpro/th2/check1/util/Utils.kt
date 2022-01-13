@@ -13,10 +13,14 @@
 
 package com.exactpro.th2.check1.util
 
+import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.common.event.bean.VerificationEntry
 import com.exactpro.th2.common.event.bean.VerificationStatus
+import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.FilterOperation
+import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MetadataFilter
+import com.exactpro.th2.common.message.message
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 
@@ -45,3 +49,10 @@ inline fun <reified T : Throwable> assertThrowsWithMessages(vararg exceptionMess
         currentException = currentException?.cause
     }
 }
+
+fun createDefaultMessage() = message(
+    AbstractCheckTaskTest.BOOK_NAME,
+    AbstractCheckTaskTest.MESSAGE_TYPE,
+    Direction.FIRST,
+    AbstractCheckTaskTest.SESSION_ALIAS
+)

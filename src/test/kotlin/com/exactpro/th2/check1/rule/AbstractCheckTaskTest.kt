@@ -59,7 +59,7 @@ abstract class AbstractCheckTaskTest {
 
     fun createStreams(alias: String = SESSION_ALIAS, direction: Direction = FIRST, messages: List<Message>): Observable<StreamContainer> {
         return Observable.just(
-            StreamContainer(SessionKey(alias, direction), messages.size + 1, Observable.fromIterable(messages))
+            StreamContainer(SessionKey(BOOK_NAME, alias, direction), messages.size + 1, Observable.fromIterable(messages))
         )
     }
 
@@ -72,37 +72,46 @@ abstract class AbstractCheckTaskTest {
     ): Message.Builder = Message.newBuilder().apply {
         metadataBuilder.apply {
             this.messageType = type
-            this.timestamp = timestamp
             idBuilder.apply {
                 this.sequence = sequence
                 this.direction = direction
                 connectionIdBuilder.sessionAlias = alias
+                this.timestamp = timestamp
             }
         }
     }
 
-    protected fun createEvent(id: String): EventID {
-        return requireNotNull(EventUtils.toEventID(id))
+    protected fun createRootEventId(): EventID {
+        return createEventId(ROOT_ID);
+    }
+    
+    protected fun createEventId(id: String): EventID {
+        return requireNotNull(EventUtils.toEventID(Instant.now(), BOOK_NAME, id))
     }
 
     protected fun getMessageTimestamp(start: Instant, delta: Long): Timestamp =
         start.plusMillis(delta).toTimestamp()
 
-    protected fun createCheckpoint(timestamp: Instant? = null, sequence: Long = -1) : Checkpoint =
+    protected fun createCheckpoint(timestamp: Instant? = null, sequence: Long = -1): Checkpoint =
         Checkpoint.newBuilder().apply {
-            putSessionAliasToDirectionCheckpoint(
-                SESSION_ALIAS,
-                Checkpoint.DirectionCheckpoint.newBuilder().apply {
-                    putDirectionToCheckpointData(
-                        FIRST.number,
-                        Checkpoint.CheckpointData.newBuilder().apply {
-                            this.sequence = sequence
-                            if (timestamp != null) {
-                                this.timestamp = timestamp.toTimestamp()
-                            }
+            putBookNameToSessionAliasToDirectionCheckpoint(
+                BOOK_NAME,
+                Checkpoint.SessionAliasToDirectionCheckpoint
+                    .newBuilder()
+                    .putSessionAliasToDirectionCheckpoint(
+                        SESSION_ALIAS,
+                        Checkpoint.DirectionCheckpoint.newBuilder().apply {
+                            putDirectionToCheckpointData(
+                                FIRST.number,
+                                Checkpoint.CheckpointData.newBuilder().apply {
+                                    this.sequence = sequence
+                                    if (timestamp != null) {
+                                        this.timestamp = timestamp.toTimestamp()
+                                    }
+                                }.build()
+                            )
                         }.build()
-                    )
-                }.build()
+                    ).build()
             )
         }.build()
 
@@ -177,7 +186,9 @@ abstract class AbstractCheckTaskTest {
 
     companion object {
         const val MESSAGE_TYPE = "TestMsg"
+        const val BOOK_NAME = "test_book"
         const val SESSION_ALIAS = "test_session"
         const val VERIFICATION_TYPE = "Verification"
+        const val ROOT_ID = "root"
     }
 }

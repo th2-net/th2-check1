@@ -52,7 +52,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             )
         )
 
-        val eventID = createEvent("root")
+        val eventID = createRootEventId()
         val task = noMessageCheckTask(
             eventID,
             streams,
@@ -99,7 +99,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
                 )
         )
 
-        val eventID = createEvent("root")
+        val eventID = createRootEventId()
         val task = noMessageCheckTask(
             eventID,
             streams,
@@ -145,7 +145,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             )
         )
 
-        val eventID = createEvent("root")
+        val eventID = createRootEventId()
         val task = noMessageCheckTask(
             eventID,
             streams,
@@ -200,7 +200,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         return NoMessageCheckTask(
             ruleConfiguration = createRuleConfiguration(taskTimeout),
             startTime = Instant.now(),
-            sessionKey = SessionKey(SESSION_ALIAS, Direction.FIRST),
+            sessionKey = SessionKey(BOOK_NAME, SESSION_ALIAS, Direction.FIRST),
             protoPreFilter = preFilterParam,
             parentEventID = parentEventID,
             messageStream = messageStream,

@@ -92,6 +92,6 @@ class CheckRuleTask(
     override fun type(): String = "Check rule"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(EventUtils.createMessageBean("Check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
+        rootEvent.bodyData(EventUtils.createMessageBean("Check rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)"} }"))
     }
 }

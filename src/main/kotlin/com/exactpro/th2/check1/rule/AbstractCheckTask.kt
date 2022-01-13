@@ -525,7 +525,7 @@ abstract class AbstractCheckTask(
             if (significant) {
                 messageContainer.protoMessage.metadata.apply {
                     lastSequence = id.sequence
-                    lastMessageTimestamp = timestamp
+                    lastMessageTimestamp = id.timestamp
                 }
             }
             AggregatedFilterResult(comparisonResult, metadataComparisonResult)
@@ -667,22 +667,16 @@ abstract class AbstractCheckTask(
             }
 
     private fun Checkpoint.getCheckpointData(sessionKey: SessionKey): CheckpointData {
-        val checkpointData = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
-            ?.directionToCheckpointDataMap?.get(sessionKey.direction.number)
+        val checkpointData = 
+            bookNameToSessionAliasToDirectionCheckpointMap[sessionKey.bookName]?.
+            sessionAliasToDirectionCheckpointMap?.get(sessionKey.sessionAlias)?.
+            directionToCheckpointDataMap?.get(sessionKey.direction.number)
 
         if (checkpointData == null) {
             if (LOGGER.isWarnEnabled) {
                 LOGGER.warn("Checkpoint '{}' doesn't contain checkpoint data for session '{}'", this.toJson(), sessionKey)
             }
-            val sequence = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
-                ?.directionToSequenceMap?.get(sessionKey.direction.number)
-            if (sequence == null) {
-                if (LOGGER.isWarnEnabled) {
-                    LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", this.toJson(), sessionKey)
-                }
-                return CheckpointData(DEFAULT_SEQUENCE)
-            }
-            return CheckpointData(sequence)
+            return CheckpointData(DEFAULT_SEQUENCE)
         }
 
         return checkpointData.convert().apply {
@@ -699,7 +693,7 @@ abstract class AbstractCheckTask(
      */
     private fun Observable<Message>.takeWhileMessagesInTimeout() : Observable<Message> =
         takeWhile {
-            checkOnMessageTimeout(it.metadata.timestamp).also { continueObservation ->
+            checkOnMessageTimeout(it.metadata.id.timestamp).also { continueObservation ->
                 hasMessagesInTimeoutInterval = hasMessagesInTimeoutInterval or continueObservation
                 if (!continueObservation) {
                     streamCompletedState = State.MESSAGE_TIMEOUT
