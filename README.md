@@ -203,6 +203,12 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
   + Migrated `common` version from `3.31.3` to `4.0.0`
   + Migrated `grpc-check1` version from `3.5.1` to `4.0.0`
 
+### 3.9.1
+
+#### Changed:
++ Migrated `sailfish-utils` version from `3.12.2` to `3.12.3`
+  + Improved condition output format for `EQ_PRECISION`, `WILDCARD`, `LIKE`, `IN`, `MORE`, `LESS` operations and their negative versions
+
 ### 3.9.0
 
 #### Added:
