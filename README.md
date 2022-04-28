@@ -206,11 +206,11 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Support for disabling of order verification for simple collection
 + Switch for events publication in checkpoint request. Parameter `enable-checkpoint-events-publication` should be used for that.
 
-### 3.9.1
-
 #### Changed:
 + Migrated `sailfish-utils` version from `3.12.2` to `3.12.3`
   + Improved condition output format for `EQ_PRECISION`, `WILDCARD`, `LIKE`, `IN`, `MORE`, `LESS` operations and their negative versions
++ Changed the way the check1 works with threads internally.
+  Now it uses a common executor for running check rules instead of creating an executor per each rule
 
 ### 3.9.0
 
