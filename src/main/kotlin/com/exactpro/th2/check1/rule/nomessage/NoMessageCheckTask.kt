@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -43,30 +43,29 @@ class NoMessageCheckTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
-    private val messagePreFilter = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
-        protoPreMessageFilter.toCompareSettings()
+    private var protoPreMessageFilter: RootMessageFilter? = protoPreFilter.toRootMessageFilter()
+    private var messagePreFilter: SailfishFilter? = SailfishFilter(
+        CONVERTER.fromProtoPreFilter(protoPreMessageFilter!!),
+        protoPreMessageFilter!!.toCompareSettings()
     )
 
-    private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
+    private var metadataPreFilter: SailfishFilter? = protoPreMessageFilter!!.metadataFilterOrNull()?.let {
         SailfishFilter(
             CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
     }
 
-    private lateinit var preFilterEvent: Event
-    private lateinit var resultEvent: Event
+    private var preFilterEvent: Event? = null
+    private var resultEvent: Event? = null
 
     private var extraMessagesCounter: Int = 0
-
 
     override fun onStart() {
         super.onStart()
         preFilterEvent = Event.start()
             .type("preFiltering")
-            .bodyData(protoPreMessageFilter.toTreeTable())
+            .bodyData(protoPreMessageFilter!!.toTreeTable())
         rootEvent.addSubEvent(preFilterEvent)
         resultEvent = Event.start()
             .type("noMessagesCheckResult")
@@ -74,10 +73,10 @@ class NoMessageCheckTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, protoPreMessageFilter, messagePreFilter, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(this, protoPreMessageFilter!!, messagePreFilter!!, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
-                preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(protoActual.metadata.id)
+                preFilterEvent!!.appendEventsWithVerification(preFilterContainer)
+                preFilterEvent!!.messageID(protoActual.metadata.id)
             }
         }
 
@@ -92,12 +91,13 @@ class NoMessageCheckTask(
     override fun onNext(messageContainer: MessageContainer) {
         messageContainer.protoMessage.metadata.apply {
             extraMessagesCounter++
-            resultEvent.messageID(id)
+            resultEvent!!.messageID(id)
         }
     }
 
     override fun completeEvent(taskState: State) {
-        preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
+        val resultEvent = resultEvent!!
+        preFilterEvent!!.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
             resultEvent.status(Event.Status.PASSED).name("Check passed")
@@ -115,5 +115,13 @@ class NoMessageCheckTask(
             }
             resultEvent.addSubEvent(executionStopEvent)
         }
+    }
+
+    override fun disposeResources() {
+        protoPreMessageFilter = null
+        messagePreFilter = null
+        metadataPreFilter = null
+        resultEvent = null
+        preFilterEvent = null
     }
 }

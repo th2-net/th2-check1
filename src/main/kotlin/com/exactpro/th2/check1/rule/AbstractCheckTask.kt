@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -347,6 +347,7 @@ abstract class AbstractCheckTask(
                 .build())
         } finally {
             RuleMetric.decrementActiveRule(type())
+            disposeResources()
             sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }
     }
@@ -382,6 +383,8 @@ abstract class AbstractCheckTask(
         super.onComplete()
         end(streamCompletedState, "Message stream is completed")
     }
+
+    abstract fun disposeResources()
 
     /**
      * Prepare the root event or children events for publication.
@@ -713,7 +716,6 @@ abstract class AbstractCheckTask(
         } else {
             null
         }
-
 
     private data class Legacy(val executorService: ExecutorService, val sequenceData: SequenceData)
     private data class SequenceData(val lastSequence: Long, val lastMessageTimestamp: Timestamp?, val untrusted: Boolean)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
@@ -44,7 +45,8 @@ import com.exactpro.th2.common.schema.message.MessageRouter
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import java.time.Instant
-import java.util.LinkedHashMap
+import java.util.Collections
+import kotlin.collections.HashSet
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
@@ -57,24 +59,25 @@ import kotlin.collections.set
  * If **checkOrder** parameter is set to `true` the messages must be received in the exact same order as filters were specified.
  * If this parameter is set to `false`, the order won't be checked.
  */
+
 class SequenceCheckRuleTask(
     ruleConfiguration: RuleConfiguration,
     startTime: Instant,
     sessionKey: SessionKey,
     protoPreFilter: PreFilter,
-    private val protoMessageFilters: List<RootMessageFilter>,
+    private var protoMessageFilters: List<RootMessageFilter>,
     private val checkOrder: Boolean,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
-    private val messagePreFilter = SailfishFilter(
+    private var protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
+    private var messagePreFilter: SailfishFilter? = SailfishFilter(
         CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
         protoPreMessageFilter.toCompareSettings()
     )
-    private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
+    private var metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
             SailfishFilter(
                 CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
                 it.toComparisonSettings()
@@ -122,7 +125,7 @@ class SequenceCheckRuleTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, protoPreMessageFilter, messagePreFilter, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(this, protoPreMessageFilter, messagePreFilter!!, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 preFilterEvent.appendEventsWithVerification(preFilterContainer)
                 preFilterEvent.messageID(protoActual.metadata.id)
@@ -180,6 +183,17 @@ class SequenceCheckRuleTask(
 
     override fun setup(rootEvent: Event) {
         rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
+    }
+
+    override fun disposeResources() {
+        protoMessageFilters = Collections.emptyList()
+        protoPreMessageFilter = RootMessageFilter.getDefaultInstance()
+        messagePreFilter = null
+        metadataPreFilter = null
+        preFilteringResults = Collections.emptyMap()
+        messageFilters = Collections.emptyList()
+        messageFilteringResults = Collections.emptyMap()
+        matchedByKeys = Collections.emptySet()
     }
 
     /**
