@@ -43,19 +43,26 @@ class SilenceCheckTask(
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
-    private var protoPreMessageFilter: RootMessageFilter? = protoPreFilter.toRootMessageFilter()
-    private var messagePreFilter: SailfishFilter? = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoPreMessageFilter!!),
-        protoPreMessageFilter!!.toCompareSettings()
-    )
-    private var metadataPreFilter: SailfishFilter? = protoPreMessageFilter!!.metadataFilterOrNull()?.let {
-        SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
-            it.toComparisonSettings()
+
+    private inner class Refs(protoPreFilter: PreFilter) {
+        val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
+        val messagePreFilter = SailfishFilter(
+            CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+            protoPreMessageFilter.toCompareSettings()
         )
+        val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
+            SailfishFilter(
+                CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                it.toComparisonSettings()
+            )
+        }
+
+        lateinit var preFilterEvent: Event
+        lateinit var resultEvent: Event
     }
-    private var preFilterEvent: Event? = null
-    private var resultEvent: Event? = null
+    private var _refs: Refs? = Refs(protoPreFilter)
+    private val refs get() = _refs ?: throw IllegalStateException("Referenced already removed")
+
     private var extraMessagesCounter: Int = 0
 
     @Volatile
@@ -75,15 +82,15 @@ class SilenceCheckTask(
             cancel()
             return
         }
-        preFilterEvent = Event.start()
+        refs.preFilterEvent = Event.start()
             .type("preFiltering")
-            .bodyData(protoPreMessageFilter!!.toReadableBodyCollection())
+            .bodyData(refs.protoPreMessageFilter.toReadableBodyCollection())
 
-        rootEvent.addSubEvent(preFilterEvent)
+        rootEvent.addSubEvent(refs.preFilterEvent)
 
-        resultEvent = Event.start()
+        refs.resultEvent = Event.start()
             .type("noMessagesCheckResult")
-        rootEvent.addSubEvent(resultEvent)
+        rootEvent.addSubEvent(refs.resultEvent)
     }
 
     override fun onChainedTaskSubscription() {
@@ -105,17 +112,17 @@ class SilenceCheckTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, protoPreMessageFilter!!, messagePreFilter!!, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(this, refs.protoPreMessageFilter, refs.messagePreFilter, refs.metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
-                preFilterEvent!!.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent!!.messageID(protoActual.metadata.id)
+                refs.preFilterEvent.appendEventsWithVerification(preFilterContainer)
+                refs.preFilterEvent.messageID(protoActual.metadata.id)
             }
         }
 
     override fun onNext(container: MessageContainer) {
         container.protoMessage.metadata.apply {
             extraMessagesCounter++
-            resultEvent!!.messageID(id)
+            refs.resultEvent.messageID(id)
         }
     }
 
@@ -123,12 +130,12 @@ class SilenceCheckTask(
         if (skipPublication) {
             return
         }
-        preFilterEvent!!.name("Prefilter: $extraMessagesCounter messages were filtered.")
+        refs.preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
-            resultEvent!!.status(Event.Status.PASSED).name("Check passed")
+            refs.resultEvent.status(Event.Status.PASSED).name("Check passed")
         } else {
-            resultEvent!!.status(Event.Status.FAILED)
+            refs.resultEvent.status(Event.Status.FAILED)
                 .name("Check failed: $extraMessagesCounter extra messages were found.")
         }
     }
@@ -145,10 +152,6 @@ class SilenceCheckTask(
     }
 
     override fun disposeResources() {
-        protoPreMessageFilter = null
-        messagePreFilter = null
-        metadataPreFilter = null
-        preFilterEvent = null
-        resultEvent = null
+        _refs = null
     }
 }

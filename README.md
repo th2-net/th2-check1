@@ -192,11 +192,6 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ## Release Notes
 
-### 3.9.2
-
-#### Added:
-+ Removing unnecessary references from rules objects that complete the work.
-
 ### 3.9.1
 
 #### Changed:
