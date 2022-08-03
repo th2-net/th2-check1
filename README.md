@@ -1,4 +1,4 @@
-# th2 check1 (3.9.1)
+# th2 check1 (3.9.2)
 
 ## Overview
 
@@ -191,6 +191,11 @@ The `th2_check1_actual_cache_number` metric separate messages with two labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 3.9.2
+
+#### Added:
++ Removing unnecessary references from rules objects that complete the work.
 
 ### 3.9.1
 
