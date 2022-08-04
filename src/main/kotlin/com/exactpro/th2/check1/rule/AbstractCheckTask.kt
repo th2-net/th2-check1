@@ -182,7 +182,7 @@ abstract class AbstractCheckTask(
             }
             LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
         } else {
-            throw IllegalStateException("Subscription to last sequence for task $description (${hashCode()}) is already executed, subscriber ${checkTask.description} (${checkTask.hashCode()})")
+            error("Subscription to last sequence for task $description (${hashCode()}) is already executed, subscriber ${checkTask.description} (${checkTask.hashCode()})")
         }
     }
 
@@ -272,7 +272,7 @@ abstract class AbstractCheckTask(
         configureRootEvent()
         isParentCompleted = previousExecutionData.completed
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
-            throw IllegalStateException("Task $description already has been started")
+            error("Task $description already has been started")
         }
         LOGGER.info("Check begin for session alias '{}' with sequence '{}' and task timeout '{}'", sessionKey, sequence, taskTimeout)
         RuleMetric.incrementActiveRule(type())
