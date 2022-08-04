@@ -81,6 +81,16 @@ abstract class AbstractCheckTask(
     private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
 
+    protected class RefsKeeper<T>(refs: T) {
+        private var refsNullable: T? = refs
+        val refs: T get() = refsNullable ?: error("Requesting references after references has been erased.")
+        fun eraseRefs() {
+            refsNullable = null
+        }
+    }
+
+    protected abstract val refsKeeper: RefsKeeper<out Any>
+
     val description: String? = ruleConfiguration.description
     private val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
 
@@ -347,7 +357,7 @@ abstract class AbstractCheckTask(
                 .build())
         } finally {
             RuleMetric.decrementActiveRule(type())
-            disposeResources()
+            refsKeeper.eraseRefs()
             sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }
     }
@@ -383,8 +393,6 @@ abstract class AbstractCheckTask(
         super.onComplete()
         end(streamCompletedState, "Message stream is completed")
     }
-
-    abstract fun disposeResources()
 
     /**
      * Prepare the root event or children events for publication.

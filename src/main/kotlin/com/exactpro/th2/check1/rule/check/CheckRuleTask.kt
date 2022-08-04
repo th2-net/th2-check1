@@ -46,25 +46,29 @@ class CheckRuleTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private class Refs(
+    protected class Refs(
         val protoMessageFilter: RootMessageFilter,
         val messageFilter: SailfishFilter,
         val metadataFilter: SailfishFilter?
     )
-    private var _refs: Refs? = Refs(
-        protoMessageFilter = protoMessageFilter,
-        messageFilter = SailfishFilter(
-            CONVERTER.fromProtoPreFilter(protoMessageFilter),
-            protoMessageFilter.toCompareSettings()
-        ),
-        metadataFilter = protoMessageFilter.metadataFilterOrNull()?.let {
-            SailfishFilter(
-                CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
-                it.toComparisonSettings()
-            )
-        }
+
+    override val refsKeeper = RefsKeeper(
+        Refs(
+            protoMessageFilter = protoMessageFilter,
+            messageFilter = SailfishFilter(
+                CONVERTER.fromProtoPreFilter(protoMessageFilter),
+                protoMessageFilter.toCompareSettings()
+            ),
+            metadataFilter = protoMessageFilter.metadataFilterOrNull()?.let {
+                SailfishFilter(
+                    CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
+                    it.toComparisonSettings()
+                )
+            }
+        )
     )
-    private val refs get() = _refs ?: error("Requesting references after references has been removed")
+
+    private val refs get() = refsKeeper.refs
 
     override fun onStart() {
         super.onStart()
@@ -94,10 +98,6 @@ class CheckRuleTask(
             .name("No message found by target keys")
             .type("Check failed")
             .status(FAILED)
-    }
-
-    override fun disposeResources() {
-        _refs = null
     }
 
     override fun name(): String = "Check rule"

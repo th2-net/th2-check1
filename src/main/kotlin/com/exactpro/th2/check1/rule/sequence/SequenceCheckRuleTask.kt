@@ -71,7 +71,7 @@ class SequenceCheckRuleTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private class Refs(
+    protected class Refs(
         val protoMessageFilters: List<RootMessageFilter>,
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
@@ -86,10 +86,8 @@ class SequenceCheckRuleTask(
         lateinit var messageFilteringResults: MutableMap<MessageID, ComparisonContainer>
         lateinit var matchedByKeys: MutableSet<MessageFilterContainer>
     }
-    private var _refs: Refs?
-    init {
-        val protoPreMessageFilter = protoPreFilter.toRootMessageFilter()
-        _refs = Refs(
+    override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
+        Refs(
             protoMessageFilters = protoMessageFilters,
             protoPreMessageFilter = protoPreMessageFilter,
             messagePreFilter = SailfishFilter(
@@ -103,9 +101,9 @@ class SequenceCheckRuleTask(
                 )
             }
         )
-    }
+    })
 
-    private val refs get() = _refs ?: error("Requesting references after references has been removed")
+    private val refs get() = refsKeeper.refs
 
     private lateinit var preFilterEvent: Event
 
@@ -197,10 +195,6 @@ class SequenceCheckRuleTask(
 
     override fun setup(rootEvent: Event) {
         rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
-    }
-
-    override fun disposeResources() {
-        _refs = null
     }
 
     /**

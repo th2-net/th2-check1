@@ -43,9 +43,7 @@ class NoMessageCheckTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private var extraMessagesCounter: Int = 0
-
-    private class Refs(
+    protected class Refs(
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?,
@@ -53,10 +51,9 @@ class NoMessageCheckTask(
         lateinit var preFilterEvent: Event
         lateinit var resultEvent: Event
     }
-    private var _refs: Refs?
-    init {
-        val protoPreMessageFilter = protoPreFilter.toRootMessageFilter()
-        _refs = Refs(
+
+    override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
+        Refs(
             protoPreMessageFilter = protoPreFilter.toRootMessageFilter(),
             messagePreFilter = SailfishFilter(
                 CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
@@ -69,9 +66,11 @@ class NoMessageCheckTask(
                 )
             }
         )
-    }
+    })
 
-    private val refs get() = _refs ?: error("Requesting references after references has been removed")
+    private val refs get() = refsKeeper.refs
+
+    private var extraMessagesCounter: Int = 0
 
     override fun onStart() {
         super.onStart()
@@ -126,9 +125,5 @@ class NoMessageCheckTask(
             }
             refs.resultEvent.addSubEvent(executionStopEvent)
         }
-    }
-
-    override fun disposeResources() {
-        _refs = null
     }
 }

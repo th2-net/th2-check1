@@ -44,7 +44,7 @@ class SilenceCheckTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private class Refs(
+    protected class Refs(
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?
@@ -52,11 +52,9 @@ class SilenceCheckTask(
         lateinit var preFilterEvent: Event
         lateinit var resultEvent: Event
     }
-    private var _refs: Refs?
 
-    init {
-        val protoPreMessageFilter = protoPreFilter.toRootMessageFilter()
-        _refs = Refs(
+    override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
+        Refs(
             protoPreMessageFilter = protoPreMessageFilter,
             messagePreFilter = SailfishFilter(
                 CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
@@ -69,9 +67,9 @@ class SilenceCheckTask(
                 )
             }
         )
-    }
+    })
 
-    private val refs get() = _refs ?: error("Requesting references after references has been removed")
+    private val refs get() = refsKeeper.refs
 
     private var extraMessagesCounter: Int = 0
 
@@ -159,9 +157,5 @@ class SilenceCheckTask(
         } else {
             LOGGER.debug("Task {} '{}' already canceled", type(), description)
         }
-    }
-
-    override fun disposeResources() {
-        _refs = null
     }
 }
