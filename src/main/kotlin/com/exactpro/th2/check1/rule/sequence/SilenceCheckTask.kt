@@ -71,7 +71,7 @@ class SilenceCheckTask(
         )
     }
 
-    private val refs get() = _refs ?: throw IllegalStateException("Requesting references after references has been removed")
+    private val refs get() = _refs ?: error("Requesting references after references has been removed")
 
     private var extraMessagesCounter: Int = 0
 
