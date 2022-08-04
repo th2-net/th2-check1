@@ -44,24 +44,34 @@ class SilenceCheckTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private inner class Refs(protoPreFilter: PreFilter) {
-        val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
-        val messagePreFilter = SailfishFilter(
-            CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
-            protoPreMessageFilter.toCompareSettings()
-        )
-        val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
-            SailfishFilter(
-                CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
-                it.toComparisonSettings()
-            )
-        }
-
+    private class Refs(
+        val protoPreMessageFilter: RootMessageFilter,
+        val messagePreFilter: SailfishFilter,
+        val metadataPreFilter: SailfishFilter?
+    ) {
         lateinit var preFilterEvent: Event
         lateinit var resultEvent: Event
     }
-    private var _refs: Refs? = Refs(protoPreFilter)
-    private val refs get() = _refs ?: throw IllegalStateException("Referenced already removed")
+    private var _refs: Refs?
+
+    init {
+        val protoPreMessageFilter = protoPreFilter.toRootMessageFilter()
+        _refs = Refs(
+            protoPreMessageFilter = protoPreMessageFilter,
+            messagePreFilter = SailfishFilter(
+                CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+                protoPreMessageFilter.toCompareSettings()
+            ),
+            metadataPreFilter = protoPreMessageFilter.metadataFilterOrNull()?.let {
+                SailfishFilter(
+                    CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                    it.toComparisonSettings()
+                )
+            }
+        )
+    }
+
+    private val refs get() = _refs ?: throw IllegalStateException("Requesting references after references has been removed")
 
     private var extraMessagesCounter: Int = 0
 

@@ -43,40 +43,52 @@ class NoMessageCheckTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private var protoPreMessageFilter: RootMessageFilter? = protoPreFilter.toRootMessageFilter()
-    private var messagePreFilter: SailfishFilter? = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoPreMessageFilter!!),
-        protoPreMessageFilter!!.toCompareSettings()
-    )
+    private var extraMessagesCounter: Int = 0
 
-    private var metadataPreFilter: SailfishFilter? = protoPreMessageFilter!!.metadataFilterOrNull()?.let {
-        SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
-            it.toComparisonSettings()
+    private class Refs(
+        val protoPreMessageFilter: RootMessageFilter,
+        val messagePreFilter: SailfishFilter,
+        val metadataPreFilter: SailfishFilter?,
+    ) {
+        lateinit var preFilterEvent: Event
+        lateinit var resultEvent: Event
+    }
+    private var _refs: Refs?
+    init {
+        val protoPreMessageFilter = protoPreFilter.toRootMessageFilter()
+        _refs = Refs(
+            protoPreMessageFilter = protoPreFilter.toRootMessageFilter(),
+            messagePreFilter = SailfishFilter(
+                CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+                protoPreMessageFilter.toCompareSettings()
+            ),
+            metadataPreFilter = protoPreMessageFilter.metadataFilterOrNull()?.let {
+                SailfishFilter(
+                    CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                    it.toComparisonSettings()
+                )
+            }
         )
     }
 
-    private var preFilterEvent: Event? = null
-    private var resultEvent: Event? = null
-
-    private var extraMessagesCounter: Int = 0
+    private val refs get() = _refs ?: throw IllegalStateException("Requesting references after references has been removed")
 
     override fun onStart() {
         super.onStart()
-        preFilterEvent = Event.start()
+        refs.preFilterEvent = Event.start()
             .type("preFiltering")
-            .bodyData(protoPreMessageFilter!!.toTreeTable())
-        rootEvent.addSubEvent(preFilterEvent)
-        resultEvent = Event.start()
+            .bodyData(refs.protoPreMessageFilter.toTreeTable())
+        rootEvent.addSubEvent(refs.preFilterEvent)
+        refs.resultEvent = Event.start()
             .type("noMessagesCheckResult")
-        rootEvent.addSubEvent(resultEvent)
+        rootEvent.addSubEvent(refs.resultEvent)
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, protoPreMessageFilter!!, messagePreFilter!!, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(this, refs.protoPreMessageFilter, refs.messagePreFilter, refs.metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
-                preFilterEvent!!.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent!!.messageID(protoActual.metadata.id)
+                refs.preFilterEvent.appendEventsWithVerification(preFilterContainer)
+                refs.preFilterEvent.messageID(protoActual.metadata.id)
             }
         }
 
@@ -91,18 +103,17 @@ class NoMessageCheckTask(
     override fun onNext(messageContainer: MessageContainer) {
         messageContainer.protoMessage.metadata.apply {
             extraMessagesCounter++
-            resultEvent!!.messageID(id)
+            refs.resultEvent.messageID(id)
         }
     }
 
     override fun completeEvent(taskState: State) {
-        val resultEvent = resultEvent!!
-        preFilterEvent!!.name("Prefilter: $extraMessagesCounter messages were filtered.")
+        refs.preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
-            resultEvent.status(Event.Status.PASSED).name("Check passed")
+            refs.resultEvent.status(Event.Status.PASSED).name("Check passed")
         } else {
-            resultEvent.status(Event.Status.FAILED)
+            refs.resultEvent.status(Event.Status.FAILED)
                 .name("Check failed: $extraMessagesCounter extra messages were found.")
         }
 
@@ -113,15 +124,11 @@ class NoMessageCheckTask(
             if (taskState != State.TIMEOUT || !isCheckpointLastReceivedMessage()) {
                 executionStopEvent.status(Event.Status.FAILED)
             }
-            resultEvent.addSubEvent(executionStopEvent)
+            refs.resultEvent.addSubEvent(executionStopEvent)
         }
     }
 
     override fun disposeResources() {
-        protoPreMessageFilter = null
-        messagePreFilter = null
-        metadataPreFilter = null
-        resultEvent = null
-        preFilterEvent = null
+        _refs = null
     }
 }

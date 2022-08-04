@@ -46,19 +46,25 @@ class CheckRuleTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private var protoMessageFilter: RootMessageFilter? = protoMessageFilter
-
-    private var messageFilter: SailfishFilter? = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoMessageFilter),
-        protoMessageFilter.toCompareSettings()
+    private class Refs(
+        val protoMessageFilter: RootMessageFilter,
+        val messageFilter: SailfishFilter,
+        val metadataFilter: SailfishFilter?
     )
-
-    private var metadataFilter: SailfishFilter? = protoMessageFilter.metadataFilterOrNull()?.let {
-        SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
-            it.toComparisonSettings()
-        )
-    }
+    private var _refs: Refs? = Refs(
+        protoMessageFilter = protoMessageFilter,
+        messageFilter = SailfishFilter(
+            CONVERTER.fromProtoPreFilter(protoMessageFilter),
+            protoMessageFilter.toCompareSettings()
+        ),
+        metadataFilter = protoMessageFilter.metadataFilterOrNull()?.let {
+            SailfishFilter(
+                CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
+                it.toComparisonSettings()
+            )
+        }
+    )
+    private val refs get() = _refs ?: throw IllegalStateException("Requesting references after references has been removed")
 
     override fun onStart() {
         super.onStart()
@@ -67,15 +73,15 @@ class CheckRuleTask(
             .endTimestamp()
             .name("Message filter")
             .type("Filter")
-            .bodyData(protoMessageFilter!!.toReadableBodyCollection())
+            .bodyData(refs.protoMessageFilter.toReadableBodyCollection())
 
         rootEvent.addSubEvent(subEvent)
     }
 
     override fun onNext(messageContainer: MessageContainer) {
-        val aggregatedResult = matchFilter(messageContainer, messageFilter!!, metadataFilter)
+        val aggregatedResult = matchFilter(messageContainer, refs.messageFilter, refs.metadataFilter)
 
-        val container = ComparisonContainer(messageContainer, protoMessageFilter!!, aggregatedResult)
+        val container = ComparisonContainer(messageContainer, refs.protoMessageFilter, aggregatedResult)
 
         if (container.matchesByKeys) {
             rootEvent.appendEventsWithVerification(container)
@@ -91,9 +97,7 @@ class CheckRuleTask(
     }
 
     override fun disposeResources() {
-        protoMessageFilter = null
-        messageFilter = null
-        metadataFilter = null
+        _refs = null
     }
 
     override fun name(): String = "Check rule"
