@@ -447,9 +447,18 @@ abstract class AbstractCheckTask(
 
     private fun completeEventOrReportError(prevState: State): Boolean {
         return try {
-            completeEvent(prevState)
-            doAfterCompleteEvent()
-            false
+            if (started) {
+                completeEvent(prevState)
+                doAfterCompleteEvent()
+                false
+            } else {
+                LOGGER.error("Check task was not started.")
+                rootEvent.addSubEventWithSamePeriod()
+                    .name("Check failed: check task was not started.")
+                    .type("taskNotStarted")
+                    .status(FAILED)
+                true
+            }
         } catch (e: Exception) {
             LOGGER.error("Result event cannot be completed", e)
             rootEvent.addSubEventWithSamePeriod()

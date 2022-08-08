@@ -176,15 +176,6 @@ class SequenceCheckRuleTask(
 
     override fun completeEvent(taskState: State) {
         refs.preFilterEvent.name("Pre-filtering (filtered ${refs.preFilteringResults.size} / processed $handledMessageCounter) messages")
-
-        if (!started) {
-            rootEvent.addSubEventWithSamePeriod()
-                .name("Check sequence (expected ${refs.protoMessageFilters.size} / actual ${refs.preFilteringResults.size} , check order $checkOrder)")
-                .status(FAILED)
-                .type("checkSequence")
-            return
-        }
-
         fillSequenceEvent()
         fillCheckMessagesEvent()
     }

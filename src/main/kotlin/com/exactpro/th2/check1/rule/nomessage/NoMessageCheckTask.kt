@@ -110,11 +110,6 @@ class NoMessageCheckTask(
     override fun completeEvent(taskState: State) {
         refs.preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
-        if (!started) {
-            refs.resultEvent.status(Event.Status.FAILED).name("Check failed: check task was not started.")
-            return
-        }
-
         if (extraMessagesCounter == 0) {
             refs.resultEvent.status(Event.Status.PASSED).name("Check passed")
         } else {
