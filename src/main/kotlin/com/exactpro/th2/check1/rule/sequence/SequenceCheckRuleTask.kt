@@ -83,15 +83,15 @@ class SequenceCheckRuleTask(
                 .bodyData(protoPreMessageFilter.toReadableBodyCollection())
         }
 
-        val preFilteringResults: MutableMap<MessageID, ComparisonContainer> by lazy { LinkedHashMap() }
+        val preFilteringResults: MutableMap<MessageID, ComparisonContainer> = LinkedHashMap()
 
         /**
          * List of filters which haven't matched yet. It is created from the requested filters and reduced after every match
          */
         lateinit var messageFilters: MutableList<MessageFilterContainer>
 
-        val messageFilteringResults: MutableMap<MessageID, ComparisonContainer> by lazy { LinkedHashMap() }
-        val matchedByKeys: MutableSet<MessageFilterContainer> by lazy { HashSet(protoMessageFilters.size) }
+        val messageFilteringResults: MutableMap<MessageID, ComparisonContainer> = LinkedHashMap()
+        val matchedByKeys: MutableSet<MessageFilterContainer> = HashSet(protoMessageFilters.size)
     }
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
         Refs(
