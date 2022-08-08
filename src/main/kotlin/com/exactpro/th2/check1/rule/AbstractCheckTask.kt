@@ -140,12 +140,20 @@ abstract class AbstractCheckTask(
     private var bufferContainsStartMessage: Boolean = false
     private var isDefaultSequence: Boolean = false
 
-    override fun onStart() {
+    @Volatile
+    protected var started = false
+
+    final override fun onStart() {
         super.onStart()
+        started = true
 
         //Init or re-init variable in TASK_SCHEDULER thread
         handledMessageCounter = 0
+
+        onStartInit()
     }
+
+    protected abstract fun onStartInit()
 
     override fun onError(e: Throwable) {
         super.onError(e)

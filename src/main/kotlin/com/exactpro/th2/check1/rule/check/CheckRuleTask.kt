@@ -70,9 +70,7 @@ class CheckRuleTask(
 
     private val refs get() = refsKeeper.refs
 
-    override fun onStart() {
-        super.onStart()
-
+    override fun onStartInit() {
         val subEvent = Event.start()
             .endTimestamp()
             .name("Message filter")

@@ -48,8 +48,15 @@ class NoMessageCheckTask(
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?,
     ) {
-        lateinit var preFilterEvent: Event
-        lateinit var resultEvent: Event
+        val preFilterEvent: Event by lazy {
+            Event.start()
+                .type("preFiltering")
+                .bodyData(protoPreMessageFilter.toTreeTable())
+        }
+        val resultEvent: Event by lazy {
+            Event.start()
+                .type("noMessagesCheckResult")
+        }
     }
 
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
@@ -72,14 +79,8 @@ class NoMessageCheckTask(
 
     private var extraMessagesCounter: Int = 0
 
-    override fun onStart() {
-        super.onStart()
-        refs.preFilterEvent = Event.start()
-            .type("preFiltering")
-            .bodyData(refs.protoPreMessageFilter.toTreeTable())
+    override fun onStartInit() {
         rootEvent.addSubEvent(refs.preFilterEvent)
-        refs.resultEvent = Event.start()
-            .type("noMessagesCheckResult")
         rootEvent.addSubEvent(refs.resultEvent)
     }
 
@@ -108,6 +109,11 @@ class NoMessageCheckTask(
 
     override fun completeEvent(taskState: State) {
         refs.preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
+
+        if (!started) {
+            refs.resultEvent.status(Event.Status.FAILED).name("Check failed: check task was not started.")
+            return
+        }
 
         if (extraMessagesCounter == 0) {
             refs.resultEvent.status(Event.Status.PASSED).name("Check passed")

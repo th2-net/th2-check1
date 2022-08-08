@@ -77,14 +77,21 @@ class SequenceCheckRuleTask(
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?,
     ) {
-        lateinit var preFilteringResults: MutableMap<MessageID, ComparisonContainer>
+        val preFilterEvent: Event by lazy {
+            Event.start()
+                .type("preFiltering")
+                .bodyData(protoPreMessageFilter.toReadableBodyCollection())
+        }
+
+        val preFilteringResults: MutableMap<MessageID, ComparisonContainer> by lazy { LinkedHashMap() }
 
         /**
          * List of filters which haven't matched yet. It is created from the requested filters and reduced after every match
          */
         lateinit var messageFilters: MutableList<MessageFilterContainer>
-        lateinit var messageFilteringResults: MutableMap<MessageID, ComparisonContainer>
-        lateinit var matchedByKeys: MutableSet<MessageFilterContainer>
+
+        val messageFilteringResults: MutableMap<MessageID, ComparisonContainer> by lazy { LinkedHashMap() }
+        val matchedByKeys: MutableSet<MessageFilterContainer> by lazy { HashSet(protoMessageFilters.size) }
     }
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
         Refs(
@@ -105,17 +112,9 @@ class SequenceCheckRuleTask(
 
     private val refs get() = refsKeeper.refs
 
-    private lateinit var preFilterEvent: Event
-
     private var reordered: Boolean = false
 
-    override fun onStart() {
-        super.onStart()
-
-        //Init or re-init variable in TASK_SCHEDULER thread
-        refs.preFilteringResults = LinkedHashMap()
-
-        refs.messageFilteringResults = LinkedHashMap()
+    override fun onStartInit() {
         refs.messageFilters = refs.protoMessageFilters.map {
             MessageFilterContainer(
                 it,
@@ -127,21 +126,14 @@ class SequenceCheckRuleTask(
             )
         }.toMutableList()
 
-        refs.matchedByKeys = HashSet(refs.messageFilters.size)
-
-        preFilterEvent = Event.start()
-            .type("preFiltering")
-            .bodyData(refs.protoPreMessageFilter.toReadableBodyCollection())
-
-        rootEvent.addSubEvent(preFilterEvent)
+        rootEvent.addSubEvent(refs.preFilterEvent)
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
         preFilterBy(this, refs.protoPreMessageFilter, refs.messagePreFilter, refs.metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
-                preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(protoActual.metadata.id)
-
+                refs.preFilterEvent.appendEventsWithVerification(preFilterContainer)
+                refs.preFilterEvent.messageID(protoActual.metadata.id)
                 refs.preFilteringResults[protoActual.metadata.id] = preFilterContainer
             }
         }
@@ -183,7 +175,15 @@ class SequenceCheckRuleTask(
     }
 
     override fun completeEvent(taskState: State) {
-        preFilterEvent.name("Pre-filtering (filtered ${refs.preFilteringResults.size} / processed $handledMessageCounter) messages")
+        refs.preFilterEvent.name("Pre-filtering (filtered ${refs.preFilteringResults.size} / processed $handledMessageCounter) messages")
+
+        if (!started) {
+            rootEvent.addSubEventWithSamePeriod()
+                .name("Check sequence (expected ${refs.protoMessageFilters.size} / actual ${refs.preFilteringResults.size} , check order $checkOrder)")
+                .status(FAILED)
+                .type("checkSequence")
+            return
+        }
 
         fillSequenceEvent()
         fillCheckMessagesEvent()

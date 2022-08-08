@@ -49,8 +49,15 @@ class SilenceCheckTask(
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?
     ) {
-        lateinit var preFilterEvent: Event
-        lateinit var resultEvent: Event
+        val preFilterEvent: Event by lazy {
+            Event.start()
+                .type("preFiltering")
+                .bodyData(protoPreMessageFilter.toReadableBodyCollection())
+        }
+        val resultEvent: Event by lazy {
+            Event.start()
+                .type("noMessagesCheckResult")
+        }
     }
 
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
@@ -73,13 +80,9 @@ class SilenceCheckTask(
 
     private var extraMessagesCounter: Int = 0
 
-    @Volatile
-    private var started = false
     private val isCanceled = AtomicBoolean()
 
-    override fun onStart() {
-        super.onStart()
-        started = true
+    override fun onStartInit() {
         val hasNextTask = hasNextTask()
         if (isParentCompleted == false || hasNextTask) {
             if (hasNextTask) {
@@ -90,14 +93,8 @@ class SilenceCheckTask(
             cancel()
             return
         }
-        refs.preFilterEvent = Event.start()
-            .type("preFiltering")
-            .bodyData(refs.protoPreMessageFilter.toReadableBodyCollection())
 
         rootEvent.addSubEvent(refs.preFilterEvent)
-
-        refs.resultEvent = Event.start()
-            .type("noMessagesCheckResult")
         rootEvent.addSubEvent(refs.resultEvent)
     }
 
@@ -138,7 +135,13 @@ class SilenceCheckTask(
         if (skipPublication) {
             return
         }
+
         refs.preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
+
+        if (!started) {
+            refs.resultEvent.status(Event.Status.FAILED).name("Check failed: check task was not started.")
+            return
+        }
 
         if (extraMessagesCounter == 0) {
             refs.resultEvent.status(Event.Status.PASSED).name("Check passed")
