@@ -44,10 +44,11 @@ class NoMessageCheckTask(
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
+        rootEvent: Event,
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?,
-    ) {
+    ) : AbstractCheckTask.Refs(rootEvent) {
         val preFilterEvent: Event by lazy {
             Event.start()
                 .type("preFiltering")
@@ -61,6 +62,7 @@ class NoMessageCheckTask(
 
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
         Refs(
+            rootEvent = createRootEvent(),
             protoPreMessageFilter = protoPreFilter.toRootMessageFilter(),
             messagePreFilter = SailfishFilter(
                 CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
@@ -80,8 +82,10 @@ class NoMessageCheckTask(
     private var extraMessagesCounter: Int = 0
 
     override fun onStartInit() {
-        rootEvent.addSubEvent(refs.preFilterEvent)
-        rootEvent.addSubEvent(refs.resultEvent)
+        with(refs) {
+            rootEvent.addSubEvent(preFilterEvent)
+            rootEvent.addSubEvent(resultEvent)
+        }
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =

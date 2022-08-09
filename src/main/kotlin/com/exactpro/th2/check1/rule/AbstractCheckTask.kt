@@ -74,14 +74,16 @@ import java.util.concurrent.atomic.AtomicReference
  */
 abstract class AbstractCheckTask(
     private val ruleConfiguration: RuleConfiguration,
-    submitTime: Instant,
+    private val submitTime: Instant,
     protected val sessionKey: SessionKey,
     private val parentEventID: EventID,
     private val messageStream: Observable<StreamContainer>,
     private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
 
-    protected class RefsKeeper<T>(refs: T) {
+    protected open class Refs(val rootEvent: Event)
+
+    protected class RefsKeeper<T : Refs>(refs: T) {
         private var refsNullable: T? = refs
         val refs: T get() = refsNullable ?: error("Requesting references after references has been erased.")
         fun eraseRefs() {
@@ -89,13 +91,13 @@ abstract class AbstractCheckTask(
         }
     }
 
-    protected abstract val refsKeeper: RefsKeeper<out Any>
+    protected abstract val refsKeeper: RefsKeeper<out Refs>
+    private val refs get() = refsKeeper.refs
 
     val description: String? = ruleConfiguration.description
     private val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
 
     protected var handledMessageCounter: Long = 0
-    protected val rootEvent: Event = Event.from(submitTime).description(description)
 
     private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
@@ -143,6 +145,8 @@ abstract class AbstractCheckTask(
     @Volatile
     protected var started = false
 
+    protected fun createRootEvent() = Event.from(submitTime).description(description)
+
     final override fun onStart() {
         super.onStart()
         started = true
@@ -158,7 +162,7 @@ abstract class AbstractCheckTask(
     override fun onError(e: Throwable) {
         super.onError(e)
 
-        rootEvent.status(FAILED)
+        refs.rootEvent.status(FAILED)
             .bodyData(EventUtils.createMessageBean(e.message))
         end(State.ERROR, "Error ${e.message} received in message stream")
     }
@@ -310,7 +314,7 @@ abstract class AbstractCheckTask(
 
                     // All sources above will be disposed on this scheduler.
                     //
-                    // This method should be called as closer as possible
+                    // This method should be called as close as possible
                     // to the actual dispose that you want to execute on this scheduler
                     // because other operations are executed on the same single-thread scheduler.
                     //
@@ -322,7 +326,7 @@ abstract class AbstractCheckTask(
                         handledMessageCounter++
 
                         with(it.metadata.id) {
-                            rootEvent.messageID(this)
+                            refs.rootEvent.messageID(this)
                         }
                     }
                     .takeWhileMessagesInTimeout()
@@ -331,7 +335,7 @@ abstract class AbstractCheckTask(
                     .subscribe(this)
         } catch (exception: Exception) {
             LOGGER.error("An internal error occurred while executing rule", exception)
-            rootEvent.addSubEventWithSamePeriod()
+            refs.rootEvent.addSubEventWithSamePeriod()
                     .name("An error occurred while executing rule")
                     .type("internalError")
                     .status(FAILED)
@@ -425,7 +429,7 @@ abstract class AbstractCheckTask(
                 LOGGER.info("Skip event publication for task ${type()} '$description' (${hashCode()})")
                 return
             }
-            val batches = rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
+            val batches = refs.rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
 
             RESPONSE_EXECUTOR.execute {
                 batches.forEach { batch ->
@@ -441,7 +445,7 @@ abstract class AbstractCheckTask(
                 }
             }
         } else {
-            LOGGER.debug("Event tree id '{}' parent id '{}' is already published", rootEvent.id, parentEventID)
+            LOGGER.debug("Event tree id '{}' parent id '{}' is already published", refs.rootEvent.id, parentEventID)
         }
     }
 
@@ -453,7 +457,7 @@ abstract class AbstractCheckTask(
                 false
             } else {
                 LOGGER.error("Check task was not started.")
-                rootEvent.addSubEventWithSamePeriod()
+                refs.rootEvent.addSubEventWithSamePeriod()
                     .name("Check failed: check task was not started.")
                     .type("taskNotStarted")
                     .status(FAILED)
@@ -461,7 +465,7 @@ abstract class AbstractCheckTask(
             }
         } catch (e: Exception) {
             LOGGER.error("Result event cannot be completed", e)
-            rootEvent.addSubEventWithSamePeriod()
+            refs.rootEvent.addSubEventWithSamePeriod()
                     .name("Check result event cannot build completely")
                     .type("eventNotComplete")
                     .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
@@ -472,8 +476,8 @@ abstract class AbstractCheckTask(
     }
 
     private fun configureRootEvent() {
-        rootEvent.name(name()).type(type())
-        setup(rootEvent)
+        refs.rootEvent.name(name()).type(type())
+        setup(refs.rootEvent)
     }
 
     private fun doAfterCompleteEvent() {
@@ -489,7 +493,7 @@ abstract class AbstractCheckTask(
     }
 
     private fun fillUntrustedExecutionEvent() {
-        rootEvent.addSubEvent(
+        refs.rootEvent.addSubEvent(
             Event.start()
                 .name("The current check is untrusted because the start point of the check interval has been selected approximately")
                 .status(FAILED)
@@ -498,7 +502,7 @@ abstract class AbstractCheckTask(
     }
 
     private fun fillMissedStartMessageAndMessagesInIntervalEvent() {
-        rootEvent.addSubEvent(
+        refs.rootEvent.addSubEvent(
             Event.start()
                 .name("Check cannot be executed because buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' contains neither message in the requested check interval with sequence '$lastSequence' and checkpoint timestamp '${checkpointTimeout?.toJson()}'")
                 .status(FAILED)
@@ -507,7 +511,7 @@ abstract class AbstractCheckTask(
     }
 
     private fun fillEmptyStartMessageEvent() {
-        rootEvent.addSubEvent(
+        refs.rootEvent.addSubEvent(
             Event.start()
                 .name("Buffer for session alias '${sessionKey.sessionAlias}' and direction '${sessionKey.direction}' doesn't contain starting message, but contains several messages in the requested check interval")
                 .status(FAILED)

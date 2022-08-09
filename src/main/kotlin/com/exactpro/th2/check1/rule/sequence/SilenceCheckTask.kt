@@ -45,10 +45,11 @@ class SilenceCheckTask(
 ) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
+        rootEvent: Event,
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?
-    ) {
+    ) : AbstractCheckTask.Refs(rootEvent) {
         val preFilterEvent: Event by lazy {
             Event.start()
                 .type("preFiltering")
@@ -62,6 +63,7 @@ class SilenceCheckTask(
 
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
         Refs(
+            rootEvent = createRootEvent(),
             protoPreMessageFilter = protoPreMessageFilter,
             messagePreFilter = SailfishFilter(
                 CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
@@ -94,8 +96,10 @@ class SilenceCheckTask(
             return
         }
 
-        rootEvent.addSubEvent(refs.preFilterEvent)
-        rootEvent.addSubEvent(refs.resultEvent)
+        with(refs) {
+            rootEvent.addSubEvent(preFilterEvent)
+            rootEvent.addSubEvent(resultEvent)
+        }
     }
 
     override fun onChainedTaskSubscription() {

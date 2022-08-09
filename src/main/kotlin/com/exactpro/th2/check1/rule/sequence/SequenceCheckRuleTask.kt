@@ -72,11 +72,12 @@ class SequenceCheckRuleTask(
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
+        rootEvent: Event,
         val protoMessageFilters: List<RootMessageFilter>,
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?,
-    ) {
+    ) : AbstractCheckTask.Refs(rootEvent) {
         val preFilterEvent: Event by lazy {
             Event.start()
                 .type("preFiltering")
@@ -95,6 +96,7 @@ class SequenceCheckRuleTask(
     }
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
         Refs(
+            rootEvent = createRootEvent(),
             protoMessageFilters = protoMessageFilters,
             protoPreMessageFilter = protoPreMessageFilter,
             messagePreFilter = SailfishFilter(
@@ -126,7 +128,7 @@ class SequenceCheckRuleTask(
             )
         }.toMutableList()
 
-        rootEvent.addSubEvent(refs.preFilterEvent)
+        refs.rootEvent.addSubEvent(refs.preFilterEvent)
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
@@ -192,7 +194,7 @@ class SequenceCheckRuleTask(
      * Creates events for check messages
      */
     private fun fillCheckMessagesEvent() {
-        val checkMessagesEvent = rootEvent.addSubEventWithSamePeriod()
+        val checkMessagesEvent = refs.rootEvent.addSubEventWithSamePeriod()
             .name("Check messages")
             .type(CHECK_MESSAGES_TYPE)
             .appendEventWithVerificationsAndFilters(refs.protoMessageFilters, refs.messageFilteringResults.values)
@@ -222,7 +224,7 @@ class SequenceCheckRuleTask(
             sequenceTable.row(CheckSequenceUtils.createOnlyExpectedSide(messageFilter.protoMessageFilter, sessionKey.sessionAlias))
         }
 
-        rootEvent.addSubEventWithSamePeriod()
+        refs.rootEvent.addSubEventWithSamePeriod()
             .name("Check sequence (expected ${refs.protoMessageFilters.size} / actual ${refs.preFilteringResults.size} , check order $checkOrder)")
             .type("checkSequence")
             .status(if (refs.protoMessageFilters.size == refs.preFilteringResults.size

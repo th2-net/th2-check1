@@ -47,13 +47,15 @@ class CheckRuleTask(
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
+        rootEvent: Event,
         val protoMessageFilter: RootMessageFilter,
         val messageFilter: SailfishFilter,
         val metadataFilter: SailfishFilter?
-    )
+    ) : AbstractCheckTask.Refs(rootEvent)
 
     override val refsKeeper = RefsKeeper(
         Refs(
+            rootEvent = createRootEvent(),
             protoMessageFilter = protoMessageFilter,
             messageFilter = SailfishFilter(
                 CONVERTER.fromProtoPreFilter(protoMessageFilter),
@@ -77,7 +79,7 @@ class CheckRuleTask(
             .type("Filter")
             .bodyData(refs.protoMessageFilter.toReadableBodyCollection())
 
-        rootEvent.addSubEvent(subEvent)
+        refs.rootEvent.addSubEvent(subEvent)
     }
 
     override fun onNext(messageContainer: MessageContainer) {
@@ -86,13 +88,13 @@ class CheckRuleTask(
         val container = ComparisonContainer(messageContainer, refs.protoMessageFilter, aggregatedResult)
 
         if (container.matchesByKeys) {
-            rootEvent.appendEventsWithVerification(container)
+            refs.rootEvent.appendEventsWithVerification(container)
             checkComplete()
         }
     }
 
     override fun onTimeout() {
-        rootEvent.addSubEventWithSamePeriod()
+        refs.rootEvent.addSubEventWithSamePeriod()
             .name("No message found by target keys")
             .type("Check failed")
             .status(FAILED)
