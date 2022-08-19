@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -53,6 +53,9 @@ public class Check1Configuration {
     @JsonProperty(value = "check-null-value-as-empty")
     private boolean checkNullValueAsEmpty = false;
 
+    @JsonProperty(value="default-check-simple-collections-order", defaultValue = "true")
+    private boolean defaultCheckSimpleCollectionsOrder = true;
+
     public int getMessageCacheSize() {
         return messageCacheSize;
     }
@@ -87,5 +90,9 @@ public class Check1Configuration {
 
     public boolean isCheckNullValueAsEmpty() {
         return checkNullValueAsEmpty;
+    }
+
+    public boolean getDefaultCheckSimpleCollectionsOrder() {
+        return defaultCheckSimpleCollectionsOrder;
     }
 }

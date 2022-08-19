@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -54,6 +54,7 @@ class RuleFactory(
     private val timePrecision = configuration.timePrecision
     private val decimalPrecision = configuration.decimalPrecision
     private val isCheckNullValueAsEmpty = configuration.isCheckNullValueAsEmpty
+    private val defaultCheckSimpleCollectionsOrder = configuration.defaultCheckSimpleCollectionsOrder
 
     fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean): CheckRuleTask =
             ruleCreation(request.parentEventId) {
@@ -79,7 +80,8 @@ class RuleFactory(
                             timePrecision,
                             decimalPrecision,
                             maxEventBatchContentSize,
-                            isCheckNullValueAsEmpty
+                            isCheckNullValueAsEmpty,
+                            defaultCheckSimpleCollectionsOrder
                     )
 
                     CheckRuleTask(
@@ -89,7 +91,7 @@ class RuleFactory(
                             filter,
                             request.parentEventId,
                             streamObservable,
-                            eventBatchRouter
+                            eventBatchRouter,
                     )
                 }
                 onErrorEvent {
@@ -123,7 +125,8 @@ class RuleFactory(
                             timePrecision,
                             decimalPrecision,
                             maxEventBatchContentSize,
-                            isCheckNullValueAsEmpty
+                            isCheckNullValueAsEmpty,
+                            defaultCheckSimpleCollectionsOrder
                     )
 
                     SequenceCheckRuleTask(
@@ -161,7 +164,8 @@ class RuleFactory(
                             timePrecision,
                             decimalPrecision,
                             maxEventBatchContentSize,
-                            isCheckNullValueAsEmpty
+                            isCheckNullValueAsEmpty,
+                            defaultCheckSimpleCollectionsOrder
                     )
 
                     NoMessageCheckTask(
@@ -197,7 +201,8 @@ class RuleFactory(
                         timePrecision,
                         decimalPrecision,
                         maxEventBatchContentSize,
-                        isCheckNullValueAsEmpty
+                        isCheckNullValueAsEmpty,
+                        defaultCheckSimpleCollectionsOrder
                 )
 
                 SilenceCheckTask(
