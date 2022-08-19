@@ -548,7 +548,12 @@ abstract class AbstractCheckTask(
         ComparatorSettings().also {
             it.metaContainer = VerificationUtil.toMetaContainer(this.messageFilter, false)
             it.ignoredFields = this.comparisonSettings.ignoreFieldsList.toSet()
-            it.isCheckSimpleCollectionsOrder = this.comparisonSettings.checkSimpleCollectionsOrder?.value ?: ruleConfiguration.defaultCheckSimpleCollectionsOrder
+
+            it.isCheckSimpleCollectionsOrder = if (comparisonSettings.hasCheckSimpleCollectionsOrder()) {
+                comparisonSettings.checkSimpleCollectionsOrder.value
+            } else {
+                ruleConfiguration.defaultCheckSimpleCollectionsOrder
+            }
 
             if (this.comparisonSettings.checkRepeatingGroupOrder) {
                 it.isCheckGroupsOrder = true
