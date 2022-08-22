@@ -54,7 +54,7 @@ class RuleFactory(
     private val timePrecision = configuration.timePrecision
     private val decimalPrecision = configuration.decimalPrecision
     private val isCheckNullValueAsEmpty = configuration.isCheckNullValueAsEmpty
-    private val defaultCheckSimpleCollectionsOrder = configuration.defaultCheckSimpleCollectionsOrder
+    private val defaultCheckSimpleCollectionsOrder = configuration.isDefaultCheckSimpleCollectionsOrder
 
     fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean): CheckRuleTask =
             ruleCreation(request.parentEventId) {

@@ -92,7 +92,7 @@ public class Check1Configuration {
         return checkNullValueAsEmpty;
     }
 
-    public boolean getDefaultCheckSimpleCollectionsOrder() {
+    public boolean isDefaultCheckSimpleCollectionsOrder() {
         return defaultCheckSimpleCollectionsOrder;
     }
 }
