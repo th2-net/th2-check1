@@ -434,7 +434,7 @@ class RuleFactoryTest {
         expectedValue: Boolean
     ) {
         val streams = createStreams(messages = emptyList())
-        val config = Check1Configuration().apply { setDefaultCheckSimpleCollectionsOrder(defaultValue) }
+        val config = Check1Configuration(isDefaultCheckSimpleCollectionsOrder = defaultValue)
         val ruleFactory = RuleFactory(config, streams, clientStub)
         val rootFilterBuilder = RootMessageFilter.newBuilder().setMessageType("TestMsgType")
 
@@ -470,12 +470,6 @@ class RuleFactoryTest {
             messageFilterField.isAccessible = true
             return messageFilterField.get(this) as SailfishFilter
         }
-
-    private fun Check1Configuration.setDefaultCheckSimpleCollectionsOrder(value: Boolean) {
-        val defaultCheckField = this.javaClass.getDeclaredField("defaultCheckSimpleCollectionsOrder")
-        defaultCheckField.isAccessible = true
-        defaultCheckField.setBoolean(this, value)
-    }
 
     private fun assertEvents() {
         val eventBatches = awaitEventBatchRequest(1000L, 1)

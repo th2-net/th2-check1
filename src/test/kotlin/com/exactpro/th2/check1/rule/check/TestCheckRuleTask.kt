@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,11 +15,16 @@ package com.exactpro.th2.check1.rule.check
 
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.entities.TaskTimeout
+import com.exactpro.th2.check1.grpc.ChainID
+import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
+import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.check1.util.createVerificationEntry
 import com.exactpro.th2.check1.util.toSimpleFilter
 import com.exactpro.th2.common.event.bean.VerificationStatus
+import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
@@ -27,6 +32,7 @@ import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.EventStatus.FAILED
 import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.FilterOperation
+import com.exactpro.th2.common.grpc.ListValue
 import com.exactpro.th2.common.grpc.ListValueFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.MessageMetadata
@@ -41,6 +47,7 @@ import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.listValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
+import com.google.protobuf.BoolValue
 import com.google.protobuf.StringValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -308,6 +315,85 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     }
 
     @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2, 3, 4])
+    fun `simple collection order checking config`(testCase: Int) {
+
+        val testCasesParams = arrayOf(
+            true to true,
+            true to false,
+            false to true,
+            false to false,
+            null to true,
+            null to false
+        )
+
+        val (requestValue, defaultValue) = testCasesParams[testCase]
+        val expectedComparisonResult: Boolean = !(requestValue ?: defaultValue)
+
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .putFields("simple_list", ListValue.newBuilder().addAllValues(
+                    listOf("C".toValue(), "A".toValue(), "B".toValue())
+                ).build().toValue())
+                .build()
+        ))
+
+        val messageFilterForCheckOrderBuilder = rootMessageFilter(MESSAGE_TYPE).apply {
+            messageFilter = messageFilter().apply {
+                putFields(
+                    "simple_list",
+                    ValueFilter.newBuilder().setListFilter(
+                        ListValueFilter.newBuilder().
+                            addAllValues(listOf(
+                                "A".toValueFilter(),
+                                "B".toValueFilter(),
+                                "C".toValueFilter()
+                            ))
+                    ).build()
+                ).build()
+            }.build()
+        }
+
+        if (requestValue != null) {
+            messageFilterForCheckOrderBuilder.setComparisonSettings(
+                RootComparisonSettings.newBuilder().setCheckSimpleCollectionsOrder(BoolValue.newBuilder().setValue(requestValue))
+            )
+        }
+
+        val config = Check1Configuration(isDefaultCheckSimpleCollectionsOrder = defaultValue)
+        val ruleFactory = RuleFactory(config, streams, clientStub)
+        val request = CheckRuleRequest.newBuilder()
+            .setParentEventId(createEvent("root"))
+            .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
+            .setRootFilter(messageFilterForCheckOrderBuilder)
+            .setMessageTimeout(5)
+            .setChainId(ChainID.newBuilder().setId("test_chain_id"))
+            .build()
+
+        ruleFactory.createCheckRule(request, true).begin()
+
+        val eventBatches = awaitEventBatchRequest(1000L, 2)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        assertAll({
+            assertEquals(3, eventList.size)
+        }, {
+            val verificationEvent = eventList.find { it.type == "Verification" }
+            assertNotNull(verificationEvent) { "Missed verification event" }
+            val verification = assertVerification(verificationEvent)
+
+            val verificationEntry = createVerificationEntry(if (expectedComparisonResult) VerificationStatus.PASSED else VerificationStatus.FAILED)
+
+            val expected = mapOf("simple_list" to createVerificationEntry(
+                "0" to verificationEntry,
+                "1" to verificationEntry,
+                "2" to verificationEntry,
+            ))
+
+            assertVerificationByStatus(verification, expected)
+        })
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = [true, false])
     fun `check verification description`(includeDescription: Boolean) {
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
@@ -521,7 +607,6 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             assertVerificationByStatus(verification, expectedLegs)
         })
     }
-
 
     companion object {
         private const val VERIFICATION_DESCRIPTION = "Test verification with description"
