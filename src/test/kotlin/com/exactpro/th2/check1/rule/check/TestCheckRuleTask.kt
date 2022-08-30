@@ -55,9 +55,12 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.lang.IllegalArgumentException
 import java.time.Instant
+import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -315,20 +318,9 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = [0, 1, 2, 3, 4])
-    fun `simple collection order checking config`(testCase: Int) {
-
-        val testCasesParams = arrayOf(
-            true to true,
-            true to false,
-            false to true,
-            false to false,
-            null to true,
-            null to false
-        )
-
-        val (requestValue, defaultValue) = testCasesParams[testCase]
-        val expectedComparisonResult: Boolean = !(requestValue ?: defaultValue)
+    @MethodSource("argsForSimpleCollectionOrderCheckingConfig")
+    fun `simple collection order checking config`(requestValue: Boolean?, defaultValue: Boolean) {
+        val expectedComparisonResult = !(requestValue ?: defaultValue)
 
         val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
             message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
@@ -610,5 +602,15 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
     companion object {
         private const val VERIFICATION_DESCRIPTION = "Test verification with description"
+
+        @JvmStatic
+        fun argsForSimpleCollectionOrderCheckingConfig(): Stream<Arguments> = Stream.of(
+            Arguments.of(true, true),
+            Arguments.of(true, false),
+            Arguments.of(false, true),
+            Arguments.of(false, true),
+            Arguments.of(null, true),
+            Arguments.of(null, false)
+        )
     }
 }
