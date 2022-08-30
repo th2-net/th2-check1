@@ -19,7 +19,6 @@ import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.exception.RuleCreationException
 import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
-import com.exactpro.th2.check1.rule.check.CheckRuleTask
 import com.exactpro.th2.check1.util.assertThrowsWithMessages
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Checkpoint
@@ -29,12 +28,10 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageMetadata
-import com.exactpro.th2.common.grpc.RootComparisonSettings
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.google.protobuf.BoolValue
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
@@ -415,61 +412,6 @@ class RuleFactoryTest {
 
         assertEvents()
     }
-
-    @Test
-    fun `setting checkSimpleCollectionsOrder value`() {
-        verifyCheckSimpleCollectionsOrderValue(true, true, true)
-        verifyCheckSimpleCollectionsOrderValue(true, false, true)
-
-        verifyCheckSimpleCollectionsOrderValue(false, true, false)
-        verifyCheckSimpleCollectionsOrderValue(false, false, false)
-
-        verifyCheckSimpleCollectionsOrderValue(null, true, true)
-        verifyCheckSimpleCollectionsOrderValue(null, false, false)
-    }
-
-    private fun verifyCheckSimpleCollectionsOrderValue(
-        requestValue: Boolean?,
-        defaultValue: Boolean,
-        expectedValue: Boolean
-    ) {
-        val streams = createStreams(messages = emptyList())
-        val config = Check1Configuration(isDefaultCheckSimpleCollectionsOrder = defaultValue)
-        val ruleFactory = RuleFactory(config, streams, clientStub)
-        val rootFilterBuilder = RootMessageFilter.newBuilder().setMessageType("TestMsgType")
-
-        if (requestValue != null) {
-            rootFilterBuilder.setComparisonSettings(
-                RootComparisonSettings.newBuilder().setCheckSimpleCollectionsOrder(BoolValue.newBuilder().setValue(requestValue))
-            )
-        }
-
-        val request = CheckRuleRequest.newBuilder()
-            .setParentEventId(EventID.newBuilder().setId("root").build())
-            .setConnectivityId(ConnectionID.newBuilder().setSessionAlias("test_alias"))
-            .setRootFilter(rootFilterBuilder)
-            .setMessageTimeout(5)
-            .setChainId(ChainID.newBuilder().setId("test_chain_id"))
-            .build()
-
-        val createCheckRule = assertDoesNotThrow {
-            ruleFactory.createCheckRule(request, true)
-        }
-        assertNotNull(createCheckRule) { "Rule cannot be null" }
-
-        assertEquals(
-            expectedValue,
-            createCheckRule.messageFilter.comparatorSettings.isCheckSimpleCollectionsOrder,
-            "Wrong isCheckSimpleCollectionsOrder value in filter: requestValue = $requestValue, defaultValue = $defaultValue"
-        )
-    }
-
-    private val CheckRuleTask.messageFilter: SailfishFilter
-        get() {
-            val messageFilterField = this.javaClass.getDeclaredField("messageFilter")
-            messageFilterField.isAccessible = true
-            return messageFilterField.get(this) as SailfishFilter
-        }
 
     private fun assertEvents() {
         val eventBatches = awaitEventBatchRequest(1000L, 1)
