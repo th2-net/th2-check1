@@ -458,7 +458,7 @@ abstract class AbstractCheckTask(
             } else {
                 LOGGER.error("Check task was not started.")
                 refs.rootEvent.addSubEventWithSamePeriod()
-                    .name("Check failed: check task was not started.")
+                    .name("Check failed: task timeout elapsed before the check task was started. Please, check component resources for throttling or intensive GC")
                     .type("taskNotStarted")
                     .status(FAILED)
                 true
