@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -35,53 +35,66 @@ import java.time.Instant
 /**
  * This rule checks for the presence of a single message in the messages stream.
  */
+
 class CheckRuleTask(
     ruleConfiguration: RuleConfiguration,
     startTime: Instant,
     sessionKey: SessionKey,
-    private val protoMessageFilter: RootMessageFilter,
+    protoMessageFilter: RootMessageFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private val messageFilter: SailfishFilter = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoMessageFilter),
-        protoMessageFilter.toCompareSettings()
-    )
-    private val metadataFilter: SailfishFilter? = protoMessageFilter.metadataFilterOrNull()?.let {
-        SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
-            it.toComparisonSettings()
+    protected class Refs(
+        rootEvent: Event,
+        val protoMessageFilter: RootMessageFilter,
+        val messageFilter: SailfishFilter,
+        val metadataFilter: SailfishFilter?
+    ) : AbstractCheckTask.Refs(rootEvent)
+
+    override val refsKeeper = RefsKeeper(
+        Refs(
+            rootEvent = createRootEvent(),
+            protoMessageFilter = protoMessageFilter,
+            messageFilter = SailfishFilter(
+                CONVERTER.fromProtoPreFilter(protoMessageFilter),
+                protoMessageFilter.toCompareSettings()
+            ),
+            metadataFilter = protoMessageFilter.metadataFilterOrNull()?.let {
+                SailfishFilter(
+                    CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
+                    it.toComparisonSettings()
+                )
+            }
         )
-    }
+    )
 
-    override fun onStart() {
-        super.onStart()
+    private val refs get() = refsKeeper.refs
 
+    override fun onStartInit() {
         val subEvent = Event.start()
             .endTimestamp()
             .name("Message filter")
             .type("Filter")
-            .bodyData(protoMessageFilter.toReadableBodyCollection())
+            .bodyData(refs.protoMessageFilter.toReadableBodyCollection())
 
-        rootEvent.addSubEvent(subEvent)
-
+        refs.rootEvent.addSubEvent(subEvent)
     }
 
     override fun onNext(messageContainer: MessageContainer) {
-        val aggregatedResult = matchFilter(messageContainer, messageFilter, metadataFilter)
+        val aggregatedResult = matchFilter(messageContainer, refs.messageFilter, refs.metadataFilter)
 
-        val container = ComparisonContainer(messageContainer, protoMessageFilter, aggregatedResult)
+        val container = ComparisonContainer(messageContainer, refs.protoMessageFilter, aggregatedResult)
 
         if (container.matchesByKeys) {
-            rootEvent.appendEventsWithVerification(container)
+            refs.rootEvent.appendEventsWithVerification(container)
             checkComplete()
         }
     }
 
     override fun onTimeout() {
-        rootEvent.addSubEventWithSamePeriod()
+        refs.rootEvent.addSubEventWithSamePeriod()
             .name("No message found by target keys")
             .type("Check failed")
             .status(FAILED)

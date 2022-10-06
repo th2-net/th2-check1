@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -43,28 +43,48 @@ class SilenceCheckTask(
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
-    private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
-    private val messagePreFilter = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
-        protoPreMessageFilter.toCompareSettings()
-    )
-    private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
-        SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
-            it.toComparisonSettings()
-        )
+
+    protected class Refs(
+        rootEvent: Event,
+        val protoPreMessageFilter: RootMessageFilter,
+        val messagePreFilter: SailfishFilter,
+        val metadataPreFilter: SailfishFilter?
+    ) : AbstractCheckTask.Refs(rootEvent) {
+        val preFilterEvent: Event by lazy {
+            Event.start()
+                .type("preFiltering")
+                .bodyData(protoPreMessageFilter.toReadableBodyCollection())
+        }
+        val resultEvent: Event by lazy {
+            Event.start()
+                .type("noMessagesCheckResult")
+        }
     }
-    private lateinit var preFilterEvent: Event
-    private lateinit var resultEvent: Event
+
+    override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
+        Refs(
+            rootEvent = createRootEvent(),
+            protoPreMessageFilter = protoPreMessageFilter,
+            messagePreFilter = SailfishFilter(
+                CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+                protoPreMessageFilter.toCompareSettings()
+            ),
+            metadataPreFilter = protoPreMessageFilter.metadataFilterOrNull()?.let {
+                SailfishFilter(
+                    CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                    it.toComparisonSettings()
+                )
+            }
+        )
+    })
+
+    private val refs get() = refsKeeper.refs
+
     private var extraMessagesCounter: Int = 0
 
-    @Volatile
-    private var started = false
     private val isCanceled = AtomicBoolean()
 
-    override fun onStart() {
-        super.onStart()
-        started = true
+    override fun onStartInit() {
         val hasNextTask = hasNextTask()
         if (isParentCompleted == false || hasNextTask) {
             if (hasNextTask) {
@@ -75,15 +95,11 @@ class SilenceCheckTask(
             cancel()
             return
         }
-        preFilterEvent = Event.start()
-            .type("preFiltering")
-            .bodyData(protoPreMessageFilter.toReadableBodyCollection())
 
-        rootEvent.addSubEvent(preFilterEvent)
-
-        resultEvent = Event.start()
-            .type("noMessagesCheckResult")
-        rootEvent.addSubEvent(resultEvent)
+        with(refs) {
+            rootEvent.addSubEvent(preFilterEvent)
+            rootEvent.addSubEvent(resultEvent)
+        }
     }
 
     override fun onChainedTaskSubscription() {
@@ -105,17 +121,17 @@ class SilenceCheckTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, protoPreMessageFilter, messagePreFilter, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(this, refs.protoPreMessageFilter, refs.messagePreFilter, refs.metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
-                preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(protoActual.metadata.id)
+                refs.preFilterEvent.appendEventsWithVerification(preFilterContainer)
+                refs.preFilterEvent.messageID(protoActual.metadata.id)
             }
         }
 
     override fun onNext(container: MessageContainer) {
         container.protoMessage.metadata.apply {
             extraMessagesCounter++
-            resultEvent.messageID(id)
+            refs.resultEvent.messageID(id)
         }
     }
 
@@ -123,12 +139,13 @@ class SilenceCheckTask(
         if (skipPublication) {
             return
         }
-        preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
+
+        refs.preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
-            resultEvent.status(Event.Status.PASSED).name("Check passed")
+            refs.resultEvent.status(Event.Status.PASSED).name("Check passed")
         } else {
-            resultEvent.status(Event.Status.FAILED)
+            refs.resultEvent.status(Event.Status.FAILED)
                 .name("Check failed: $extraMessagesCounter extra messages were found.")
         }
     }
