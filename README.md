@@ -85,6 +85,7 @@ spec:
     auto-silence-check-after-sequence-rule: false
     time-precision: 'PT0.000000001S'
     decimal-precision: '0.00001'
+    enable-checkpoint-events-publication: true
   type: th2-check1
   pins:
     - name: server
@@ -122,7 +123,8 @@ This block describes the configuration for check1.
   "auto-silence-check-after-sequence-rule": false,
   "time-precision": "PT0.000000001S",
   "decimal-precision": 0.00001,
-  "check-null-value-as-empty": false
+  "check-null-value-as-empty": false,
+  "enable-checkpoint-events-publication": true
 }
 ```
 
@@ -156,6 +158,12 @@ The decimal precision is used to compare the value of two numbers. Can be specif
 #### check-null-value-as-empty
 `check-null-value-as-empty` is used for `EMPTY` and `NOT_EMPTY` operations to check if `NULL_VALUE` value is empty. By default, this parameter is set to `false`. For example, if the `checkNullValueAsEmpty` parameter is:
 + `true`, then `NULL_VALUE` is equal to `EMPTY`, otherwise `NULL_VALUE` is equal to `NOT_EMPTY`
+
+#### enable-checkpoint-events-publication
+
+Enables event publication for each stream that was added into checkpoint.
+Otherwise, only top events with attached messages will be published.
+_Enabled by default._
 
 ## Required pins
 
@@ -196,6 +204,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 #### Added:
 + Support for disabling of order verification for simple collection
++ Switch for events publication in checkpoint request. Parameter `enable-checkpoint-events-publication` should be used for that.
 
 ### 3.9.1
 
