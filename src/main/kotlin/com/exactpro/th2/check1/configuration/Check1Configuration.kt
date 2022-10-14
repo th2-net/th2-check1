@@ -52,5 +52,9 @@ class Check1Configuration(
     val isCheckNullValueAsEmpty: Boolean = false,
 
     @field:JsonProperty(value = "default-check-simple-collections-order", defaultValue = "true")
-    val isDefaultCheckSimpleCollectionsOrder: Boolean = true
+    val isDefaultCheckSimpleCollectionsOrder: Boolean = true,
+
+    @field:JsonProperty(value = "enable-checkpoint-events-publication", defaultValue = "true")
+    @field:JsonPropertyDescription("Enables events publication if parent event ID is specified in checkpoint request")
+    val enableCheckpointEventsPublication: Boolean = true,
 )

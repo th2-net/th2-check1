@@ -44,9 +44,12 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
+import com.exactpro.th2.common.message.toJson
 
 class CollectorService(
-    private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: Check1Configuration
+    private val messageRouter: MessageRouter<MessageBatch>,
+    private val eventBatchRouter: MessageRouter<EventBatch>,
+    private val configuration: Check1Configuration,
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
@@ -211,35 +214,10 @@ class CollectorService(
     }
 
     fun createCheckpoint(request: CheckpointRequestOrBuilder): Checkpoint {
-        val rootEvent = Event.start()
-            .name("Checkpoint")
-            .type("Checkpoint")
-            .description(request.description)
-        return try {
-            val checkpoint = checkpointSubscriber.createCheckpoint()
-            rootEvent.endTimestamp()
-                .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
-            checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
-                val messageID = sessionKey.toMessageID(checkpointData.sequence)
-                rootEvent.messageID(messageID)
-                    .addSubEventWithSamePeriod()
-                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '${checkpointData.sequence}'")
-                    .type("Checkpoint for session")
-                    .messageID(messageID)
-            }
-            checkpoint
-        } finally {
-            try {
-                if (request.hasParentEventId()) {
-                    sendEvents(request.parentEventId, rootEvent)
-                } else {
-                    logger.warn("Parent id missed in request")
-                }
-            } catch (e: Exception) {
-                logger.error("Sending events '{}' with a parent '{}' failed ",
-                    rootEvent, request.parentEventId, e)
-            }
-        }
+        val event: Event = Event.start()
+        val checkpoint = checkpointSubscriber.createCheckpoint()
+        publishCheckpoint(request, checkpoint, event)
+        return checkpoint
     }
 
     fun close() {
@@ -262,4 +240,40 @@ class CollectorService(
         .setSequence(sequence)
         .setDirection(direction)
         .build()
+
+    private fun publishCheckpoint(request: CheckpointRequestOrBuilder, checkpoint: Checkpoint, event: Event) {
+        if (!request.hasParentEventId()) {
+            if (logger.isWarnEnabled) {
+                logger.warn("Parent id missed in request {}", request.toJson())
+            }
+            return
+        }
+        val rootEvent: Event = event
+            .name("Checkpoint")
+            .type("Checkpoint")
+            .description(request.description)
+            .endTimestamp()
+            .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
+        if (!configuration.enableCheckpointEventsPublication) {
+            rootEvent.bodyData(EventUtils.createMessageBean("Checkpoints publication is disabled. Check the component configuration to enable it"))
+        }
+        checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
+            val messageID = sessionKey.toMessageID(checkpointData.sequence)
+            rootEvent.messageID(messageID)
+            if (configuration.enableCheckpointEventsPublication) {
+                rootEvent.addSubEventWithSamePeriod()
+                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '${checkpointData.sequence}'")
+                    .type("Checkpoint for session")
+                    .messageID(messageID)
+            }
+        }
+        try {
+            sendEvents(request.parentEventId, rootEvent)
+        } catch (e: Exception) {
+            logger.error(
+                "Sending events '{}' with a parent '{}' failed ",
+                rootEvent, request.parentEventId, e
+            )
+        }
+    }
 }
