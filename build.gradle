@@ -229,13 +229,13 @@ test {
 }
 
 application {
-    mainClassName 'com.exactpro.th2.check1.Check1Main'
+    mainClass.set('com.exactpro.th2.check1.Check1Main')
 }
 
 applicationName = 'service'
 
 distTar {
-    archiveName "${applicationName}.tar"
+    archiveFileName.set("${applicationName}.tar")
 }
 
 dockerPrepare {

@@ -119,6 +119,9 @@ class SilenceCheckTask(
         }
     }
 
+    override val errorEventOnTimeout: Boolean
+        get() = false
+
     override fun name(): String = "AutoSilenceCheck"
 
     override fun type(): String = "AutoSilenceCheck"
