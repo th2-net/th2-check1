@@ -198,7 +198,7 @@ class CollectorService(
 
         val batch = EventBatch.newBuilder()
             .setParentEventId(parentEventID)
-            .addAllEvents(event.toProtoEvents(parentEventID.id))
+            .addAllEvents(event.toListProto(parentEventID))
             .build()
 
         ForkJoinPool.commonPool().execute {

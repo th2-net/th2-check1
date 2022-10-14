@@ -515,8 +515,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertEquals(3, eventList.size)
-        assertEquals(2, eventList.filter { it.status == FAILED }.size)
+        assertEquals(4, eventList.size)
+        assertEquals(3, eventList.filter { it.status == FAILED }.size)
     }
 
     @Test

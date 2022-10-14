@@ -66,6 +66,7 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import com.exactpro.th2.common.util.toInstant
 
 /**
  * Implements common logic for check task.
@@ -163,7 +164,7 @@ abstract class AbstractCheckTask(
         super.onError(e)
 
         refs.rootEvent.status(FAILED)
-            .bodyData(EventUtils.createMessageBean(e.message))
+            .exception(e, true)
         end(State.ERROR, "Error ${e.message} received in message stream")
     }
 
@@ -414,6 +415,9 @@ abstract class AbstractCheckTask(
 
     protected open val skipPublication: Boolean = false
 
+    protected open val errorEventOnTimeout: Boolean
+        get() = true
+
     protected fun isCheckpointLastReceivedMessage(): Boolean = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
 
     /**
@@ -452,6 +456,9 @@ abstract class AbstractCheckTask(
     private fun completeEventOrReportError(prevState: State): Boolean {
         return try {
             if (started) {
+                if (errorEventOnTimeout && prevState in TIMEOUT_STATES) {
+                    addTimeoutEvent(prevState)
+                }
                 completeEvent(prevState)
                 doAfterCompleteEvent()
                 false
@@ -473,6 +480,36 @@ abstract class AbstractCheckTask(
                     .status(FAILED)
             true
         }
+    }
+
+    private fun addTimeoutEvent(timeoutType: State) {
+        refs.rootEvent.addSubEventWithSamePeriod()
+            .status(FAILED)
+            .type(
+                when (timeoutType) {
+                    State.TIMEOUT -> "CheckTimeoutInterrupted"
+                    State.MESSAGE_TIMEOUT -> "CheckMessageTimeoutInterrupted"
+                    else -> error("unexpected timeout state: $timeoutType")
+                }
+            ).name("Check task was interrupter because of ${timeoutType.name.lowercase()}")
+            .bodyData(
+                EventUtils.createMessageBean(
+                    when (timeoutType) {
+                        State.TIMEOUT ->
+                            "Check task was interrupted because the task execution took longer than ${taskTimeout.timeout} mls. " +
+                                "It might be caused by the lack of the memory or CPU resources. Check the component resources consumption"
+                        State.MESSAGE_TIMEOUT ->
+                            "Check task was interrupted because the timestamp on the last processed message exceeds the message timeout. " +
+                                    (checkpointTimeout
+                                        ?.toInstant()
+                                        ?.let {
+                                            "Rule expects messages between $it and ${it.plusMillis(taskTimeout.messageTimeout)} " +
+                                                    "but processed one outside this range. Check the attached messages."
+                                        } ?: "But the message timeout is not specified. Contact the developers.")
+                        else -> error("unexpected timeout state: $timeoutType")
+                    }
+                )
+            )
     }
 
     private fun configureRootEvent() {
@@ -571,6 +608,7 @@ abstract class AbstractCheckTask(
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
         @JvmField
         val CONVERTER = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null, createParameters().setUseMarkerForNullsInMessage(true))
+        private val TIMEOUT_STATES: Set<State> = setOf(State.TIMEOUT, State.MESSAGE_TIMEOUT)
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
