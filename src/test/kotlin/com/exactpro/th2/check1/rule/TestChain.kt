@@ -95,8 +95,8 @@ class TestChain: AbstractCheckTaskTest() {
 
         val task = sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
-        assertEquals(8, eventList.size)
-        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(9, eventList.size)
+        assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(4, eventList.filter { it.status == FAILED }.size)
 
         sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { task.subscribeNextTask(it) }
@@ -110,8 +110,8 @@ class TestChain: AbstractCheckTaskTest() {
 
         val task = sequenceCheckRuleTask(listOf(1, 4), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
-        assertEquals(9, eventList.size)
-        assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(10, eventList.size)
+        assertEquals(6, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(4, eventList.filter { it.status == FAILED }.size)
 
         sequenceCheckRuleTask(listOf(2, 3), eventID, streams).also { task.subscribeNextTask(it) }
@@ -134,8 +134,8 @@ class TestChain: AbstractCheckTaskTest() {
         task.begin()
 
         val eventList = awaitEventBatchRequest(1000L, 4 * 2).flatMap(EventBatch::getEventsList)
-        assertEquals(4 * 3, eventList.size)
-        assertEquals(4 * 3, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(4 * 4, eventList.size)
+        assertEquals(4 * 4, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(listOf(1L, 2L, 3L, 4L), eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList).map(MessageID::getSequence))
     }
 
@@ -240,7 +240,7 @@ class TestChain: AbstractCheckTaskTest() {
             val rootEvent = eventsList.first()
             assertEquals(FAILED, rootEvent.status)
             assertEquals(3, rootEvent.attachedMessageIdsCount)
-            assertEquals(1, eventsList[2].attachedMessageIdsCount)
+            assertEquals(1, eventsList.single { it.type == "Verification" }.attachedMessageIdsCount)
             assertEquals(FAILED, eventsList.last().status)
         })
     }
@@ -250,20 +250,20 @@ class TestChain: AbstractCheckTaskTest() {
         awaitEventBatchRequest(1000L, times).drop(times - last).flatMap(EventBatch::getEventsList)
 
     private fun checkSimpleVerifySuccess(eventList: List<Event>, sequence: Long) {
-        assertEquals(3, eventList.size)
-        assertEquals(3, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(4, eventList.size)
+        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(listOf(sequence), eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList).map(MessageID::getSequence))
     }
 
     private fun checkSimpleVerifyFailure(eventList: List<Event>) {
-        assertEquals(3, eventList.size)
-        assertEquals(1, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(4, eventList.size)
+        assertEquals(2, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(2, eventList.filter { it.status == FAILED }.size)
     }
 
     private fun checkSequenceVerifySuccess(eventList: List<Event>, sequences: List<Long>) {
-        assertEquals(8, eventList.size)
-        assertEquals(8, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(9, eventList.size)
+        assertEquals(9, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(sequences, eventList
             .dropWhile { it.type != CHECK_MESSAGES_TYPE } // Skip prefilter
             .filter { it.type == VERIFICATION_TYPE }

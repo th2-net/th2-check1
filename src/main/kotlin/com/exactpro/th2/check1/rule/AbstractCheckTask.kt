@@ -70,6 +70,8 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import com.exactpro.th2.check1.utils.toMessageID
+import com.exactpro.th2.common.event.EventUtils.createMessageBean
 import com.exactpro.th2.common.util.toInstant
 
 /**
@@ -153,7 +155,7 @@ abstract class AbstractCheckTask(
     @Volatile
     protected var started = false
 
-    protected fun createRootEvent() = Event.from(submitTime).description(description)
+    protected fun createRootEvent(): Event = Event.from(submitTime).description(description)
 
     final override fun onStart() {
         super.onStart()
@@ -312,6 +314,7 @@ abstract class AbstractCheckTask(
         this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
         this.isDefaultSequence = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
+        addStartInfo(refs.rootEvent.addSubEventWithSamePeriod(), sequence, checkpointTimestamp)
 
         endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end(State.TIMEOUT, "Timeout is exited") }
@@ -353,6 +356,30 @@ abstract class AbstractCheckTask(
         }
     }
 
+    private fun addStartInfo(event: Event, lastSequence: Long, checkpointTimestamp: Timestamp?) {
+        with(event) {
+            name(
+                if (lastSequence == DEFAULT_SEQUENCE) {
+                    "Rule works from the beginning of the cache"
+                } else {
+                    "Rule works from the $lastSequence sequence in session ${sessionKey.sessionAlias} and direction ${sessionKey.direction}"
+                }
+            )
+            status(PASSED)
+            type("ruleStartPoint")
+            if (lastSequence != DEFAULT_SEQUENCE) {
+                messageID(sessionKey.toMessageID(lastSequence))
+            }
+            bodyData(createMessageBean("The rule starts working from " +
+                    (if (lastSequence == DEFAULT_SEQUENCE) "start of cache" else "sequence $lastSequence") +
+                    (checkpointTimestamp?.let {
+                        val instant = checkpointTimestamp.toInstant()
+                        " and expects messages between $instant and ${instant.plusMillis(taskTimeout.messageTimeout)}"
+                    } ?: "")))
+            bodyData(createMessageBean("Rule timeout is set to ${taskTimeout.timeout} mls"))
+        }
+    }
+
     private fun taskFinished() {
         var ruleEventStatus = EventStatus.FAILED
         try {
@@ -372,8 +399,8 @@ abstract class AbstractCheckTask(
                     .name("Check rule $description problem")
                     .type("Exception")
                     .status(FAILED)
-                    .bodyData(EventUtils.createMessageBean(message))
-                    .bodyData(EventUtils.createMessageBean(ex.message))
+                    .bodyData(createMessageBean(message))
+                    .bodyData(createMessageBean(ex.message))
                     .toProto(parentEventID))
                 .build())
         } finally {
@@ -489,8 +516,8 @@ abstract class AbstractCheckTask(
             refs.rootEvent.addSubEventWithSamePeriod()
                     .name("Check result event cannot build completely")
                     .type("eventNotComplete")
-                    .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
-                    .bodyData(EventUtils.createMessageBean(e.message))
+                    .bodyData(createMessageBean("An unexpected exception has been thrown during result check build"))
+                    .bodyData(createMessageBean(e.message))
                     .status(FAILED)
             true
         }
@@ -507,7 +534,7 @@ abstract class AbstractCheckTask(
                 }
             ).name("Check task was interrupter because of ${timeoutType.name.lowercase()}")
             .bodyData(
-                EventUtils.createMessageBean(
+                createMessageBean(
                     when (timeoutType) {
                         State.TIMEOUT ->
                             "Check task was interrupted because the task execution took longer than ${taskTimeout.timeout} mls. " +

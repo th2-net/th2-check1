@@ -51,6 +51,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
+import com.exactpro.th2.check1.utils.toMessageID
 import com.exactpro.th2.common.message.toJson
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -324,14 +325,6 @@ class CollectorService(
     private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
         return checkNotNull(messageRouter.subscribeAll(listener)) { "Can not subscribe to queues" }
     }
-
-    private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
-        .setConnectionId(ConnectionID.newBuilder()
-            .setSessionAlias(sessionAlias)
-            .build())
-        .setSequence(sequence)
-        .setDirection(direction)
-        .build()
 
     private fun publishCheckpoint(request: CheckpointRequestOrBuilder, checkpoint: Checkpoint, event: Event) {
         if (!request.hasParentEventId()) {
