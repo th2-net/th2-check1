@@ -524,6 +524,11 @@ abstract class AbstractCheckTask(
     }
 
     private fun addTimeoutEvent(timeoutType: State) {
+        val timeoutValue: Long = when (timeoutType) {
+            State.TIMEOUT -> taskTimeout.timeout
+            State.MESSAGE_TIMEOUT -> taskTimeout.messageTimeout
+            else -> error("unexpected timeout state: $timeoutType")
+        }
         refs.rootEvent.addSubEventWithSamePeriod()
             .status(FAILED)
             .type(
@@ -532,26 +537,33 @@ abstract class AbstractCheckTask(
                     State.MESSAGE_TIMEOUT -> "CheckMessageTimeoutInterrupted"
                     else -> error("unexpected timeout state: $timeoutType")
                 }
-            ).name("Check task was interrupter because of ${timeoutType.name.lowercase()}")
+            ).name("Rule processed $handledMessageCounter message(s) and was interrupted due to $timeoutValue mls ${timeoutType.name.lowercase()}")
             .bodyData(
                 createMessageBean(
                     when (timeoutType) {
-                        State.TIMEOUT ->
-                            "Check task was interrupted because the task execution took longer than ${taskTimeout.timeout} mls. " +
-                                "It might be caused by the lack of the memory or CPU resources. Check the component resources consumption"
-                        State.MESSAGE_TIMEOUT ->
-                            "Check task was interrupted because the timestamp on the last processed message exceeds the message timeout. " +
-                                    (checkpointTimeout
-                                        ?.toInstant()
-                                        ?.let {
-                                            "Rule expects messages between $it and ${it.plusMillis(taskTimeout.messageTimeout)} " +
-                                                    "but processed one outside this range. Check the attached messages."
-                                        } ?: "But the message timeout is not specified. Contact the developers.")
+                        State.TIMEOUT -> timeoutText()
+                        State.MESSAGE_TIMEOUT -> messageTimeoutText()
                         else -> error("unexpected timeout state: $timeoutType")
                     }
                 )
             )
     }
+
+    private fun messageTimeoutText(): String = "Check task was interrupted because the timestamp on the last processed message exceeds the message timeout. " +
+            (checkpointTimeout
+                ?.toInstant()
+                ?.let {
+                    "Rule expects messages between $it and ${it.plusMillis(taskTimeout.messageTimeout)} " +
+                            "but processed one outside this range. Check the messages attached to the root rule event to find all processed messages."
+                } ?: "But the message timeout is not specified. Contact the developers.")
+
+    private fun timeoutText(): String =
+        """
+            |Check task was interrupted because the task execution took longer than ${taskTimeout.timeout} mls. The possible reasons are:
+            |* incorrect message filter - rule didn't find a match for all requested messages and kept working until the timeout exceeded (check key fields)
+            |* incorrect point of start - some of the expected messages were behind the start point and rule couldn't find them (check the checkpoint)
+            |* lack of the resources - rule might perform slow and didn't get to the expected messages in specified timeout (check component resources)
+        """.trimMargin()
 
     private fun configureRootEvent() {
         refs.rootEvent.name(name()).type(type())
