@@ -1,16 +1,29 @@
 plugins {
     id 'com.palantir.docker' version '0.25.0'
-    id 'org.jetbrains.kotlin.jvm' version '1.5.30'
+    id 'org.jetbrains.kotlin.jvm' version '1.6.21'
     id "io.github.gradle-nexus.publish-plugin" version "1.0.0"
     id 'signing'
     id 'java-library'
     id 'application'
     id 'maven-publish'
+    id "org.owasp.dependencycheck" version "7.3.0"
+}
+
+dependencyCheck {
+    format='HTML'
+    failBuildOnCVSS=5
 }
 
 ext {
     sharedDir           = file("${project.rootDir}/shared")
-    sailfishVersion     = '3.2.1752'
+    sailfishVersion     = '3.3.11'
+}
+
+ext.excludeSailfish = { rcd ->
+    rcd.excludeModule("com.exactpro.sf", "sailfish-core")
+    rcd.excludeModule("com.exactpro.sf", "sailfish-common")
+    rcd.excludeModule("com.exactpro.sf", "sailfish-rest-api-client")
+    rcd.excludeModule("com.exactpro.sf", "service-http")
 }
 
 group = 'com.exactpro.th2'
@@ -33,15 +46,43 @@ repositories {
         url sharedDir
     }
 
-    mavenCentral()
     maven {
         name 'Sonatype_snapshots'
         url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+        content {
+            excludeSailfish(it)
+        }
+    }
+    // ignoreGradleMetadataRedirection is used for sonatype because
+    // Sailfish dependencies have constrains that interfere with our BOM
+    // so we exclude Gradle metadata for this repositories.
+    // We've checked these versions - they are compatible and safe to use
+    maven {
+        name 'Sonatype_snapshots'
+        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+        metadataSources {
+            mavenPom()
+            artifact()
+            ignoreGradleMetadataRedirection()
+        }
     }
     maven {
         name 'Sonatype_releases'
         url 'https://s01.oss.sonatype.org/content/repositories/releases/'
+        content {
+            excludeSailfish(it)
+        }
     }
+    maven {
+        name 'Sonatype_releases'
+        url 'https://s01.oss.sonatype.org/content/repositories/releases/'
+        metadataSources {
+            mavenPom()
+            artifact()
+            ignoreGradleMetadataRedirection()
+        }
+    }
+    mavenCentral()
     mavenLocal()
 
     configurations.all {
@@ -165,23 +206,19 @@ signing {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:3.0.0')
-    implementation 'com.exactpro.th2:grpc-check1:3.5.1'
-    implementation 'com.exactpro.th2:common:3.31.3'
-    implementation 'com.exactpro.th2:sailfish-utils:3.12.2'
-    implementation "org.slf4j:slf4j-log4j12"
-    implementation "org.slf4j:slf4j-api"
+    api platform('com.exactpro.th2:bom:4.0.2')
+    implementation 'com.exactpro.th2:grpc-check1:3.6.0'
+    implementation 'com.exactpro.th2:common:3.41.1'
+    implementation 'com.exactpro.th2:sailfish-utils:3.13.0'
 
-    implementation "com.exactpro.sf:sailfish-core:${sailfishVersion}"
-
-    implementation "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.21' // https://github.com/salesforce/reactive-grpc/issues/202
 
     implementation('io.prometheus:simpleclient') {
         because('metrics from messages and rules')
     }
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
 }
