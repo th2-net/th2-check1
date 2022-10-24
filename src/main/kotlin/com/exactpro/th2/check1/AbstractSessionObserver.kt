@@ -15,6 +15,7 @@ package com.exactpro.th2.check1
 import io.reactivex.observers.DisposableObserver
 import mu.KotlinLogging
 import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 abstract class AbstractSessionObserver<T> : DisposableObserver<T>() {
     override fun onComplete() {
@@ -27,6 +28,6 @@ abstract class AbstractSessionObserver<T> : DisposableObserver<T>() {
 
     companion object {
         @JvmField
-        val LOGGER: Logger = KotlinLogging.logger { }
+        val LOGGER: Logger = LoggerFactory.getLogger(AbstractSessionObserver::class.java)
     }
 }
