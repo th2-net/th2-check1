@@ -361,7 +361,14 @@ abstract class AbstractCheckTask(
 
     private fun taskFinished() {
         try {
-            val currentState = taskState.get()
+            val currentState = taskState.updateAndGet {
+                when (it) {
+                    // When we complete because of the stream completion the unsubscribe method might be called before the complete method
+                    // Because of that we need to check the status and use the completion status if we are still in BEGIN state
+                    State.BEGIN -> streamCompletedState
+                    else -> it
+                }
+            }
             LOGGER.info("Finishes task '$description' in state ${currentState.name}")
             if (currentState.callOnTimeoutCallback) {
                 callOnTimeoutCallback()
