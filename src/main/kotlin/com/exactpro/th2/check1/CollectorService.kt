@@ -220,7 +220,7 @@ class CollectorService(
             rootEvent.endTimestamp()
                 .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
             checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
-                val messageID = sessionKey.toMessageID(checkpointData.sequence)
+                val messageID = sessionKey.toMessageID(checkpointData)
                 rootEvent.messageID(messageID)
                     .addSubEventWithSamePeriod()
                     .name("Checkpoint for book name '${sessionKey.bookName}', session alias '${sessionKey.sessionAlias}', direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
@@ -255,7 +255,7 @@ class CollectorService(
         return checkNotNull(messageRouter.subscribeAll(listener)) { "Can not subscribe to queues" }
     }
 
-    private fun SessionKey.toMessageID(sequence: Long) = MessageID.newBuilder()
+    private fun SessionKey.toMessageID(data: CheckpointData) = MessageID.newBuilder()
         .setBookName(bookName)
         .setConnectionId(
             ConnectionID
@@ -263,7 +263,8 @@ class CollectorService(
                 .setSessionAlias(sessionAlias)
                 .build()
         )
-        .setSequence(sequence)
+        .setTimestamp(requireNotNull(data.timestamp) { "timestamp is not set for session $this" })
+        .setSequence(data.sequence)
         .setDirection(direction)
         .build()
 }
