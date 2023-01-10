@@ -207,3 +207,9 @@ dockerPrepare {
 docker {
     copySpec.from(tarTree("$buildDir/distributions/${applicationName}.tar"))
 }
+
+configurations {
+    compileClasspath {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}
