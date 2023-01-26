@@ -11,7 +11,7 @@ plugins {
 
 ext {
     sharedDir           = file("${project.rootDir}/shared")
-    sailfishVersion     = '3.3.51'
+    sailfishVersion     = '3.3.54'
 }
 
 group = 'com.exactpro.th2'
@@ -207,7 +207,7 @@ dependencies {
     api platform('com.exactpro.th2:bom:4.1.0')
     implementation 'com.exactpro.th2:grpc-check1:3.5.1'
     implementation 'com.exactpro.th2:common:3.44.0'
-    implementation 'com.exactpro.th2:sailfish-utils:3.14.0-th2-4347-vulnerabilities-4004340199-afa2a0e-SNAPSHOT'
+    implementation 'com.exactpro.th2:sailfish-utils:3.14.0'
 
     implementation "org.slf4j:slf4j-api"
 
