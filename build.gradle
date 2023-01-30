@@ -205,7 +205,7 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:4.1.0')
-    implementation 'com.exactpro.th2:grpc-check1:3.5.1'
+    implementation 'com.exactpro.th2:grpc-check1:3.6.0'
     implementation 'com.exactpro.th2:common:3.44.0'
     implementation 'com.exactpro.th2:sailfish-utils:3.14.0'
 
