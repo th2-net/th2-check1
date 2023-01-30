@@ -1,4 +1,4 @@
-# th2 check1 (3.9.0)
+# th2 check1 (3.10.0)
 
 ## Overview
 
@@ -191,6 +191,13 @@ The `th2_check1_actual_cache_number` metric separate messages with two labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 3.10.0
+
+#### Changed:
++ Migrated `common` version from `3.31.3` to `3.44.0`
++ Migrated `sailfish-utils` version from `3.12.2` to `3.14.0`
+  + sailfish updated to 3.3.54
 
 ### 3.9.0
 
