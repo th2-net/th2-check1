@@ -22,7 +22,6 @@ import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.AbstractSessionObserver
-import com.exactpro.th2.check1.ResultsStorage
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.CheckpointData
@@ -65,6 +64,7 @@ import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.SingleSubject
 import java.time.Instant
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ForkJoinPool
@@ -83,11 +83,12 @@ abstract class AbstractCheckTask(
     protected val sessionKey: SessionKey,
     private val parentEventID: EventID,
     private val messageStream: Observable<StreamContainer>,
-    private val eventBatchRouter: MessageRouter<EventBatch>,
-    private val resultsStorage: ResultsStorage
+    private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
 
-    protected open class Refs(val rootEvent: RuleRootEvent)
+    val result: CompletableFuture<EventStatus> = CompletableFuture()
+
+    protected open class Refs(val rootEvent: Event)
 
     protected class RefsKeeper<T : Refs>(refs: T) {
         private var refsNullable: T? = refs
@@ -151,11 +152,7 @@ abstract class AbstractCheckTask(
     @Volatile
     protected var started = false
 
-    class RuleRootEvent(timestamp: Instant) : Event(timestamp) {
-        val status: Status get() = status
-    }
-
-    protected fun createRootEvent() = RuleRootEvent(submitTime).apply { description(description) }
+    protected fun createRootEvent() = Event.from(submitTime).description(description)
 
     final override fun onStart() {
         super.onStart()
@@ -379,9 +376,13 @@ abstract class AbstractCheckTask(
                 .build())
         } finally {
             RuleMetric.decrementActiveRule(type())
-            if (ruleConfiguration.ruleId != 0L) {
-                resultsStorage.putResult(ruleConfiguration.ruleId, EventStatus.forNumber(refs.rootEvent.status.ordinal))
-            }
+
+            // We need to convert event to protobuf here because
+            // getAggregatedStatus() method is 'protected' in
+            // com.exactpro.th2.common.event.Event class
+            val status = refs.rootEvent.toProto(null).status
+            result.complete(status)
+
             refsKeeper.eraseRefs()
             sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }

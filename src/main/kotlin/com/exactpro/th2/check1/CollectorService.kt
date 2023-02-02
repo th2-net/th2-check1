@@ -32,8 +32,10 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.grpc.RequestStatus
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
@@ -49,12 +51,14 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 import com.exactpro.th2.common.message.toJson
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicLong
 
 class CollectorService(
     private val messageRouter: MessageRouter<MessageBatch>,
     private val eventBatchRouter: MessageRouter<EventBatch>,
-    resultsStorage: ResultsStorage,
-    private val configuration: Check1Configuration,
+    private val configuration: Check1Configuration
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
@@ -66,7 +70,8 @@ class CollectorService(
     private val streamObservable: Observable<StreamContainer>
     private val checkpointSubscriber: CheckpointSubscriber
     private val mqSubject: PublishSubject<MessageBatch>
-    private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, AbstractCheckTask> = ConcurrentHashMap()
+    private val rules: MutableMap<Long, AbstractCheckTask> = ConcurrentHashMap()
+    private val ruleIdCounter = AtomicLong()
 
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
@@ -92,25 +97,28 @@ class CollectorService(
 
         checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
 
-        ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter, resultsStorage)
+        ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter)
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckRule(request: CheckRuleRequest, ruleId: Long): ChainID {
+    fun verifyCheckRule(request: CheckRuleRequest): Pair<Long, ChainID> {
         val chainID = request.getChainIdOrGenerate()
+        val ruleId = ruleIdCounter.incrementAndGet()
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createCheckRule(request, value != null, ruleId)
+        rules.compute(ruleId) { _, value ->
+            val task = ruleFactory.createCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
-        return chainID
+
+        return ruleId to chainID
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, ruleId: Long): ChainID {
+    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): Pair<Long, ChainID> {
         val chainID = request.getChainIdOrGenerate()
+        val ruleId = ruleIdCounter.incrementAndGet()
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
         val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
@@ -121,24 +129,65 @@ class CollectorService(
             null
         }
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createSequenceCheckRule(request, value != null, ruleId)
+        rules.compute(ruleId) { _, value ->
+            val task = ruleFactory.createSequenceCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
                 .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this }
         }
-        return chainID
+
+        return ruleId to chainID
     }
 
-    fun verifyNoMessageCheck(request: NoMessageCheckRequest, ruleId: Long): ChainID {
+    fun verifyNoMessageCheck(request: NoMessageCheckRequest): Pair<Long, ChainID> {
         val chainID = request.getChainIdOrGenerate()
+        val ruleId = ruleIdCounter.incrementAndGet()
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createNoMessageCheckRule(request, value != null, ruleId)
+        rules.compute(ruleId) { _, value ->
+            val task = ruleFactory.createNoMessageCheckRule(request, value != null)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
-        return chainID
+
+        return ruleId to chainID
+    }
+
+    enum class RuleResult(
+        val requestStatus: RequestStatus.Status = RequestStatus.Status.ERROR,
+        val message: String? = null,
+        val status: EventStatus? = null
+    ) {
+        Passed(RequestStatus.Status.SUCCESS, status = EventStatus.SUCCESS),
+        Failed(RequestStatus.Status.SUCCESS, status = EventStatus.FAILED),
+        Timeout(message = "Timeout expired"),
+        NotFound(message = "No rule with specified id found"),
+        Error(message = "Failed to retrieve rule result due to internal error. See logs for more details.");
+    }
+
+    fun getRuleResult(id: Long, timeoutNano: Long): RuleResult {
+        val task = rules[id]
+        if (task == null) {
+            logger.debug("No rule with specified id found")
+            return RuleResult.NotFound
+        }
+
+        return try {
+            val status: EventStatus = task.result.get(timeoutNano, TimeUnit.NANOSECONDS)
+            when (status) {
+                EventStatus.SUCCESS -> RuleResult.Passed
+                EventStatus.FAILED -> RuleResult.Failed
+                else -> {
+                    logger.error("Invalid rule status: $status")
+                    RuleResult.Error
+                }
+            }
+        } catch (e: TimeoutException) {
+            logger.debug("Timeout expired")
+            RuleResult.Timeout
+        } catch (e: Exception) {
+            logger.error("Failed to retrieve rule result: ", e)
+            RuleResult.Error
+        }
     }
 
     private fun AbstractCheckTask.addToChainOrBegin(value: AbstractCheckTask?, checkpoint: GrpcCheckpoint) {
@@ -178,7 +227,7 @@ class CollectorService(
 
     private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
         val now = Instant.now()
-        eventIdToLastCheckTask.values.removeIf { task ->
+        rules.values.removeIf { task ->
             val endTime = task.endTime
             when {
                 !olderThan(now, delta, unit, endTime) -> false

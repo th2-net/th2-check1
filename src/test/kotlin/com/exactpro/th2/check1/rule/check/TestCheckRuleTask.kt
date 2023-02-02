@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,8 +81,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         messageFilter,
         parentEventID,
         messageStream,
-        clientStub,
-        resultsStorage
+        clientStub
     )
 
     @Test
@@ -357,7 +356,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         }
 
         val config = Check1Configuration(isDefaultCheckSimpleCollectionsOrder = defaultValue)
-        val ruleFactory = RuleFactory(config, streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(config, streams, clientStub)
         val request = CheckRuleRequest.newBuilder()
             .setParentEventId(createEvent("root"))
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -366,7 +365,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setChainId(ChainID.newBuilder().setId("test_chain_id"))
             .build()
 
-        ruleFactory.createCheckRule(request, true, 0).begin()
+        ruleFactory.createCheckRule(request, true).begin()
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)

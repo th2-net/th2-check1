@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 .putFields("B", it.toValue())
                 .build()
         })
-        val factory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val factory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
@@ -65,7 +65,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
             .build()
-        val sequenceRule = factory.createSequenceCheckRule(request, true, 0)
+        val sequenceRule = factory.createSequenceCheckRule(request, true)
         val silenceCheck = factory.createSilenceCheck(request, 1000)
         sequenceRule.subscribeNextTask(silenceCheck)
         sequenceRule.begin()
@@ -92,7 +92,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 .putFields("B", it.toValue())
                 .build()
         })
-        val factory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val factory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
@@ -112,7 +112,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
             .build()
-        val sequenceRule = factory.createSequenceCheckRule(request, true, 0)
+        val sequenceRule = factory.createSequenceCheckRule(request, true)
         val silenceCheck = factory.createSilenceCheck(request, 1000)
         sequenceRule.subscribeNextTask(silenceCheck)
         sequenceRule.begin()
@@ -134,7 +134,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 .putFields("B", it.toValue())
                 .build()
         })
-        val factory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val factory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
@@ -164,9 +164,9 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                     .putFields("B", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("2").build())
                 ).build())
             .build()
-        val sequenceRule = factory.createSequenceCheckRule(request, true, 0)
+        val sequenceRule = factory.createSequenceCheckRule(request, true)
         val silenceCheck = factory.createSilenceCheck(request, 1000)
-        val anotherRule = factory.createSequenceCheckRule(anotherRequest, true, 0)
+        val anotherRule = factory.createSequenceCheckRule(anotherRequest, true)
         sequenceRule.subscribeNextTask(silenceCheck)
         sequenceRule.begin()
         silenceCheck.subscribeNextTask(anotherRule)
@@ -197,7 +197,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
                 .putFields("B", it.toValue())
                 .build()
         })
-        val factory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val factory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
@@ -219,7 +219,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .setParentEventId(parentId)
             .build()
         val silenceCheck = factory.createSilenceCheck(request, 1000)
-        val sequenceRule = factory.createSequenceCheckRule(request.toBuilder().setDescription("2").build(), true, 0)
+        val sequenceRule = factory.createSequenceCheckRule(request.toBuilder().setDescription("2").build(), true)
         silenceCheck.begin()
         silenceCheck.subscribeNextTask(sequenceRule)
 

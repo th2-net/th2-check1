@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ class RuleConfigurationTest {
     fun `check that time precision is negative`() {
         val exception = assertThrows<IllegalArgumentException> {
             RuleConfiguration(
-                    0,
                     TaskTimeout(0, 0), null, Duration.ofSeconds(-1),
                     0.005,
                     1,
@@ -42,7 +41,6 @@ class RuleConfigurationTest {
     fun `check that decimal precision is negative`() {
         val exception = assertThrows<IllegalArgumentException> {
             RuleConfiguration(
-                    0,
                     TaskTimeout(0, 0), null, Duration.ofSeconds(1),
                     -0.005,
                     1,
@@ -59,7 +57,6 @@ class RuleConfigurationTest {
 
         val exception = assertThrows<IllegalArgumentException> {
             RuleConfiguration(
-                    0,
                     TaskTimeout(0, 0),
                     null,
                     Duration.ofSeconds(1),
@@ -78,7 +75,6 @@ class RuleConfigurationTest {
 
         val exception = assertThrows<IllegalArgumentException> {
             RuleConfiguration(
-                    0,
                     TaskTimeout(timeout, 0),
                     null,
                     Duration.ofSeconds(1),

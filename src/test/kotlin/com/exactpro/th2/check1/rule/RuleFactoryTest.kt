@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.check1.ResultsStorage
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
@@ -50,7 +49,6 @@ import kotlin.test.assertNotNull
 
 class RuleFactoryTest {
     private val clientStub: MessageRouter<EventBatch> = spy { }
-    private val resultsStorage = ResultsStorage(5)
 
     @Test
     fun `failed rule creation because session alias is empty`() {
@@ -63,7 +61,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -72,7 +70,7 @@ class RuleFactoryTest {
         assertThrowsWithMessages<RuleCreationException>(
                 "An error occurred while creating rule",
                 "Session alias cannot be empty"
-        ) { ruleFactory.createCheckRule(request, true, 0) }
+        ) { ruleFactory.createCheckRule(request, true) }
 
         assertEvents()
     }
@@ -88,7 +86,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -103,7 +101,7 @@ class RuleFactoryTest {
                 .build()
 
         val createCheckRule = assertDoesNotThrow {
-            ruleFactory.createCheckRule(request, true, 0)
+            ruleFactory.createCheckRule(request, true)
         }
         assertNotNull(createCheckRule) { "Rule cannot be null" }
     }
@@ -119,7 +117,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -136,7 +134,7 @@ class RuleFactoryTest {
         assertThrowsWithMessages<RuleCreationException>(
                 "An error occurred while creating rule",
                 "The request has an invalid chain ID or connectivity ID. Please use checkpoint instead of chain ID"
-        ) { ruleFactory.createCheckRule(request, false, 0) }
+        ) { ruleFactory.createCheckRule(request, false) }
 
         assertEvents()
     }
@@ -152,7 +150,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -183,7 +181,7 @@ class RuleFactoryTest {
 
 
         val createCheckRule = assertDoesNotThrow {
-            ruleFactory.createCheckRule(request, false, 0)
+            ruleFactory.createCheckRule(request, false)
         }
         assertNotNull(createCheckRule) { "Rule cannot be null" }
     }
@@ -200,7 +198,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -232,7 +230,7 @@ class RuleFactoryTest {
         assertThrowsWithMessages<RuleCreationException>(
                 "An error occurred while creating rule",
                 "The checkpoint doesn't contain a direction checkpoint with session alias '$sessionAlias'"
-        ) { ruleFactory.createCheckRule(request, true, 0) }
+        ) { ruleFactory.createCheckRule(request, true) }
 
         assertEvents()
     }
@@ -248,7 +246,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -265,7 +263,7 @@ class RuleFactoryTest {
         assertThrowsWithMessages<RuleCreationException>(
                 "An error occurred while creating rule",
                 "Request must contain a checkpoint, because the 'messageTimeout' is used and no chain ID is specified"
-        ) { ruleFactory.createCheckRule(request, true, 0) }
+        ) { ruleFactory.createCheckRule(request, true) }
 
         assertEvents()
     }
@@ -283,7 +281,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -315,7 +313,7 @@ class RuleFactoryTest {
         assertThrowsWithMessages<RuleCreationException>(
                 "An error occurred while creating rule",
                 "The direction checkpoint doesn't contain a checkpoint data with direction '$direction'"
-        ) { ruleFactory.createCheckRule(request, true, 0) }
+        ) { ruleFactory.createCheckRule(request, true) }
 
         assertEvents()
     }
@@ -333,7 +331,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -365,7 +363,7 @@ class RuleFactoryTest {
         assertThrowsWithMessages<RuleCreationException>(
                 "An error occurred while creating rule",
                 "The checkpoint data has incorrect sequence number '$sequence'"
-        ) { ruleFactory.createCheckRule(request, true, 0) }
+        ) { ruleFactory.createCheckRule(request, true) }
 
         assertEvents()
     }
@@ -382,7 +380,7 @@ class RuleFactoryTest {
                         .build()
         ))
 
-        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub, resultsStorage)
+        val ruleFactory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val request = CheckRuleRequest.newBuilder()
                 .setParentEventId(EventID.newBuilder().setId("root").build())
@@ -413,7 +411,7 @@ class RuleFactoryTest {
         assertThrowsWithMessages<RuleCreationException>(
                 "An error occurred while creating rule",
                 "The checkpoint data doesn't contain timestamp"
-        ) { ruleFactory.createCheckRule(request, true, 0) }
+        ) { ruleFactory.createCheckRule(request, true) }
 
         assertEvents()
     }

@@ -16,7 +16,6 @@
 
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.check1.ResultsStorage
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
@@ -51,8 +50,7 @@ import java.util.concurrent.ForkJoinPool
 class RuleFactory(
     configuration: Check1Configuration,
     private val streamObservable: Observable<StreamContainer>,
-    private val eventBatchRouter: MessageRouter<EventBatch>,
-    private val resultsStorage: ResultsStorage
+    private val eventBatchRouter: MessageRouter<EventBatch>
 ) {
     private val maxEventBatchContentSize = configuration.maxEventBatchContentSize
     private val defaultRuleExecutionTimeout = configuration.ruleExecutionTimeout
@@ -61,7 +59,7 @@ class RuleFactory(
     private val isCheckNullValueAsEmpty = configuration.isCheckNullValueAsEmpty
     private val defaultCheckSimpleCollectionsOrder = configuration.isDefaultCheckSimpleCollectionsOrder
 
-    fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean, ruleId: Long): CheckRuleTask =
+    fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean): CheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -80,7 +78,6 @@ class RuleFactory(
                     }.also { it.validateRootMessageFilter() }
 
                     val ruleConfiguration = RuleConfiguration(
-                            ruleId,
                             createTaskTimeout(request.timeout, request.messageTimeout),
                             request.description,
                             timePrecision,
@@ -97,8 +94,7 @@ class RuleFactory(
                             filter,
                             request.parentEventId,
                             streamObservable,
-                            eventBatchRouter,
-                            resultsStorage
+                            eventBatchRouter
                     )
                 }
                 onErrorEvent {
@@ -108,7 +104,7 @@ class RuleFactory(
                 }
             }
 
-    fun createSequenceCheckRule(request: CheckSequenceRuleRequest, isChainIdExist: Boolean, ruleId: Long): SequenceCheckRuleTask =
+    fun createSequenceCheckRule(request: CheckSequenceRuleRequest, isChainIdExist: Boolean): SequenceCheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -127,7 +123,6 @@ class RuleFactory(
                     }.onEach { it.validateRootMessageFilter() }
 
                     val ruleConfiguration = RuleConfiguration(
-                            ruleId,
                             createTaskTimeout(request.timeout, request.messageTimeout),
                             request.description,
                             timePrecision,
@@ -146,8 +141,7 @@ class RuleFactory(
                             request.checkOrder,
                             request.parentEventId,
                             streamObservable,
-                            eventBatchRouter,
-                            resultsStorage
+                            eventBatchRouter
                     )
                 }
                 onErrorEvent {
@@ -157,7 +151,7 @@ class RuleFactory(
                 }
             }
 
-    fun createNoMessageCheckRule(request: NoMessageCheckRequest, isChainIdExist: Boolean, ruleId: Long): NoMessageCheckTask =
+    fun createNoMessageCheckRule(request: NoMessageCheckRequest, isChainIdExist: Boolean): NoMessageCheckTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -168,7 +162,6 @@ class RuleFactory(
                     checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
 
                     val ruleConfiguration = RuleConfiguration(
-                            ruleId,
                             createTaskTimeout(request.timeout, request.messageTimeout),
                             request.description,
                             timePrecision,
@@ -185,8 +178,7 @@ class RuleFactory(
                             request.preFilter,
                             parentEventID,
                             streamObservable,
-                            eventBatchRouter,
-                            resultsStorage
+                            eventBatchRouter
                     )
                 }
                 onErrorEvent {
@@ -207,7 +199,6 @@ class RuleFactory(
                 val sessionKey = SessionKey(sessionAlias, directionOrDefault(request.direction))
 
                 val ruleConfiguration = RuleConfiguration(
-                        0,
                         createTaskTimeout(timeout),
                         request.description.takeIf(String::isNotEmpty),
                         timePrecision,
@@ -224,8 +215,7 @@ class RuleFactory(
                     sessionKey,
                     request.parentEventId,
                     streamObservable,
-                    eventBatchRouter,
-                    resultsStorage
+                    eventBatchRouter
                 )
             }
             onErrorEvent {

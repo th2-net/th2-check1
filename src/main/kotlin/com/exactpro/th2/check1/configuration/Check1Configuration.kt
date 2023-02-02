@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,4 @@ class Check1Configuration(
     @field:JsonProperty(value = "enable-checkpoint-events-publication", defaultValue = "true")
     @field:JsonPropertyDescription("Enables events publication if parent event ID is specified in checkpoint request")
     val enableCheckpointEventsPublication: Boolean = true,
-
-    @field:JsonProperty(value = "results-cleanup-timeout-sec")
-    val resultsCleanupTimeoutSec: Long = 60L
 )
