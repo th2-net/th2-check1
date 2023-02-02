@@ -1,16 +1,17 @@
 plugins {
     id 'com.palantir.docker' version '0.25.0'
-    id 'org.jetbrains.kotlin.jvm' version '1.5.32'
+    id 'org.jetbrains.kotlin.jvm' version '1.6.21'
     id "io.github.gradle-nexus.publish-plugin" version "1.0.0"
     id 'signing'
     id 'java-library'
     id 'application'
     id 'maven-publish'
+    id "org.owasp.dependencycheck" version "7.4.4"
 }
 
 ext {
     sharedDir           = file("${project.rootDir}/shared")
-    sailfishVersion     = '3.2.1877'
+    sailfishVersion     = '3.3.54'
 }
 
 group = 'com.exactpro.th2'
@@ -27,26 +28,64 @@ compileTestKotlin {
 sourceCompatibility = 11
 targetCompatibility = 11
 
+ext.excludeSailfish = { rcd ->
+    rcd.excludeModule("com.exactpro.sf", "sailfish-core")
+    rcd.excludeModule("com.exactpro.sf", "sailfish-common")
+    rcd.excludeModule("com.exactpro.sf", "sailfish-rest-api-client")
+    rcd.excludeModule("com.exactpro.sf", "service-http")
+}
+
 repositories {
     maven {
         name 'MavenLocal'
         url sharedDir
     }
 
-    mavenCentral()
     maven {
         name 'Sonatype_snapshots'
         url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+        content {
+            excludeSailfish(it)
+        }
+    }
+
+    // ignoreGradleMetadataRedirection is used for sonatype because
+    // Sailfish dependencies have constrains that interfere with our BOM
+    // so we exclude Gradle metadata for this repositories.
+    // We've checked these versions - they are compatible and safe to use
+    maven {
+        name 'Sonatype_snapshots'
+        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+        metadataSources {
+            mavenPom()
+            artifact()
+            ignoreGradleMetadataRedirection()
+        }
     }
     maven {
         name 'Sonatype_releases'
         url 'https://s01.oss.sonatype.org/content/repositories/releases/'
+        content {
+            excludeSailfish(it)
+        }
     }
+    maven {
+        name 'Sonatype_releases'
+        url 'https://s01.oss.sonatype.org/content/repositories/releases/'
+        metadataSources {
+            mavenPom()
+            artifact()
+            ignoreGradleMetadataRedirection()
+        }
+    }
+    mavenCentral()
     mavenLocal()
 
     configurations.all {
-        resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
-        resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+        resolutionStrategy {
+            cacheChangingModulesFor 0, 'seconds'
+            cacheDynamicVersionsFor 0, 'seconds'
+        }
     }
 }
 
@@ -165,11 +204,11 @@ signing {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:3.2.0')
+    api platform('com.exactpro.th2:bom:4.1.0')
     implementation 'com.exactpro.th2:grpc-check1:3.6.1-TH2-4728-4078276443-SNAPSHOT'
-    implementation 'com.exactpro.th2:common:3.41.0-dev-2918529806-SNAPSHOT'
-    implementation 'com.exactpro.th2:sailfish-utils:3.12.4'
-    implementation "org.slf4j:slf4j-log4j12"
+    implementation 'com.exactpro.th2:common:3.44.0'
+    implementation 'com.exactpro.th2:sailfish-utils:3.14.0'
+
     implementation "org.slf4j:slf4j-api"
 
     implementation "com.exactpro.sf:sailfish-core:${sailfishVersion}"
@@ -206,4 +245,10 @@ dockerPrepare {
 
 docker {
     copySpec.from(tarTree("$buildDir/distributions/${applicationName}.tar"))
+}
+
+configurations {
+    compileClasspath {
+        resolutionStrategy.activateDependencyLocking()
+    }
 }
