@@ -35,10 +35,10 @@ import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.nhaarman.mockitokotlin2.argumentCaptor
-import com.nhaarman.mockitokotlin2.spy
-import com.nhaarman.mockitokotlin2.timeout
-import com.nhaarman.mockitokotlin2.verify
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.spy
+import org.mockito.kotlin.timeout
+import org.mockito.kotlin.verify
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
