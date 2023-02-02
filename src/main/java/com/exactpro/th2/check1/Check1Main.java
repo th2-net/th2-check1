@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1;
 
 import java.util.ArrayDeque;
@@ -42,10 +43,11 @@ public class Check1Main {
             GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
             Check1Configuration configuration = commonFactory.getCustomConfiguration(Check1Configuration.class);
 
-            CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), configuration);
+            ResultsStorage resultsStorage = new ResultsStorage(configuration.getResultsCleanupTimeoutSec());
+            CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), resultsStorage, configuration);
             toDispose.add(collectorService::close);
 
-            Check1Handler check1Handler = new Check1Handler(collectorService);
+            Check1Handler check1Handler = new Check1Handler(collectorService, resultsStorage);
             Check1Server check1Server = new Check1Server(grpcRouter.startServer(check1Handler));
             check1Server.start();
             LOGGER.info("verify started");

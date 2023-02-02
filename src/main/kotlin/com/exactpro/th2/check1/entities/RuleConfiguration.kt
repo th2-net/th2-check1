@@ -16,6 +16,7 @@ package com.exactpro.th2.check1.entities
 import java.time.Duration
 
 data class RuleConfiguration(
+    val ruleId: Long,
     val taskTimeout: TaskTimeout,
     val description: String?,
     val timePrecision: Duration,

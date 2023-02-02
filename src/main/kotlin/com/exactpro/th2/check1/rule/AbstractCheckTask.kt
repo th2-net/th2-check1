@@ -1,9 +1,12 @@
 /*
- * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,6 +22,7 @@ import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.AbstractSessionObserver
+import com.exactpro.th2.check1.ResultsStorage
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.CheckpointData
@@ -38,6 +42,7 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
@@ -78,10 +83,11 @@ abstract class AbstractCheckTask(
     protected val sessionKey: SessionKey,
     private val parentEventID: EventID,
     private val messageStream: Observable<StreamContainer>,
-    private val eventBatchRouter: MessageRouter<EventBatch>
+    private val eventBatchRouter: MessageRouter<EventBatch>,
+    private val resultsStorage: ResultsStorage
 ) : AbstractSessionObserver<MessageContainer>() {
 
-    protected open class Refs(val rootEvent: Event)
+    protected open class Refs(val rootEvent: RuleRootEvent)
 
     protected class RefsKeeper<T : Refs>(refs: T) {
         private var refsNullable: T? = refs
@@ -145,7 +151,11 @@ abstract class AbstractCheckTask(
     @Volatile
     protected var started = false
 
-    protected fun createRootEvent() = Event.from(submitTime).description(description)
+    class RuleRootEvent(timestamp: Instant) : Event(timestamp) {
+        val status: Status get() = status
+    }
+
+    protected fun createRootEvent() = RuleRootEvent(submitTime).apply { description(description) }
 
     final override fun onStart() {
         super.onStart()
@@ -369,6 +379,9 @@ abstract class AbstractCheckTask(
                 .build())
         } finally {
             RuleMetric.decrementActiveRule(type())
+            if (ruleConfiguration.ruleId != 0L) {
+                resultsStorage.putResult(ruleConfiguration.ruleId, EventStatus.forNumber(refs.rootEvent.status.ordinal))
+            }
             refsKeeper.eraseRefs()
             sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }

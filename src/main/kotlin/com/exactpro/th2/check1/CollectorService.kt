@@ -1,15 +1,19 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1
 
 import com.exactpro.th2.check1.configuration.Check1Configuration
@@ -49,6 +53,7 @@ import com.exactpro.th2.common.message.toJson
 class CollectorService(
     private val messageRouter: MessageRouter<MessageBatch>,
     private val eventBatchRouter: MessageRouter<EventBatch>,
+    resultsStorage: ResultsStorage,
     private val configuration: Check1Configuration,
 ) {
 
@@ -87,24 +92,24 @@ class CollectorService(
 
         checkpointSubscriber = streamObservable.subscribeWith(CheckpointSubscriber())
 
-        ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter)
+        ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter, resultsStorage)
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckRule(request: CheckRuleRequest): ChainID {
+    fun verifyCheckRule(request: CheckRuleRequest, ruleId: Long): ChainID {
         val chainID = request.getChainIdOrGenerate()
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createCheckRule(request, value != null)
+            val task = ruleFactory.createCheckRule(request, value != null, ruleId)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): ChainID {
+    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, ruleId: Long): ChainID {
         val chainID = request.getChainIdOrGenerate()
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
@@ -117,20 +122,20 @@ class CollectorService(
         }
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createSequenceCheckRule(request, value != null)
+            val task = ruleFactory.createSequenceCheckRule(request, value != null, ruleId)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
                 .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this }
         }
         return chainID
     }
 
-    fun verifyNoMessageCheck(request: NoMessageCheckRequest): ChainID {
+    fun verifyNoMessageCheck(request: NoMessageCheckRequest, ruleId: Long): ChainID {
         val chainID = request.getChainIdOrGenerate()
 
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createNoMessageCheckRule(request, value != null)
+            val task = ruleFactory.createNoMessageCheckRule(request, value != null, ruleId)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
