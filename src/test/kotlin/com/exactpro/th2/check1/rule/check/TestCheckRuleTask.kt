@@ -61,6 +61,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.lang.IllegalArgumentException
 import java.time.Instant
 import java.util.stream.Stream
+import java.util.concurrent.Executors
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -80,6 +81,35 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         messageStream,
         clientStub
     )
+
+    @Test
+    fun `success verification several rules on same executor`() {
+        val streams = createStreams(SESSION_ALIAS, Direction.FIRST, listOf(
+            message(MESSAGE_TYPE, Direction.FIRST, SESSION_ALIAS)
+                .mergeMetadata(MessageMetadata.newBuilder()
+                    .putProperties("keyProp", "42")
+                    .putProperties("notKeyProp", "2")
+                    .build())
+                .build()
+        ))
+
+        val eventID = EventID.newBuilder().setId("root").build()
+        val filter = RootMessageFilter.newBuilder()
+            .setMessageType(MESSAGE_TYPE)
+            .setMetadataFilter(MetadataFilter.newBuilder()
+                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
+            .build()
+        val executor = Executors.newSingleThreadExecutor()
+
+        checkTask(filter, eventID, streams).apply { begin(executorService = executor) }
+        checkTask(filter, eventID, streams).apply { begin(executorService = executor) }
+
+        val eventBatches = awaitEventBatchRequest(1000L, 4)
+        val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+        val eventsPerRule = 5
+        assertEquals(2 * eventsPerRule, eventList.size)
+        assertEquals(2 * eventsPerRule, eventList.filter { it.status == SUCCESS }.size)
+    }
 
     @Test
     fun `success verification`() {
@@ -103,8 +133,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertEquals(4, eventList.size)
-        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(5, eventList.size)
+        assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
     }
 
     @Test
@@ -153,9 +183,9 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val task = checkTask(filter, eventID, streams, 200)
         task.begin()
 
-        val eventBatches = awaitEventBatchRequest(1000L, 3)
+        val eventBatches = awaitEventBatchRequest(1000L, 4)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertEquals(4, eventList.size)
+        assertEquals(5, eventList.size)
         assertEquals(2, eventList.filter { it.status == EventStatus.FAILED }.size) // Message filter and verification exceed max event batch content size
     }
 
@@ -181,7 +211,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventBatch = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatch.flatMap(EventBatch::getEventsList)
-        assertEquals(4, eventList.size)
+        assertEquals(5, eventList.size)
         assertTrue({
             eventList.none { it.status == EventStatus.FAILED }
         }) {
@@ -294,7 +324,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertAll({
-            assertEquals(3, eventList.size)
+            assertEquals(4, eventList.size)
         }, {
             val verificationEvent = eventList.find { it.type == "Verification" }
             assertNotNull(verificationEvent) { "Missed verification event" }
@@ -367,7 +397,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertAll({
-            assertEquals(3, eventList.size)
+            assertEquals(4, eventList.size)
         }, {
             val verificationEvent = eventList.find { it.type == "Verification" }
             assertNotNull(verificationEvent) { "Missed verification event" }
@@ -407,7 +437,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertAll({
-            assertEquals(3, eventList.size)
+            assertEquals(4, eventList.size)
         }, {
             val verificationEvent = eventList.find { it.type == "Verification" }
             assertNotNull(verificationEvent) { "Missed verification event" }
@@ -448,8 +478,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertEquals(4, eventList.size)
-        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(5, eventList.size)
+        assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
     }
 
     @Test
@@ -477,7 +507,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertEquals(5, eventList.size)
+        assertEquals(6, eventList.size)
         assertEquals(2, eventList.filter { it.status == SUCCESS && it.type == "Verification" }.size)
         assertEquals(FAILED, eventList.last().status)
     }
@@ -515,8 +545,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertEquals(3, eventList.size)
-        assertEquals(2, eventList.filter { it.status == FAILED }.size)
+        assertEquals(5, eventList.size)
+        assertEquals(3, eventList.filter { it.status == FAILED }.size)
     }
 
     @Test
@@ -572,7 +602,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertAll({
-            assertEquals(3, eventList.size)
+            assertEquals(4, eventList.size)
         }, {
             val verificationEvent = eventList.find { it.type == "Verification" }
             assertNotNull(verificationEvent) { "Missed verification event" }

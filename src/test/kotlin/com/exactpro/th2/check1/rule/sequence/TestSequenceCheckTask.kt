@@ -51,6 +51,8 @@ import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import com.exactpro.th2.common.message.toJson
+import org.junit.jupiter.api.Assertions
 
 class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
@@ -124,6 +126,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         /*
             checkSequenceRule
+              ruleStartPoint
               preFiltering
                 Verification x 3
               checkMessages
@@ -152,8 +155,13 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 assertTrue (getEventsList().all { VERIFICATION_TYPE == it.type })
             }
             with(batchRequest[5]) {
-                assertEquals(1, eventsCount)
-                assertEquals("checkSequence", getEvents(0).type)
+                assertEquals(2, eventsCount)
+                Assertions.assertEquals(1, eventsList.count { it.type == "checkSequence" }) {
+                    "unexpected count of \"checkSequence\" events: ${eventsList.joinToString { it.toJson() }}"
+                }
+                Assertions.assertEquals(1, eventsList.count { it.type == "ruleStartPoint" }) {
+                    "unexpected count of \"ruleStartPoint\" events: ${eventsList.joinToString { it.toJson() }}"
+                }
             }
         }, {
             val checkedMessages = assertNotNull(eventsList.find { it.type == CHECK_MESSAGES_TYPE }, "Cannot find checkMessages event")
@@ -763,7 +771,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertAll({
-            assertEquals(3, eventList.size)
+            assertEquals(4, eventList.size)
             assertEquals(1, eventList.filter { it.type == "internalError" }.size)
         })
     }
