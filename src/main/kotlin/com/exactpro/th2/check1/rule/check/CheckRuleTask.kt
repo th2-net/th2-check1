@@ -29,6 +29,7 @@ import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
@@ -46,19 +47,22 @@ class CheckRuleTask(
     protoMessageFilter: RootMessageFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
-    eventBatchRouter: MessageRouter<EventBatch>
+    eventBatchRouter: MessageRouter<EventBatch>,
+    onTaskFinished: ((EventStatus) -> Unit)? = null
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
         rootEvent: Event,
+        onTaskFinished: ((EventStatus) -> Unit)?,
         val protoMessageFilter: RootMessageFilter,
         val messageFilter: SailfishFilter,
         val metadataFilter: SailfishFilter?
-    ) : AbstractCheckTask.Refs(rootEvent)
+    ) : AbstractCheckTask.Refs(rootEvent, onTaskFinished)
 
     override val refsKeeper = RefsKeeper(
         Refs(
             rootEvent = createRootEvent(),
+            onTaskFinished = onTaskFinished,
             protoMessageFilter = protoMessageFilter,
             messageFilter = SailfishFilter(
                 CONVERTER.fromProtoPreFilter(protoMessageFilter),

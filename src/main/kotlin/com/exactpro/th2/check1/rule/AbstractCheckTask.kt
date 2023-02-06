@@ -64,7 +64,6 @@ import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.SingleSubject
 import java.time.Instant
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ForkJoinPool
@@ -86,9 +85,10 @@ abstract class AbstractCheckTask(
     private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
 
-    val result: CompletableFuture<EventStatus> = CompletableFuture()
-
-    protected open class Refs(val rootEvent: Event)
+    protected open class Refs(
+        val rootEvent: Event,
+        val onTaskFinished: ((EventStatus) -> Unit)?
+    )
 
     protected class RefsKeeper<T : Refs>(refs: T) {
         private var refsNullable: T? = refs
@@ -353,13 +353,14 @@ abstract class AbstractCheckTask(
     }
 
     private fun taskFinished() {
+        var ruleEventStatus = EventStatus.FAILED
         try {
             val currentState = taskState.get()
             LOGGER.info("Finishes task '$description' in state ${currentState.name}")
             if (currentState.callOnTimeoutCallback) {
                 callOnTimeoutCallback()
             }
-            publishEvent()
+            ruleEventStatus = publishEvent()
             LOGGER.info("Task '$description' has been finished")
         } catch (ex: Exception) {
             val message = "Cannot finish task '$description'"
@@ -377,12 +378,7 @@ abstract class AbstractCheckTask(
         } finally {
             RuleMetric.decrementActiveRule(type())
 
-            // We need to convert event to protobuf here because
-            // getAggregatedStatus() method is 'protected' in
-            // com.exactpro.th2.common.event.Event class
-            val status = refs.rootEvent.toProto(null).status
-            result.complete(status)
-
+            refs.onTaskFinished?.invoke(ruleEventStatus)
             refsKeeper.eraseRefs()
             sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }
@@ -433,34 +429,38 @@ abstract class AbstractCheckTask(
     /**
      * Publishes the event to [eventBatchRouter].
      */
-    private fun publishEvent() {
+    private fun publishEvent(): EventStatus {
         val prevState = taskState.getAndSet(State.PUBLISHED)
+        var ruleEventStatus: EventStatus? = null
         if (prevState != State.PUBLISHED) {
             val hasError = completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
             if (skipPublication && !hasError) {
                 LOGGER.info("Skip event publication for task ${type()} '$description' (${hashCode()})")
-                return
-            }
-            val batches = refs.rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
+            } else {
+                val batches = refs.rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
+                ruleEventStatus = batches[0].getEvents(0).status
 
-            RESPONSE_EXECUTOR.execute {
-                batches.forEach { batch ->
-                    LOGGER.debug("Sending event batch parent id '{}'", parentEventID.id)
-                    try {
-                        eventBatchRouter.send(batch)
-                        if (LOGGER.isDebugEnabled) {
-                            LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
+                RESPONSE_EXECUTOR.execute {
+                    batches.forEach { batch ->
+                        LOGGER.debug("Sending event batch parent id '{}'", parentEventID.id)
+                        try {
+                            eventBatchRouter.send(batch)
+                            if (LOGGER.isDebugEnabled) {
+                                LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
+                            }
+                        } catch (e: Exception) {
+                            LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
                         }
-                    } catch (e: Exception) {
-                        LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
                     }
                 }
             }
         } else {
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", refs.rootEvent.id, parentEventID)
         }
+
+        return ruleEventStatus ?: refs.rootEvent.toProto(null).status
     }
 
     private fun completeEventOrReportError(prevState: State): Boolean {

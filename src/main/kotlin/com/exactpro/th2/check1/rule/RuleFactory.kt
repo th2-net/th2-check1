@@ -36,6 +36,7 @@ import com.exactpro.th2.common.grpc.ComparisonSettings
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.RootComparisonSettings
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -59,7 +60,11 @@ class RuleFactory(
     private val isCheckNullValueAsEmpty = configuration.isCheckNullValueAsEmpty
     private val defaultCheckSimpleCollectionsOrder = configuration.isDefaultCheckSimpleCollectionsOrder
 
-    fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean): CheckRuleTask =
+    fun createCheckRule(
+        request: CheckRuleRequest,
+        isChainIdExist: Boolean,
+        onTaskFinished: ((EventStatus) -> Unit)? = null
+    ): CheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -94,7 +99,8 @@ class RuleFactory(
                             filter,
                             request.parentEventId,
                             streamObservable,
-                            eventBatchRouter
+                            eventBatchRouter,
+                            onTaskFinished
                     )
                 }
                 onErrorEvent {
@@ -104,7 +110,11 @@ class RuleFactory(
                 }
             }
 
-    fun createSequenceCheckRule(request: CheckSequenceRuleRequest, isChainIdExist: Boolean): SequenceCheckRuleTask =
+    fun createSequenceCheckRule(
+        request: CheckSequenceRuleRequest,
+        isChainIdExist: Boolean,
+        onTaskFinished: ((EventStatus) -> Unit)? = null
+    ): SequenceCheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -141,7 +151,8 @@ class RuleFactory(
                             request.checkOrder,
                             request.parentEventId,
                             streamObservable,
-                            eventBatchRouter
+                            eventBatchRouter,
+                            onTaskFinished
                     )
                 }
                 onErrorEvent {
@@ -151,7 +162,11 @@ class RuleFactory(
                 }
             }
 
-    fun createNoMessageCheckRule(request: NoMessageCheckRequest, isChainIdExist: Boolean): NoMessageCheckTask =
+    fun createNoMessageCheckRule(
+        request: NoMessageCheckRequest,
+        isChainIdExist: Boolean,
+        onTaskFinished: ((EventStatus) -> Unit)? = null
+    ): NoMessageCheckTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -178,7 +193,8 @@ class RuleFactory(
                             request.preFilter,
                             parentEventID,
                             streamObservable,
-                            eventBatchRouter
+                            eventBatchRouter,
+                            onTaskFinished
                     )
                 }
                 onErrorEvent {
@@ -190,7 +206,8 @@ class RuleFactory(
 
     fun createSilenceCheck(
         request: CheckSequenceRuleRequest,
-        timeout: Long
+        timeout: Long,
+        onTaskFinished: ((EventStatus) -> Unit)? = null
     ): SilenceCheckTask {
         return ruleCreation(request.parentEventId) {
             checkAndCreateRule {
@@ -215,7 +232,8 @@ class RuleFactory(
                     sessionKey,
                     request.parentEventId,
                     streamObservable,
-                    eventBatchRouter
+                    eventBatchRouter,
+                    onTaskFinished
                 )
             }
             onErrorEvent {

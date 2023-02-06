@@ -37,6 +37,7 @@ import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.event.bean.builder.TableBuilder
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -68,16 +69,18 @@ class SequenceCheckRuleTask(
     private val checkOrder: Boolean,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
-    eventBatchRouter: MessageRouter<EventBatch>
+    eventBatchRouter: MessageRouter<EventBatch>,
+    onTaskFinished: ((EventStatus) -> Unit)? = null
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
         rootEvent: Event,
+        onTaskFinished: ((EventStatus) -> Unit)?,
         val protoMessageFilters: List<RootMessageFilter>,
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?,
-    ) : AbstractCheckTask.Refs(rootEvent) {
+    ) : AbstractCheckTask.Refs(rootEvent, onTaskFinished) {
         val preFilterEvent: Event by lazy {
             Event.start()
                 .type("preFiltering")
@@ -97,6 +100,7 @@ class SequenceCheckRuleTask(
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
         Refs(
             rootEvent = createRootEvent(),
+            onTaskFinished = onTaskFinished,
             protoMessageFilters = protoMessageFilters,
             protoPreMessageFilter = protoPreMessageFilter,
             messagePreFilter = SailfishFilter(

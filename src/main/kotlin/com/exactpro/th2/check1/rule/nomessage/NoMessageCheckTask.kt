@@ -30,6 +30,7 @@ import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
@@ -43,15 +44,17 @@ class NoMessageCheckTask(
     protoPreFilter: PreFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
-    eventBatchRouter: MessageRouter<EventBatch>
+    eventBatchRouter: MessageRouter<EventBatch>,
+    onTaskFinished: ((EventStatus) -> Unit)? = null
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
         rootEvent: Event,
+        onTaskFinished: ((EventStatus) -> Unit)?,
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?,
-    ) : AbstractCheckTask.Refs(rootEvent) {
+    ) : AbstractCheckTask.Refs(rootEvent, onTaskFinished) {
         val preFilterEvent: Event by lazy {
             Event.start()
                 .type("preFiltering")
@@ -66,6 +69,7 @@ class NoMessageCheckTask(
     override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
         Refs(
             rootEvent = createRootEvent(),
+            onTaskFinished = onTaskFinished,
             protoPreMessageFilter = protoPreFilter.toRootMessageFilter(),
             messagePreFilter = SailfishFilter(
                 CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
