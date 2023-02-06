@@ -36,7 +36,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
 
     @Test
     fun `reports about extra messages when timeout exceeded`() {
-        val streams = createStreams(messages = (0..2L).map {
+        val streams = createStreams(messages = (1..3L).map {
             constructMessage(sequence = it)
                 .putFields("A", 42.toValue())
                 .putFields("B", it.toValue())
@@ -75,7 +75,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             { assertEquals(EventStatus.FAILED, result.status) { "Unexpected status for event: ${result.toJson()}" } },
             { assertEquals("Check failed: 1 extra messages were found.", result.name) { "Unexpected name for event: ${result.toJson()}" } },
             {
-                assertEquals(listOf(2L), result.attachedMessageIdsList.map { it.sequence }) {
+                assertEquals(listOf(3L), result.attachedMessageIdsList.map { it.sequence }) {
                     "Unexpected messages attached: ${result.attachedMessageIdsList.map { it.toJson() }}"
                 }
             }
@@ -84,7 +84,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
 
     @Test
     fun `reports no extra messages found when timeout exceeded`() {
-        val streams = createStreams(messages = (0..1L).map {
+        val streams = createStreams(messages = (1..2L).map {
             constructMessage(sequence = it)
                 .putFields("A", 42.toValue())
                 .putFields("B", it.toValue())
@@ -127,7 +127,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
 
     @Test
     fun `does not report if next rule is subscribed in chain before beginning`() {
-        val streams = createStreams(messages = (0..2L).map {
+        val streams = createStreams(messages = (1..3L).map {
             constructMessage(sequence = it)
                 .putFields("A", 42.toValue())
                 .putFields("B", it.toValue())
@@ -191,7 +191,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
 
     @Test
     fun `does not report when next rule added to the chain before timeout exceeds`() {
-        val streams = createStreams(messages = (0..1L).map {
+        val streams = createStreams(messages = (1..2L).map {
             constructMessage(sequence = it)
                 .putFields("A", 42.toValue())
                 .putFields("B", it.toValue())

@@ -44,6 +44,9 @@ import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -64,11 +67,11 @@ abstract class AbstractCheckTaskTest {
     }
 
     fun constructMessage(
-        sequence: Long = 0,
+        sequence: Long = 1,
         alias: String = SESSION_ALIAS,
         type: String = MESSAGE_TYPE,
         direction: Direction = FIRST,
-        timestamp: Timestamp = Timestamp.getDefaultInstance()
+        timestamp: Timestamp = Instant.now().toTimestamp()
     ): Message.Builder = Message.newBuilder().apply {
         metadataBuilder.apply {
             this.messageType = type
@@ -76,6 +79,7 @@ abstract class AbstractCheckTaskTest {
                 this.sequence = sequence
                 this.direction = direction
                 connectionIdBuilder.sessionAlias = alias
+                this.bookName = BOOK_NAME
                 this.timestamp = timestamp
             }
         }

@@ -19,6 +19,7 @@ import com.exactpro.th2.common.event.bean.VerificationStatus
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.message.message
 import org.junit.jupiter.api.assertThrows
@@ -55,4 +56,6 @@ fun createDefaultMessage() = message(
     AbstractCheckTaskTest.MESSAGE_TYPE,
     Direction.FIRST,
     AbstractCheckTaskTest.SESSION_ALIAS
-)
+).also {
+    it.metadataBuilder.mergeId(MessageID.newBuilder().setSequence(1).build())
+}

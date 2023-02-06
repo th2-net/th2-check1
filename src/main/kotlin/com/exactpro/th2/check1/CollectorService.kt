@@ -30,6 +30,7 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
@@ -72,7 +73,7 @@ class CollectorService(
         val limitSize = configuration.messageCacheSize
         mqSubject = PublishSubject.create()
 
-        subscriberMonitor = subscribe(MessageListener { _: String, batch: MessageBatch -> mqSubject.onNext(batch) })
+        subscriberMonitor = subscribe(MessageListener { _: DeliveryMetadata, batch: MessageBatch -> mqSubject.onNext(batch) })
         streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
                 .groupBy { message ->
                     message.metadata.id.run {
