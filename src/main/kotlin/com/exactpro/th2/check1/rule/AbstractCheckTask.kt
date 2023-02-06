@@ -87,7 +87,7 @@ abstract class AbstractCheckTask(
 
     protected open class Refs(
         val rootEvent: Event,
-        val onTaskFinished: ((EventStatus) -> Unit)?
+        val onTaskFinished: ((EventStatus) -> Unit)
     )
 
     protected class RefsKeeper<T : Refs>(refs: T) {
@@ -378,7 +378,7 @@ abstract class AbstractCheckTask(
         } finally {
             RuleMetric.decrementActiveRule(type())
 
-            refs.onTaskFinished?.invoke(ruleEventStatus)
+            refs.onTaskFinished(ruleEventStatus)
             refsKeeper.eraseRefs()
             sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }
@@ -585,6 +585,7 @@ abstract class AbstractCheckTask(
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
         @JvmField
         val CONVERTER = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null, createParameters().setUseMarkerForNullsInMessage(true))
+        val EMPTY_STATUS_CONSUMER: (EventStatus) -> Unit = {}
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =

@@ -46,12 +46,12 @@ class SilenceCheckTask(
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>,
-    onTaskFinished: ((EventStatus) -> Unit)? = null
+    onTaskFinished: ((EventStatus) -> Unit) = EMPTY_STATUS_CONSUMER
 ) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
         rootEvent: Event,
-        onTaskFinished: ((EventStatus) -> Unit)?,
+        onTaskFinished: ((EventStatus) -> Unit),
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?

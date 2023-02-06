@@ -71,8 +71,8 @@ class CollectorService(
     private val streamObservable: Observable<StreamContainer>
     private val checkpointSubscriber: CheckpointSubscriber
     private val mqSubject: PublishSubject<MessageBatch>
-    private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, Pair<AbstractCheckTask, MutableList<Long>?>> = ConcurrentHashMap()
-    private val ruleIdToResult: MutableMap<Long, CompletableFuture<EventStatus>> = ConcurrentHashMap()
+    private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, AbstractCheckTask> = ConcurrentHashMap()
+    private val ruleIdToResult: MutableMap<Long, CompletableFuture<Pair<EventStatus, Instant>>> = ConcurrentHashMap()
     private val ruleIdCounter = AtomicLong()
 
     private val olderThanDelta = configuration.cleanupOlderThan
@@ -102,12 +102,13 @@ class CollectorService(
         ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter)
     }
 
-    private fun prepareStoringResults(storeResult: Boolean): Triple<Long, CompletableFuture<EventStatus>?, ((EventStatus) -> Unit)?> {
+    private fun prepareStoringResults(storeResult: Boolean): Triple<Long, CompletableFuture<Pair<EventStatus, Instant>>?, ((EventStatus) -> Unit)> {
         return if (storeResult) {
-            val future = CompletableFuture<EventStatus>()
-            Triple(ruleIdCounter.incrementAndGet(), future, { status: EventStatus -> future.complete(status) })
+            val future = CompletableFuture<Pair<EventStatus, Instant>>()
+            val ruleId = ruleIdCounter.incrementAndGet()
+            Triple(ruleId, future) { future.complete(it to Instant.now()) }
         } else {
-            Triple(0L, null, null)
+            Triple(0L, null, AbstractCheckTask.EMPTY_STATUS_CONSUMER)
         }
     }
 
@@ -116,16 +117,11 @@ class CollectorService(
         val chainID = request.getChainIdOrGenerate()
         val (ruleId, resultFuture, onTaskFinished) = prepareStoringResults(request.storeResult)
 
-        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+        cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, pair ->
-            var (prevTask, taskIdList) = pair ?: (null to null)
-            if (request.storeResult) {
-                taskIdList = taskIdList?.apply { add(ruleId) } ?: mutableListOf(ruleId)
-            }
-
-            ruleFactory.createCheckRule(request, pair != null, onTaskFinished)
-                .apply { addToChainOrBegin(prevTask, request.checkpoint) } to taskIdList
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, prevTask ->
+            ruleFactory.createCheckRule(request, prevTask != null, onTaskFinished)
+                .apply { addToChainOrBegin(prevTask, request.checkpoint) }
         }
 
         if (resultFuture != null) {
@@ -140,7 +136,7 @@ class CollectorService(
         val chainID = request.getChainIdOrGenerate()
         val (ruleId, resultFuture, onTaskFinished) = prepareStoringResults(request.storeResult)
 
-        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+        cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
         val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
 
         val (silenceCheckTask, silenceFuture) = if (silenceCheck) {
@@ -154,26 +150,17 @@ class CollectorService(
             null to null
         }
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, pair ->
-            var (prevTask, taskIdList) = pair ?: (null to null)
-            if (request.storeResult) {
-                taskIdList = taskIdList?.apply { add(ruleId) } ?: mutableListOf(ruleId)
-            }
-
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, prevTask ->
             ruleFactory.createSequenceCheckRule(request, prevTask != null, onTaskFinished)
                 .apply { addToChainOrBegin(prevTask, request.checkpoint) }
-                .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this } to taskIdList
+                .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this }
         }
 
         if (resultFuture != null) {
-            val aggregatedResultFuture = resultFuture.thenApply { status ->
-                when {
-                    silenceFuture == null -> status
-                    status == EventStatus.FAILED -> status
-                    else -> silenceFuture.get()
-                }
-            }
-            ruleIdToResult[ruleId] = aggregatedResultFuture
+            ruleIdToResult[ruleId] = if (silenceFuture == null)
+                resultFuture
+            else
+                resultFuture.thenApply { if (it.first == EventStatus.SUCCESS) silenceFuture.get() else it }
         }
 
         return ruleId to chainID
@@ -183,16 +170,11 @@ class CollectorService(
         val chainID = request.getChainIdOrGenerate()
         val (ruleId, resultFuture, onTaskFinished) = prepareStoringResults(request.storeResult)
 
-        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+        cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
 
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, pair ->
-            var (prevTask, taskIdList) = pair ?: (null to null)
-            if (request.storeResult) {
-                taskIdList = taskIdList?.apply { add(ruleId) } ?: mutableListOf(ruleId)
-            }
-
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, prevTask ->
             ruleFactory.createNoMessageCheckRule(request, prevTask != null, onTaskFinished)
-                .apply { addToChainOrBegin(prevTask, request.checkpoint) } to taskIdList
+                .apply { addToChainOrBegin(prevTask, request.checkpoint) }
         }
 
         if (resultFuture != null) {
@@ -223,7 +205,7 @@ class CollectorService(
         }
 
         return try {
-            val status: EventStatus = statusFuture.get(timeoutNano, TimeUnit.NANOSECONDS)
+            val (status, _) = statusFuture.get(timeoutNano, TimeUnit.NANOSECONDS)
             when (status) {
                 EventStatus.SUCCESS -> RuleResult.PASSED
                 EventStatus.FAILED -> RuleResult.FAILED
@@ -276,15 +258,15 @@ class CollectorService(
 
     private fun generateChainID() = ChainID.newBuilder().setId(EventUtils.generateUUID()).build()
 
-    private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
+    private fun cleanupTasksAndResults(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
         val now = Instant.now()
-        eventIdToLastCheckTask.values.removeIf { (task, taskIds) ->
+
+        eventIdToLastCheckTask.values.removeIf { task ->
             val endTime = task.endTime
             when {
                 !olderThan(now, delta, unit, endTime) -> false
                 task.tryShutdownExecutor() -> {
                     logger.info("Removed task ${task.description} ($endTime) from tasks map")
-                    taskIds?.forEach { ruleIdToResult.remove(it) }
                     true
                 }
                 else -> {
@@ -292,6 +274,11 @@ class CollectorService(
                     false
                 }
             }
+        }
+
+        ruleIdToResult.values.removeIf { future ->
+            val (_, endTime) = future.getNow(null) ?: return@removeIf false
+            return@removeIf olderThan(now, delta, unit, endTime)
         }
     }
 

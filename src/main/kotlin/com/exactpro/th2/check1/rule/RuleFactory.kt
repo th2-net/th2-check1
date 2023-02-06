@@ -63,7 +63,7 @@ class RuleFactory(
     fun createCheckRule(
         request: CheckRuleRequest,
         isChainIdExist: Boolean,
-        onTaskFinished: ((EventStatus) -> Unit)? = null
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): CheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
@@ -113,7 +113,7 @@ class RuleFactory(
     fun createSequenceCheckRule(
         request: CheckSequenceRuleRequest,
         isChainIdExist: Boolean,
-        onTaskFinished: ((EventStatus) -> Unit)? = null
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): SequenceCheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
@@ -165,7 +165,7 @@ class RuleFactory(
     fun createNoMessageCheckRule(
         request: NoMessageCheckRequest,
         isChainIdExist: Boolean,
-        onTaskFinished: ((EventStatus) -> Unit)? = null
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): NoMessageCheckTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
@@ -207,7 +207,7 @@ class RuleFactory(
     fun createSilenceCheck(
         request: CheckSequenceRuleRequest,
         timeout: Long,
-        onTaskFinished: ((EventStatus) -> Unit)? = null
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): SilenceCheckTask {
         return ruleCreation(request.parentEventId) {
             checkAndCreateRule {
