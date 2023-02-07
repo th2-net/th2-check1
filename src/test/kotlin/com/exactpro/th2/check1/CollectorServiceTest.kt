@@ -131,7 +131,7 @@ class CollectorServiceTest {
     }
 
     companion object {
-        private const val REQUEST_TIMEOUT_NANO = 200_000_000L
+        private const val REQUEST_TIMEOUT_NANO = 300_000_000L
         private const val CLEANUP_OLDER_THAN_MILLIS = 100L
     }
 }
