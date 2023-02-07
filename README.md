@@ -23,6 +23,7 @@ Available requests are described in [this repository](https://gitlab.exactpro.co
   Reports about unexpected messages only after the timeout is exceeded. Reports nothing if any task is added to the chain.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in case of empty cache or message absence.
 - NoMessageCheckRequest - prefilters messages and verifies that no other messages have been received.
+- WaitForResult - synchronous request waiting for the result of specified rule during specified timeout
 
 ## Request parameters
 
@@ -39,7 +40,8 @@ Available requests are described in [this repository](https://gitlab.exactpro.co
 * **chain_id** - the id to connect rules (rule starts checking after the previous one in the chain). Considers **connectivity_id**
 * **description** - the description that will be added to the root event produced by the rule
 * **timeout** - defines the allowed timeout for messages matching by real time. If not set the default value from check1 settings will be taken
-* **message_timeout** - defines the allowed timeout for messages matching by the time they were received.
+* **store_result** - `true` indicates that the rule result should be stored for later request using `WaitForResult` method
+* **message_timeout** - defines the allowed timeout for messages matching by the time they were received
 * **checkpoint** (must be set if `message_timeout` is used and no valid `chain_id` has been provided)
 
 ### CheckRuleRequest
@@ -64,6 +66,13 @@ Available requests are described in [this repository](https://gitlab.exactpro.co
 
 #### Optional
 * **pre_filter** pre-filtering for messages that should not be received.
+
+### WaitForResult
+
+#### Required
+
+* **rule_id** - the id of rule
+* **timeout** - timeout for waiting for result
 
 ## Quick start
 General view of the component will look like this:
@@ -204,7 +213,8 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 #### Added:
 + Support for disabling of order verification for simple collection
-+ Switch for events publication in checkpoint request. Parameter `enable-checkpoint-events-publication` should be used for that.
++ Switch for events publication in checkpoint request. Parameter `enable-checkpoint-events-publication` should be used for that
++ `WaitForResult` method added
 
 #### Changed:
 + Migrated `common` version from `3.31.3` to `3.44.0`

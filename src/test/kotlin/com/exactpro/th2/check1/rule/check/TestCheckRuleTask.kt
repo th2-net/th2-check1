@@ -64,7 +64,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
-import org.mockito.kotlin.verifyNoMoreInteractions
+import org.mockito.kotlin.timeout
 import java.lang.IllegalArgumentException
 import java.time.Instant
 import java.util.stream.Stream
@@ -119,8 +119,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertEquals(4, eventList.size)
         assertTrue(eventList.all { it.status == SUCCESS })
 
-        verify(onTaskFinishedMock).invoke(SUCCESS)
-        verifyNoMoreInteractions(onTaskFinishedMock)
+        verify(onTaskFinishedMock, timeout(1000).only()).invoke(SUCCESS)
     }
 
     @Test
@@ -149,8 +148,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertEquals(1, eventList.size)
         assertEquals(FAILED, eventList[0].status)
 
-        verify(onTaskFinishedMock).invoke(FAILED)
-        verifyNoMoreInteractions(onTaskFinishedMock)
+        verify(onTaskFinishedMock, timeout(1000).only()).invoke(FAILED)
     }
 
     @Test
