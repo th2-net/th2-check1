@@ -22,6 +22,7 @@ import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
+import com.exactpro.th2.check1.rule.AbstractCheckTask.Companion.EMPTY_STATUS_CONSUMER
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.check1.util.createVerificationEntry
@@ -61,6 +62,9 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoMoreInteractions
 import java.lang.IllegalArgumentException
 import java.time.Instant
 import java.util.stream.Stream
@@ -73,7 +77,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
         maxEventBatchContentSize: Int = 1024 * 1024,
-        taskTimeout: TaskTimeout = TaskTimeout(1000L)
+        taskTimeout: TaskTimeout = TaskTimeout(1000L),
+        onTaskFinished: (EventStatus) -> Unit = EMPTY_STATUS_CONSUMER
     ) = CheckRuleTask(
         createRuleConfiguration(taskTimeout, SESSION_ALIAS, maxEventBatchContentSize),
         Instant.now(),
@@ -81,7 +86,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         messageFilter,
         parentEventID,
         messageStream,
-        clientStub
+        clientStub,
+        onTaskFinished
     )
 
     @Test
@@ -101,13 +107,20 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true)))
             .build()
-        val task = checkTask(filter, eventID, streams)
+
+        val onTaskFinishedMock: (EventStatus) -> Unit = mock()
+        val task = checkTask(filter, eventID, streams, onTaskFinished = onTaskFinishedMock)
+
         task.begin()
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
+
         assertEquals(4, eventList.size)
-        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
+        assertTrue(eventList.all { it.status == SUCCESS })
+
+        verify(onTaskFinishedMock).invoke(SUCCESS)
+        verifyNoMoreInteractions(onTaskFinishedMock)
     }
 
     @Test
@@ -127,13 +140,17 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             .setMetadataFilter(MetadataFilter.newBuilder()
                 .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL)))
             .build()
-        val task = checkTask(filter, eventID, streams, 1)
+        val onTaskFinishedMock: (EventStatus) -> Unit = mock()
+        val task = checkTask(filter, eventID, streams, 1, onTaskFinished = onTaskFinishedMock)
         task.begin()
 
         val eventBatches = awaitEventBatchRequest(1000L, 1)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertEquals(1, eventList.size)
-        assertEquals(EventStatus.FAILED, eventList[0].status)
+        assertEquals(FAILED, eventList[0].status)
+
+        verify(onTaskFinishedMock).invoke(FAILED)
+        verifyNoMoreInteractions(onTaskFinishedMock)
     }
 
     @Test
@@ -159,7 +176,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val eventBatches = awaitEventBatchRequest(1000L, 3)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertEquals(4, eventList.size)
-        assertEquals(2, eventList.filter { it.status == EventStatus.FAILED }.size) // Message filter and verification exceed max event batch content size
+        assertEquals(2, eventList.filter { it.status == FAILED }.size) // Message filter and verification exceed max event batch content size
     }
 
     @Test
@@ -186,7 +203,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val eventList = eventBatch.flatMap(EventBatch::getEventsList)
         assertEquals(4, eventList.size)
         assertTrue({
-            eventList.none { it.status == EventStatus.FAILED }
+            eventList.none { it.status == FAILED }
         }) {
             "Some events are failed $eventBatch"
         }
@@ -215,7 +232,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val eventBatch = awaitEventBatchRequest(1000L, 2)
 
         val checkFailedEvent = eventBatch.flatMap(EventBatch::getEventsList).firstOrNull {
-            it.status == EventStatus.FAILED && it.type == "Check failed"
+            it.status == FAILED && it.type == "Check failed"
         }
         assertNotNull(checkFailedEvent) {
             "No failed event $eventBatch"
