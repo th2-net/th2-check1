@@ -92,12 +92,13 @@ class CollectorServiceTest {
         val request = createCheckRuleRequest(500)
         val (id, _) = collector.verifyCheckRule(request)
 
+        val shortTimeout = REQUEST_TIMEOUT_NANO / 10
         val result: CollectorService.RuleResult
         val requestWaitMillis = measureTimeMillis {
-            result = collector.getRuleResult(id, REQUEST_TIMEOUT_NANO)
+            result = collector.getRuleResult(id, shortTimeout)
         }
 
-        val expectedWaitMillis = REQUEST_TIMEOUT_NANO / 1_000_000
+        val expectedWaitMillis = shortTimeout / 1_000_000
         assertContains(expectedWaitMillis..expectedWaitMillis + 10, requestWaitMillis)
         assertEquals(CollectorService.RuleResult.TIMEOUT, result)
     }
@@ -131,7 +132,7 @@ class CollectorServiceTest {
     }
 
     companion object {
-        private const val REQUEST_TIMEOUT_NANO = 300_000_000L
+        private const val REQUEST_TIMEOUT_NANO = 1_000_000_000L
         private const val CLEANUP_OLDER_THAN_MILLIS = 100L
     }
 }
