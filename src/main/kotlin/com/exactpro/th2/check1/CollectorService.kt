@@ -86,8 +86,7 @@ class CollectorService(
 
         val limitSize = configuration.messageCacheSize
         mqSubject = PublishSubject.create()
-
-        subscriberMonitor = subscribe(MessageListener { _: String, batch: MessageBatch -> mqSubject.onNext(batch) })
+        subscriberMonitor = subscribe { _: String, batch: MessageBatch -> mqSubject.onNext(batch) }
         streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
                 .groupBy { message ->
                     message.metadata.id.run {
@@ -160,7 +159,7 @@ class CollectorService(
             ruleIdToResult[ruleId] = if (silenceFuture == null)
                 resultFuture
             else
-                resultFuture.thenApply { if (it.first == EventStatus.SUCCESS) silenceFuture.get() else it }
+                resultFuture.thenCompose { if (it.first == EventStatus.SUCCESS) silenceFuture else resultFuture }
         }
 
         return ruleId to chainID
@@ -291,7 +290,7 @@ class CollectorService(
 
         val batch = EventBatch.newBuilder()
             .setParentEventId(parentEventID)
-            .addAllEvents(event.toProtoEvents(parentEventID.id))
+            .addAllEvents(event.toListProto(parentEventID))
             .build()
 
         ForkJoinPool.commonPool().execute {
