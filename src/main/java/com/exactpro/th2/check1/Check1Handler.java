@@ -1,22 +1,29 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1;
 
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
 
+import com.exactpro.th2.check1.grpc.WaitForResultRequest;
+import com.exactpro.th2.check1.grpc.WaitForResultResponse;
 import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 import com.exactpro.th2.common.message.MessageUtils;
+import kotlin.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,8 +82,9 @@ public class Check1Handler extends Check1ImplBase {
 
             CheckRuleResponse.Builder response = CheckRuleResponse.newBuilder();
             try {
-                ChainID chainID = collectorService.verifyCheckRule(request);
-                response.setChainId(chainID)
+                Pair<Long, ChainID> ids = collectorService.verifyCheckRule(request);
+                response.setRuleId(ids.getFirst())
+                        .setChainId(ids.getSecond())
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
@@ -109,11 +117,12 @@ public class Check1Handler extends Check1ImplBase {
                 if (logger.isInfoEnabled()) {
                     logger.info("Submitting sequence rule for request '" + MessageUtils.toJson(request) + "' started");
                 }
-                ChainID chainID = collectorService.verifyCheckSequenceRule(request);
+                Pair<Long, ChainID> ids = collectorService.verifyCheckSequenceRule(request);
                 if (logger.isInfoEnabled()) {
                     logger.info("Submitting sequence rule for request '" + request.getDescription() + "' finished");
                 }
-                response.setChainId(chainID)
+                response.setRuleId(ids.getFirst())
+                        .setChainId(ids.getSecond())
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
@@ -149,8 +158,9 @@ public class Check1Handler extends Check1ImplBase {
 
             NoMessageCheckResponse.Builder response = NoMessageCheckResponse.newBuilder();
             try {
-                ChainID chainID = collectorService.verifyNoMessageCheck(request);
-                response.setChainId(chainID)
+                Pair<Long, ChainID> ids = collectorService.verifyNoMessageCheck(request);
+                response.setRuleId(ids.getFirst())
+                        .setChainId(ids.getSecond())
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
@@ -170,6 +180,24 @@ public class Check1Handler extends Check1ImplBase {
             responseObserver.onNext(NoMessageCheckResponse.newBuilder()
                     .setStatus(RequestStatus.newBuilder().setStatus(ERROR).setMessage("No message check rule failed. See the logs.").build())
                     .build());
+        } finally {
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void waitForResult(WaitForResultRequest request, StreamObserver<WaitForResultResponse> responseObserver) {
+        try {
+            var timeoutNano = request.getTimeout().getSeconds() * 1_000_000_000 + request.getTimeout().getNanos();
+            var ruleResult = collectorService.getRuleResult(request.getRuleId(), timeoutNano);
+
+            var requestStatusBuilder = RequestStatus.newBuilder().setStatus(ruleResult.getRequestStatus());
+            if (ruleResult.getMessage() != null) requestStatusBuilder.setMessage(ruleResult.getMessage());
+
+            var responseBuilder = WaitForResultResponse.newBuilder();
+            if (ruleResult.getStatus() != null) responseBuilder.setRuleResult(ruleResult.getStatus());
+
+            responseObserver.onNext(responseBuilder.setStatus(requestStatusBuilder).build());
         } finally {
             responseObserver.onCompleted();
         }

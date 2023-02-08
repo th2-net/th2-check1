@@ -1,9 +1,12 @@
 /*
- * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -38,6 +41,7 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageMetadata
@@ -81,7 +85,10 @@ abstract class AbstractCheckTask(
     private val eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractSessionObserver<MessageContainer>() {
 
-    protected open class Refs(val rootEvent: Event)
+    protected open class Refs(
+        val rootEvent: Event,
+        val onTaskFinished: ((EventStatus) -> Unit)
+    )
 
     protected class RefsKeeper<T : Refs>(refs: T) {
         private var refsNullable: T? = refs
@@ -346,13 +353,14 @@ abstract class AbstractCheckTask(
     }
 
     private fun taskFinished() {
+        var ruleEventStatus = EventStatus.FAILED
         try {
             val currentState = taskState.get()
             LOGGER.info("Finishes task '$description' in state ${currentState.name}")
             if (currentState.callOnTimeoutCallback) {
                 callOnTimeoutCallback()
             }
-            publishEvent()
+            ruleEventStatus = publishEvent()
             LOGGER.info("Task '$description' has been finished")
         } catch (ex: Exception) {
             val message = "Cannot finish task '$description'"
@@ -369,6 +377,8 @@ abstract class AbstractCheckTask(
                 .build())
         } finally {
             RuleMetric.decrementActiveRule(type())
+
+            refs.onTaskFinished(ruleEventStatus)
             refsKeeper.eraseRefs()
             sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
         }
@@ -419,34 +429,38 @@ abstract class AbstractCheckTask(
     /**
      * Publishes the event to [eventBatchRouter].
      */
-    private fun publishEvent() {
+    private fun publishEvent(): EventStatus {
         val prevState = taskState.getAndSet(State.PUBLISHED)
+        var ruleEventStatus: EventStatus? = null
         if (prevState != State.PUBLISHED) {
             val hasError = completeEventOrReportError(prevState)
             _endTime = Instant.now()
 
             if (skipPublication && !hasError) {
                 LOGGER.info("Skip event publication for task ${type()} '$description' (${hashCode()})")
-                return
-            }
-            val batches = refs.rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
+            } else {
+                val batches = refs.rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
+                ruleEventStatus = batches[0].getEvents(0).status
 
-            RESPONSE_EXECUTOR.execute {
-                batches.forEach { batch ->
-                    LOGGER.debug("Sending event batch parent id '{}'", parentEventID.id)
-                    try {
-                        eventBatchRouter.send(batch)
-                        if (LOGGER.isDebugEnabled) {
-                            LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
+                RESPONSE_EXECUTOR.execute {
+                    batches.forEach { batch ->
+                        LOGGER.debug("Sending event batch parent id '{}'", parentEventID.id)
+                        try {
+                            eventBatchRouter.send(batch)
+                            if (LOGGER.isDebugEnabled) {
+                                LOGGER.debug("Sent event batch '{}'", shortDebugString(batch))
+                            }
+                        } catch (e: Exception) {
+                            LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
                         }
-                    } catch (e: Exception) {
-                        LOGGER.error("Can not send event batch '{}'", shortDebugString(batch), e)
                     }
                 }
             }
         } else {
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", refs.rootEvent.id, parentEventID)
         }
+
+        return ruleEventStatus ?: refs.rootEvent.toProto(null).status
     }
 
     private fun completeEventOrReportError(prevState: State): Boolean {
@@ -571,6 +585,7 @@ abstract class AbstractCheckTask(
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
         @JvmField
         val CONVERTER = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null, createParameters().setUseMarkerForNullsInMessage(true))
+        val EMPTY_STATUS_CONSUMER: (EventStatus) -> Unit = {}
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
