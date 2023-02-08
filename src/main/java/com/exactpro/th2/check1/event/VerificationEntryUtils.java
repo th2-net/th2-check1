@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1.event;
 
 import java.util.LinkedHashMap;
@@ -20,6 +21,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import com.exactpro.sf.comparison.ComparisonUtil;
 import org.jetbrains.annotations.Nullable;
 
 import com.exactpro.sf.aml.scriptutil.StaticUtil.IFilter;
@@ -38,7 +40,7 @@ public class VerificationEntryUtils {
         VerificationEntry verificationEntry = new VerificationEntry();
         verificationEntry.setActual(convertActual(result));
         verificationEntry.setExpected(convertExpectedResult(result));
-        verificationEntry.setStatus(toVerificationStatus(result.getStatus()));
+        verificationEntry.setStatus(toVerificationStatus(ComparisonUtil.getStatusType(result)));
         verificationEntry.setKey(result.isKey());
         verificationEntry.setOperation(resolveOperation(result));
         verificationEntry.setHint(extractHint(result));
