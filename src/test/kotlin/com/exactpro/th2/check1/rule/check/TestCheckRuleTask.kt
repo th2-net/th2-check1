@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -320,11 +320,14 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
             val expectedLegs = mapOf(
                     "legs" to createVerificationEntry(
+                            VerificationStatus.FAILED,
                             "0" to createVerificationEntry(
+                                    VerificationStatus.FAILED,
                                     "A" to createVerificationEntry(VerificationStatus.PASSED),
                                     "B" to createVerificationEntry(VerificationStatus.FAILED)
                             ),
                             "1" to createVerificationEntry(
+                                    VerificationStatus.PASSED,
                                     "A" to createVerificationEntry(VerificationStatus.PASSED),
                                     "B" to createVerificationEntry(VerificationStatus.PASSED)
                             )
@@ -391,9 +394,11 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             assertNotNull(verificationEvent) { "Missed verification event" }
             val verification = assertVerification(verificationEvent)
 
-            val verificationEntry = createVerificationEntry(if (expectedComparisonResult) VerificationStatus.PASSED else VerificationStatus.FAILED)
+            val expectedStatus = if (expectedComparisonResult) VerificationStatus.PASSED else VerificationStatus.FAILED
+            val verificationEntry = createVerificationEntry(expectedStatus)
 
             val expected = mapOf("simple_list" to createVerificationEntry(
+                expectedStatus,
                 "0" to verificationEntry,
                 "1" to verificationEntry,
                 "2" to verificationEntry,
@@ -599,13 +604,16 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
             val expectedLegs = mapOf(
                     "legs" to createVerificationEntry(
+                            VerificationStatus.FAILED,
                             "0" to createVerificationEntry(
+                                    VerificationStatus.FAILED,
                                     "A" to createVerificationEntry(VerificationStatus.NA),
                                     "B" to createVerificationEntry(VerificationStatus.NA),
                                     "C" to createVerificationEntry(VerificationStatus.FAILED),
                                     "D" to createVerificationEntry(VerificationStatus.FAILED)
                             ),
                             "1" to createVerificationEntry(
+                                    VerificationStatus.FAILED,
                                     "C" to createVerificationEntry(VerificationStatus.NA),
                                     "D" to createVerificationEntry(VerificationStatus.NA),
                                     "A" to createVerificationEntry(VerificationStatus.FAILED),
