@@ -6,7 +6,7 @@ plugins {
     id 'java-library'
     id 'application'
     id 'maven-publish'
-    id "org.owasp.dependencycheck" version "7.4.4"
+    id "org.owasp.dependencycheck" version "8.1.0"
 }
 
 ext {
@@ -204,14 +204,18 @@ signing {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.1.0')
+    api platform('com.exactpro.th2:bom:4.2.0')
     implementation 'com.exactpro.th2:grpc-check1:3.5.1'
-    implementation 'com.exactpro.th2:common:3.44.0'
-    implementation 'com.exactpro.th2:sailfish-utils:3.14.0'
+    implementation 'com.exactpro.th2:common:3.44.1'
+    implementation ('com.exactpro.th2:sailfish-utils:3.14.0') {
+        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
+    }
 
     implementation "org.slf4j:slf4j-api"
 
-    implementation "com.exactpro.sf:sailfish-core:${sailfishVersion}"
+    implementation ("com.exactpro.sf:sailfish-core:${sailfishVersion}") {
+        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
+    }
 
     implementation "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
 
@@ -250,5 +254,15 @@ docker {
 configurations {
     compileClasspath {
         resolutionStrategy.activateDependencyLocking()
+    }
+}
+dependencyCheck {
+    formats=['SARIF', 'JSON', 'HTML']
+    failBuildOnCVSS=5
+
+    analyzers {
+        assemblyEnabled = false
+        nugetconfEnabled = false
+        nodeEnabled = false
     }
 }

@@ -1,4 +1,4 @@
-# th2 check1 (3.10.0)
+# th2 check1 (3.10.1)
 
 ## Overview
 
@@ -191,6 +191,12 @@ The `th2_check1_actual_cache_number` metric separate messages with two labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 3.10.1
+
+#### Changed:
++ Migrated `common` version from `3.44.0` to `3.44.1`
++ Updated bom to `4.2.0`
 
 ### 3.10.0
 
