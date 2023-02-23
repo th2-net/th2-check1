@@ -1,4 +1,4 @@
-# th2 check1 (3.10.2)
+# th2 check1 (3.10.3)
 
 ## Overview
 
@@ -191,6 +191,11 @@ The `th2_check1_actual_cache_number` metric separate messages with two labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 3.10.3
+
+#### Changed:
++ Excluded `apache-mina-core` from dependencies list
 
 ### 3.10.2
 

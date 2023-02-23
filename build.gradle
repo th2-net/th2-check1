@@ -210,6 +210,7 @@ dependencies {
     implementation ('com.exactpro.th2:sailfish-utils:3.14.0') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
+        exclude group: 'com.exactpro.mina', module: 'apache-mina-core' // because of the vulnerability
     }
 
     implementation "org.slf4j:slf4j-api"
@@ -217,6 +218,7 @@ dependencies {
     implementation ("com.exactpro.sf:sailfish-core:${sailfishVersion}") {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
+        exclude group: 'com.exactpro.mina', module: 'apache-mina-core' // because of the vulnerability
     }
 
     implementation "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
