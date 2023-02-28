@@ -194,10 +194,14 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 ## Release Notes
 
 ### 4.0.1
+
 #### Added:
 + Vulnerability scanning
 + Dev release workflow
 
+#### Changed:
++ Excluded vulnerable transitive dependencies from sailfish
++ Migrated to common `5.2.0-dev`
 
 ### 4.0.0
 
