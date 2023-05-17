@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -19,8 +19,8 @@ import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
-import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
+import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.common.event.Event
@@ -34,6 +34,7 @@ import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
@@ -47,7 +48,10 @@ import java.util.concurrent.ForkJoinPool
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 
 class CollectorService(
-    private val messageRouter: MessageRouter<MessageBatch>, private val eventBatchRouter: MessageRouter<EventBatch>, configuration: Check1Configuration
+    private val messageRouter: MessageRouter<MessageBatch>,
+    private val transportMessageRouter: MessageRouter<GroupBatch>,
+    private val eventBatchRouter: MessageRouter<EventBatch>,
+    configuration: Check1Configuration
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
@@ -55,10 +59,12 @@ class CollectorService(
     /**
      * Queue name to subscriber. Messages with different connectivity can be transferred with one queue.
      */
-    private val subscriberMonitor: SubscriberMonitor
+    private val protoSubscriberMonitor: SubscriberMonitor
+
+    //    private val transportSubscriberMonitor: SubscriberMonitor
     private val streamObservable: Observable<StreamContainer>
     private val checkpointSubscriber: CheckpointSubscriber
-    private val mqSubject: PublishSubject<MessageBatch>
+    private val mqSubject: PublishSubject<MessageWrapper>
     private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, AbstractCheckTask> = ConcurrentHashMap()
 
     private val olderThanDelta = configuration.cleanupOlderThan
@@ -73,13 +79,18 @@ class CollectorService(
         val limitSize = configuration.messageCacheSize
         mqSubject = PublishSubject.create()
 
-        subscriberMonitor = subscribe(MessageListener { _: DeliveryMetadata, batch: MessageBatch -> mqSubject.onNext(batch) })
-        streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
-                .groupBy { message ->
-                    message.metadata.id.run {
-                        SessionKey(message.metadata.id.bookName, connectionId.sessionAlias, direction)
-                    }.also(BufferMetric::processMessage)
-                }
+        protoSubscriberMonitor = subscribe(MessageListener { _: DeliveryMetadata, batch: MessageBatch ->
+            batch.messagesList.forEach {
+                mqSubject.onNext(ProtoMessageWrapper(it))
+            }
+        })
+//        transportMessageRouter =
+//            subscribe(MessageListener { _: DeliveryMetadata, batch: GroupBatch -> mqSubject.onNext(batch) })
+        streamObservable = mqSubject.groupBy { wrapper ->
+            wrapper.id.run {
+                SessionKey(wrapper.id.bookName, connectionId.sessionAlias, direction)
+            }.also(BufferMetric::processMessage)
+        }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
             .replay().apply { connect() }
 
@@ -179,6 +190,7 @@ class CollectorService(
                     logger.info("Removed task ${task.description} ($endTime) from tasks map")
                     true
                 }
+
                 else -> {
                     logger.warn("Task ${task.description} can't be removed because it has a continuation")
                     false
@@ -237,15 +249,17 @@ class CollectorService(
                     logger.warn("Parent id missed in request")
                 }
             } catch (e: Exception) {
-                logger.error("Sending events '{}' with a parent '{}' failed ",
-                    rootEvent, request.parentEventId, e)
+                logger.error(
+                    "Sending events '{}' with a parent '{}' failed ",
+                    rootEvent, request.parentEventId, e
+                )
             }
         }
     }
 
     fun close() {
         try {
-            subscriberMonitor.unsubscribe()
+            protoSubscriberMonitor.unsubscribe()
         } catch (e: IOException) {
             logger.error("Close subscriber failure", e)
         }

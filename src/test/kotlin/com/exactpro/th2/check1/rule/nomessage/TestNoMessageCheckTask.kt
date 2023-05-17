@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,6 +13,8 @@
 
 package com.exactpro.th2.check1.rule.nomessage
 
+import com.exactpro.th2.check1.MessageWrapper
+import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.TaskTimeout
@@ -22,8 +24,6 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
-import com.exactpro.th2.common.grpc.FilterOperation
-import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.value.toValue
 import com.google.protobuf.Timestamp
@@ -56,7 +56,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val task = noMessageCheckTask(
             eventID,
             streams,
-            createPreFilter("E", "5", FilterOperation.EQUAL),
+            createPreFilter("E", "5"),
             TaskTimeout(5000L, 1500L)
         )
         task.begin(createCheckpoint(checkpointTimestamp, 1))
@@ -96,14 +96,14 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
                 MessageData("D", "4".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
                 // should be skipped because of message timeout
                 MessageData("E", "5".toValue(), getMessageTimestamp(checkpointTimestamp, 1700))
-                )
+            )
         )
 
         val eventID = createRootEventId()
         val task = noMessageCheckTask(
             eventID,
             streams,
-            createPreFilter("A", "1", FilterOperation.EQUAL),
+            createPreFilter("A", "1"),
             TaskTimeout(5000, messageTimeout)
         )
         task.begin(createCheckpoint(checkpointTimestamp, 1))
@@ -149,7 +149,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val task = noMessageCheckTask(
             eventID,
             streams,
-            createPreFilter("B", "2", FilterOperation.EQUAL),
+            createPreFilter("B", "2"),
             TaskTimeout(2000)
         )
         task.begin(createCheckpoint(checkpointTimestamp))
@@ -172,7 +172,10 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             assertNotNull(unexpectedMessagesEvent, "Missed resulting event")
             assertTrue(unexpectedMessagesEvent.attachedMessageIdsCount == 0)
             assertEquals(emptyList(), unexpectedMessagesEvent.attachedMessageIdsList.map { it.sequence })
-            assertTrue(unexpectedMessagesEvent.name == "Check passed", "All messages should be ignored due to prefilter")
+            assertTrue(
+                unexpectedMessagesEvent.name == "Check passed",
+                "All messages should be ignored due to prefilter"
+            )
         })
     }
 
@@ -182,12 +185,14 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         sessionAlias: String = SESSION_ALIAS,
         messageType: String = MESSAGE_TYPE,
         direction: Direction = Direction.FIRST
-    ): List<Message> {
-        var sequence = 1L;
+    ): List<MessageWrapper> {
+        var sequence = 1L
         return messageData.map { data ->
-            constructMessage(sequence++, sessionAlias, messageType, direction, data.timestamp)
-                .putFields(data.fieldName, data.value)
-                .build()
+            ProtoMessageWrapper(
+                constructMessage(sequence++, sessionAlias, messageType, direction, data.timestamp)
+                    .putFields(data.fieldName, data.value)
+                    .build()
+            )
         }
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,9 +15,9 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.scriptrunner.StatusType
+import com.exactpro.th2.check1.MessageWrapper
 import com.exactpro.th2.check1.utils.FilterUtils
 import com.exactpro.th2.check1.utils.FilterUtils.fullMatch
-import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.RootMessageFilter
 
 class ComparisonContainer(
@@ -28,8 +28,8 @@ class ComparisonContainer(
     val sailfishActual: IMessage
         get() = messageContainer.sailfishMessage
 
-    val protoActual: Message
-        get() = messageContainer.protoMessage
+    val wrapperActual: MessageWrapper
+        get() = messageContainer.messageWrapper
 
     /**
      * If [RootMessageFilter.hasMetadataFilter] for [protoFilter] is `true`
@@ -57,6 +57,7 @@ class AggregatedFilterResult(
 ) {
     operator fun component1(): ComparisonResult? = messageResult
     operator fun component2(): ComparisonResult? = metadataResult
+
     companion object {
         @JvmField
         val EMPTY = AggregatedFilterResult(null, null)

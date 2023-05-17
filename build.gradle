@@ -10,8 +10,8 @@ plugins {
 }
 
 ext {
-    sharedDir           = file("${project.rootDir}/shared")
-    sailfishVersion     = '3.3.54'
+    sharedDir = file("${project.rootDir}/shared")
+    sailfishVersion = '3.3.54'
 }
 
 group = 'com.exactpro.th2'
@@ -101,13 +101,13 @@ javadoc {
 jar {
     manifest {
         attributes(
-                'Created-By':               "${System.getProperty('java.version')} (${System.getProperty('java.vendor')})",
-                'Specification-Title':      '',
-                'Specification-Vendor':     'Exactpro Systems LLC',
-                'Implementation-Title':     project.archivesBaseName,
-                'Implementation-Vendor':    'Exactpro Systems LLC',
+                'Created-By': "${System.getProperty('java.version')} (${System.getProperty('java.vendor')})",
+                'Specification-Title': '',
+                'Specification-Vendor': 'Exactpro Systems LLC',
+                'Implementation-Title': project.archivesBaseName,
+                'Implementation-Vendor': 'Exactpro Systems LLC',
                 'Implementation-Vendor-Id': 'com.exactpro',
-                'Implementation-Version':   project.version
+                'Implementation-Version': project.version
         )
     }
 }
@@ -126,13 +126,14 @@ tasks.withType(PublishToMavenRepository) {
     }
 }
 tasks.withType(Sign) {
-    onlyIf { project.hasProperty('signingKey') &&
-            project.hasProperty('signingPassword')
+    onlyIf {
+        project.hasProperty('signingKey') &&
+                project.hasProperty('signingPassword')
     }
 }
 // disable running task 'initializeSonatypeStagingRepository' on a gitlab
-tasks.whenTaskAdded {task ->
-    if(task.name.equals('initializeSonatypeStagingRepository') &&
+tasks.whenTaskAdded { task ->
+    if (task.name.equals('initializeSonatypeStagingRepository') &&
             !(project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword'))
     ) {
         task.enabled = false
@@ -206,17 +207,19 @@ signing {
 dependencies {
     api platform('com.exactpro.th2:bom:4.2.0')
     implementation 'com.exactpro.th2:grpc-check1:4.1.0-dev'
-    implementation 'com.exactpro.th2:common:5.2.0-dev'
-    implementation ('com.exactpro.th2:sailfish-utils:3.14.0') {
-        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
+    implementation 'com.exactpro.th2:common:5.2.0-separate-executor-4807123825-9449978-SNAPSHOT'
+    implementation('com.exactpro.th2:sailfish-utils:4.0.0-TH2-4891-4805811652-8645b9c-SNAPSHOT') {
+        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
+        // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
         exclude group: 'com.exactpro.mina', module: 'apache-mina-core' // because of the vulnerability
     }
 
     implementation "org.slf4j:slf4j-api"
 
-    implementation ("com.exactpro.sf:sailfish-core:${sailfishVersion}") {
-        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
+    implementation("com.exactpro.sf:sailfish-core:${sailfishVersion}") {
+        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
+        // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
         exclude group: 'com.exactpro.mina', module: 'apache-mina-core' // because of the vulnerability
     }
@@ -259,8 +262,8 @@ dependencyLocking {
     lockAllConfigurations()
 }
 dependencyCheck {
-    formats=['SARIF', 'JSON', 'HTML']
-    failBuildOnCVSS=5
+    formats = ['SARIF', 'JSON', 'HTML']
+    failBuildOnCVSS = 5
 
     analyzers {
         assemblyEnabled = false

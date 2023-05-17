@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,9 +28,10 @@ fun AbstractCheckTask.preFilterBy(
 ): Observable<MessageContainer> =
     stream.map { messageContainer -> // Compare the message with pre-filter
         if (logger.isDebugEnabled) {
-            logger.debug("Pre-filtering message with id: {}", messageContainer.protoMessage.metadata.id.toJson())
+            logger.debug("Pre-filtering message with id: {}", messageContainer.messageWrapper.id.toJson())
         }
-        val result = matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false, significant = false)
+        val result =
+            matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false, significant = false)
         ComparisonContainer(messageContainer, protoPreMessageFilter, result)
             .takeIf(ComparisonContainer::fullyMatches)
             ?.also(onMatch)

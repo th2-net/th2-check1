@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -105,15 +105,21 @@ class SilenceCheckTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, protoPreMessageFilter, messagePreFilter, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(
+            this,
+            protoPreMessageFilter,
+            messagePreFilter,
+            metadataPreFilter,
+            LOGGER
+        ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(protoActual.metadata.id)
+                preFilterEvent.messageID(wrapperActual.id)
             }
         }
 
     override fun onNext(container: MessageContainer) {
-        container.protoMessage.metadata.apply {
+        container.messageWrapper.apply {
             extraMessagesCounter++
             resultEvent.messageID(id)
         }

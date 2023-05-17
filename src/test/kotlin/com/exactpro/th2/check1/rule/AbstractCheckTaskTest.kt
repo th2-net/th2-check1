@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -12,6 +12,7 @@
  */
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.th2.check1.MessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
@@ -44,9 +45,6 @@ import com.nhaarman.mockitokotlin2.timeout
 import com.nhaarman.mockitokotlin2.verify
 import io.reactivex.Observable
 import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -60,9 +58,17 @@ abstract class AbstractCheckTaskTest {
         return argumentCaptor.allValues
     }
 
-    fun createStreams(alias: String = SESSION_ALIAS, direction: Direction = FIRST, messages: List<Message>): Observable<StreamContainer> {
+    fun createStreams(
+        alias: String = SESSION_ALIAS,
+        direction: Direction = FIRST,
+        messages: List<MessageWrapper>
+    ): Observable<StreamContainer> {
         return Observable.just(
-            StreamContainer(SessionKey(BOOK_NAME, alias, direction), messages.size + 1, Observable.fromIterable(messages))
+            StreamContainer(
+                SessionKey(BOOK_NAME, alias, direction),
+                messages.size + 1,
+                Observable.fromIterable(messages)
+            )
         )
     }
 
@@ -86,9 +92,9 @@ abstract class AbstractCheckTaskTest {
     }
 
     protected fun createRootEventId(): EventID {
-        return createEventId(ROOT_ID);
+        return createEventId(ROOT_ID)
     }
-    
+
     protected fun createEventId(id: String): EventID {
         return requireNotNull(EventUtils.toEventID(Instant.now(), BOOK_NAME, id))
     }
@@ -119,9 +125,12 @@ abstract class AbstractCheckTaskTest {
             )
         }.build()
 
-    protected fun createPreFilter(fieldName: String, value: String, operation: FilterOperation): PreFilter =
+    protected fun createPreFilter(fieldName: String, value: String): PreFilter =
         PreFilter.newBuilder()
-            .putFields(fieldName, ValueFilter.newBuilder().setSimpleFilter(value).setKey(true).setOperation(operation).build())
+            .putFields(
+                fieldName,
+                ValueFilter.newBuilder().setSimpleFilter(value).setKey(true).setOperation(FilterOperation.EQUAL).build()
+            )
             .build()
 
     protected fun List<Event>.findEventByType(eventType: String): Event? =
@@ -129,8 +138,8 @@ abstract class AbstractCheckTaskTest {
 
     protected fun extractEventBody(verificationEvent: Event): List<IBodyData> {
         return jacksonObjectMapper()
-                .addMixIn(IBodyData::class.java, IBodyDataMixIn::class.java)
-                .readValue(verificationEvent.body.toByteArray())
+            .addMixIn(IBodyData::class.java, IBodyDataMixIn::class.java)
+            .readValue(verificationEvent.body.toByteArray())
     }
 
     protected fun assertVerification(verificationEvent: Event): Verification {
@@ -141,9 +150,10 @@ abstract class AbstractCheckTaskTest {
     }
 
     protected fun assertVerificationEntries(
-            expectedVerificationEntries: Map<String, VerificationEntry>,
-            actualVerificationEntries: Map<String, VerificationEntry>?,
-            asserts: (VerificationEntry, VerificationEntry) -> Unit) {
+        expectedVerificationEntries: Map<String, VerificationEntry>,
+        actualVerificationEntries: Map<String, VerificationEntry>?,
+        asserts: (VerificationEntry, VerificationEntry) -> Unit
+    ) {
         assertNotNull(actualVerificationEntries) { "Actual verification entry is null" }
         expectedVerificationEntries.forEach { (expectedFieldName, expectedVerificationEntry) ->
             val actualVerificationEntry = actualVerificationEntries[expectedFieldName]
@@ -158,33 +168,40 @@ abstract class AbstractCheckTaskTest {
         }
     }
 
-    protected fun assertVerifications(
-            expectedVerification: Verification,
-            actualVerification: Verification,
-            asserts: (VerificationEntry, VerificationEntry) -> Unit) =  assertVerificationEntries(expectedVerification.fields, actualVerification.fields, asserts)
-
-    protected fun assertVerificationByStatus(verification: Verification, expectedVerificationEntries: Map<String, VerificationEntry>) {
+    protected fun assertVerificationByStatus(
+        verification: Verification,
+        expectedVerificationEntries: Map<String, VerificationEntry>
+    ) {
         assertVerificationEntries(expectedVerificationEntries, verification.fields) { expected, actual ->
             assertEquals(expected.status, actual.status)
         }
     }
 
-    protected fun createRuleConfiguration(taskTimeout: TaskTimeout, description: String = "Test", maxEventBatchContentSize: Int = 1024 * 1024): RuleConfiguration {
+    protected fun createRuleConfiguration(
+        taskTimeout: TaskTimeout,
+        description: String = "Test",
+        maxEventBatchContentSize: Int = 1024 * 1024
+    ): RuleConfiguration {
         return RuleConfiguration(
-                taskTimeout,
-                description,
-                configuration.timePrecision,
-                configuration.decimalPrecision,
-                maxEventBatchContentSize,
-                true
+            taskTimeout,
+            description,
+            configuration.timePrecision,
+            configuration.decimalPrecision,
+            maxEventBatchContentSize,
+            true
         )
     }
 
 
-    @JsonSubTypes(value = [
-        JsonSubTypes.Type(value = Verification::class, name = Verification.TYPE),
-        JsonSubTypes.Type(value = com.exactpro.th2.common.event.bean.Message::class, name = com.exactpro.th2.common.event.bean.Message.TYPE)
-    ])
+    @JsonSubTypes(
+        value = [
+            JsonSubTypes.Type(value = Verification::class, name = Verification.TYPE),
+            JsonSubTypes.Type(
+                value = com.exactpro.th2.common.event.bean.Message::class,
+                name = com.exactpro.th2.common.event.bean.Message.TYPE
+            )
+        ]
+    )
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type", include = JsonTypeInfo.As.PROPERTY, visible = true)
     private interface IBodyDataMixIn
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -12,6 +12,7 @@
  */
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.TaskTimeout
@@ -39,7 +40,7 @@ import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class TestChain: AbstractCheckTaskTest() {
+class TestChain : AbstractCheckTaskTest() {
     private val eventID = createRootEventId()
     private val preFilter = PreFilter.newBuilder()
         .putFields(KEY_FIELD, ValueFilter.newBuilder().setKey(true).setOperation(FilterOperation.NOT_EMPTY).build())
@@ -131,20 +132,26 @@ class TestChain: AbstractCheckTaskTest() {
         val eventList = awaitEventBatchRequest(1000L, 4 * 2).flatMap(EventBatch::getEventsList)
         assertEquals(4 * 3, eventList.size)
         assertEquals(4 * 3, eventList.filter { it.status == SUCCESS }.size)
-        assertEquals(listOf(1L, 2L, 3L, 4L), eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList).map(MessageID::getSequence))
+        assertEquals(
+            listOf(1L, 2L, 3L, 4L),
+            eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList)
+                .map(MessageID::getSequence)
+        )
     }
 
     @Test
     fun `sequence rules - untrusted execution`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
-            constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
-                .putAllFields(
-                    mapOf(
-                        KEY_FIELD to "$KEY_FIELD$it".toValue(),
-                        NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
-                    )
-                ).build()
+            ProtoMessageWrapper(
+                constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                    .putAllFields(
+                        mapOf(
+                            KEY_FIELD to "$KEY_FIELD$it".toValue(),
+                            NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
+                        )
+                    ).build()
+            )
         })
 
         val task = sequenceCheckRuleTask(
@@ -174,21 +181,23 @@ class TestChain: AbstractCheckTaskTest() {
     fun `no messages sequence rules - untrusted execution`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
-            constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
-                .putAllFields(
-                    mapOf(
-                        KEY_FIELD to "$KEY_FIELD$it".toValue(),
-                        NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
-                    )
-                ).build()
+            ProtoMessageWrapper(
+                constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                    .putAllFields(
+                        mapOf(
+                            KEY_FIELD to "$KEY_FIELD$it".toValue(),
+                            NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
+                        )
+                    ).build()
+            )
         })
 
         val task = noMessageCheckTask(
             eventID,
             streams,
             taskTimeout = TaskTimeout(2000L, 500),
-            preFilterParam = createPreFilter("E", "5", FilterOperation.EQUAL)
-            ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+            preFilterParam = createPreFilter("E", "5")
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
         var eventsList = awaitEventBatchAndGetEvents(2, 2)
         assertAll({
             val rootEvent = eventsList.first()
@@ -200,7 +209,7 @@ class TestChain: AbstractCheckTaskTest() {
             eventID,
             streams,
             taskTimeout = TaskTimeout(2000L, 1500L),
-            preFilterParam = createPreFilter("E", "5", FilterOperation.EQUAL)
+            preFilterParam = createPreFilter("E", "5")
         ).also { task.subscribeNextTask(it) }
         eventsList = awaitEventBatchAndGetEvents(6, 4)
         assertEquals(UNTRUSTED_EXECUTION_EVENT_NAME, eventsList.last().name)
@@ -210,13 +219,15 @@ class TestChain: AbstractCheckTaskTest() {
     fun `simple rules - ignored untrusted execution`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
-            constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
-                .putAllFields(
-                    mapOf(
-                        KEY_FIELD to "$KEY_FIELD$it".toValue(),
-                        NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
-                    )
-                ).build()
+            ProtoMessageWrapper(
+                constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                    .putAllFields(
+                        mapOf(
+                            KEY_FIELD to "$KEY_FIELD$it".toValue(),
+                            NOT_KEY_FIELD to "$NOT_KEY_FIELD$it".toValue()
+                        )
+                    ).build()
+            )
         })
 
         val task = checkRuleTask(
@@ -247,7 +258,11 @@ class TestChain: AbstractCheckTaskTest() {
     private fun checkSimpleVerifySuccess(eventList: List<Event>, sequence: Long) {
         assertEquals(3, eventList.size)
         assertEquals(3, eventList.filter { it.status == SUCCESS }.size)
-        assertEquals(listOf(sequence), eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList).map(MessageID::getSequence))
+        assertEquals(
+            listOf(sequence),
+            eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList)
+                .map(MessageID::getSequence)
+        )
     }
 
     private fun checkSimpleVerifyFailure(eventList: List<Event>) {
@@ -319,25 +334,33 @@ class TestChain: AbstractCheckTaskTest() {
         )
     }
 
-    private fun createMessage(sequence: Int) = constructMessage(sequence.toLong())
-        .putAllFields(mapOf(
-            KEY_FIELD to "$KEY_FIELD$sequence".toValue(),
-            NOT_KEY_FIELD to "$NOT_KEY_FIELD$sequence".toValue()
-        )).build()
+    private fun createMessage(sequence: Int) = ProtoMessageWrapper(
+        constructMessage(sequence.toLong())
+            .putAllFields(
+                mapOf(
+                    KEY_FIELD to "$KEY_FIELD$sequence".toValue(),
+                    NOT_KEY_FIELD to "$NOT_KEY_FIELD$sequence".toValue()
+                )
+            ).build()
+    )
 
     private fun createMessageFilter(sequence: Int) = RootMessageFilter.newBuilder()
         .setMessageType(MESSAGE_TYPE)
         .setMessageFilter(
             MessageFilter.newBuilder()
-                .putAllFields(mapOf(
-                    KEY_FIELD to ValueFilter.newBuilder().setKey(true).setSimpleFilter("$KEY_FIELD$sequence").build(),
-                    NOT_KEY_FIELD to ValueFilter.newBuilder().setSimpleFilter("$NOT_KEY_FIELD$sequence").build()
-                ))
+                .putAllFields(
+                    mapOf(
+                        KEY_FIELD to ValueFilter.newBuilder().setKey(true).setSimpleFilter("$KEY_FIELD$sequence")
+                            .build(),
+                        NOT_KEY_FIELD to ValueFilter.newBuilder().setSimpleFilter("$NOT_KEY_FIELD$sequence").build()
+                    )
+                )
         ).build()
 
     companion object {
         private const val KEY_FIELD = "key"
         private const val NOT_KEY_FIELD = "not_key"
-        private const val UNTRUSTED_EXECUTION_EVENT_NAME: String = "The current check is untrusted because the start point of the check interval has been selected approximately"
+        private const val UNTRUSTED_EXECUTION_EVENT_NAME: String =
+            "The current check is untrusted because the start point of the check interval has been selected approximately"
     }
 }

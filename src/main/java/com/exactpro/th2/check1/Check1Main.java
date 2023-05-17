@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,17 @@
  */
 package com.exactpro.th2.check1;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.exactpro.th2.check1.configuration.Check1Configuration;
 import com.exactpro.th2.common.grpc.MessageBatch;
 import com.exactpro.th2.common.schema.factory.CommonFactory;
 import com.exactpro.th2.common.schema.grpc.router.GrpcRouter;
 import com.exactpro.th2.common.schema.message.MessageRouter;
-import com.exactpro.th2.check1.configuration.Check1Configuration;
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
 
 public class Check1Main {
     private static final Logger LOGGER = LoggerFactory.getLogger(Check1Main.class);
@@ -38,11 +38,17 @@ public class Check1Main {
             CommonFactory commonFactory = CommonFactory.createFromArguments(args);
             toDispose.add(commonFactory);
 
-            MessageRouter<MessageBatch> messageRouter = commonFactory.getMessageRouterParsedBatch();
+            MessageRouter<MessageBatch> protoMessageRouter = commonFactory.getMessageRouterParsedBatch();
+            MessageRouter<GroupBatch> transportMessageRouter = commonFactory.getTransportGroupBatchRouter();
             GrpcRouter grpcRouter = commonFactory.getGrpcRouter();
             Check1Configuration configuration = commonFactory.getCustomConfiguration(Check1Configuration.class);
 
-            CollectorService collectorService = new CollectorService(messageRouter, commonFactory.getEventBatchRouter(), configuration);
+            CollectorService collectorService = new CollectorService(
+                    protoMessageRouter,
+                    transportMessageRouter,
+                    commonFactory.getEventBatchRouter(),
+                    configuration
+            );
             toDispose.add(collectorService::close);
 
             Check1Handler check1Handler = new Check1Handler(collectorService);
@@ -58,7 +64,6 @@ public class Check1Main {
 
     /**
      * Close resources in LIFO order
-     * @param resources
      */
     private static void closeResources(Deque<AutoCloseable> resources) {
         resources.descendingIterator().forEachRemaining(resource -> {
