@@ -23,7 +23,8 @@ class MessageContainer(
     val messageWrapper: MessageWrapper,
     val sailfishMessage: IMessage
 ) {
-    val metadataMessage: IMessage by lazy(messageWrapper::toMetadataMessage)
+    val metadataMessage: IMessage
+        get() = messageWrapper.metadata
 
     companion object {
         private val EMPTY_MESSAGE = DefaultMessageFactory.getFactory().createMessage("empty", "empty")

@@ -31,16 +31,16 @@ import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.schema.message.DeliveryMetadata
-import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageGroup
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMessage
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
@@ -48,8 +48,8 @@ import java.util.concurrent.ForkJoinPool
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 
 class CollectorService(
-    private val messageRouter: MessageRouter<MessageBatch>,
-    private val transportMessageRouter: MessageRouter<GroupBatch>,
+    protoMessageRouter: MessageRouter<MessageBatch>,
+    transportMessageRouter: MessageRouter<GroupBatch>,
     private val eventBatchRouter: MessageRouter<EventBatch>,
     configuration: Check1Configuration
 ) {
@@ -60,8 +60,7 @@ class CollectorService(
      * Queue name to subscriber. Messages with different connectivity can be transferred with one queue.
      */
     private val protoSubscriberMonitor: SubscriberMonitor
-
-    //    private val transportSubscriberMonitor: SubscriberMonitor
+    private val transportSubscriberMonitor: SubscriberMonitor
     private val streamObservable: Observable<StreamContainer>
     private val checkpointSubscriber: CheckpointSubscriber
     private val mqSubject: PublishSubject<MessageWrapper>
@@ -78,14 +77,25 @@ class CollectorService(
 
         val limitSize = configuration.messageCacheSize
         mqSubject = PublishSubject.create()
-
-        protoSubscriberMonitor = subscribe(MessageListener { _: DeliveryMetadata, batch: MessageBatch ->
-            batch.messagesList.forEach {
-                mqSubject.onNext(ProtoMessageWrapper(it))
-            }
-        })
-//        transportMessageRouter =
-//            subscribe(MessageListener { _: DeliveryMetadata, batch: GroupBatch -> mqSubject.onNext(batch) })
+        protoSubscriberMonitor =
+            checkNotNull(protoMessageRouter.subscribeAll({ _: DeliveryMetadata, batch: MessageBatch ->
+                batch.messagesList.forEach {
+                    mqSubject.onNext(ProtoMessageWrapper(it))
+                }
+            })) { "Can not subscribe for listening protobuf messages" }
+        transportSubscriberMonitor =
+            checkNotNull(transportMessageRouter.subscribeAll({ _: DeliveryMetadata, batch: GroupBatch ->
+                val book = batch.book
+                val sessionGroup = batch.sessionGroup
+                batch.groups.asSequence()
+                    .flatMap(MessageGroup::messages)
+                    .forEach { message ->
+                        when (message) {
+                            is ParsedMessage -> mqSubject.onNext(TransportMessageWrapper(message, book, sessionGroup))
+                            else -> error("Transport group contains not parsed message $message")
+                        }
+                    }
+            })) { "Can not subscribe for listening transport messages" }
         streamObservable = mqSubject.groupBy { wrapper ->
             wrapper.id.run {
                 SessionKey(wrapper.id.bookName, connectionId.sessionAlias, direction)
@@ -258,16 +268,11 @@ class CollectorService(
     }
 
     fun close() {
-        try {
-            protoSubscriberMonitor.unsubscribe()
-        } catch (e: IOException) {
-            logger.error("Close subscriber failure", e)
-        }
+        runCatching(protoSubscriberMonitor::unsubscribe)
+            .onFailure { logger.error("Close protobuf subscriber failure", it) }
+        runCatching(transportSubscriberMonitor::unsubscribe)
+            .onFailure { logger.error("Close transport subscriber failure", it) }
         mqSubject.onComplete()
-    }
-
-    private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
-        return checkNotNull(messageRouter.subscribeAll(listener)) { "Can not subscribe to queues" }
     }
 
     private fun SessionKey.toMessageID(data: CheckpointData) = MessageID.newBuilder()

@@ -17,6 +17,7 @@ import com.exactpro.th2.check1.MessageWrapper
 import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.TransportMessageWrapper
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
@@ -24,31 +25,34 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
-import com.exactpro.th2.common.grpc.Value
+import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.value.toValue
-import com.google.protobuf.Timestamp
 import io.reactivex.Observable
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.Direction as TransportDirection
 
 class TestNoMessageCheckTask : AbstractCheckTaskTest() {
-    @Test
-    fun `no messages outside the prefilter`() {
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `no messages outside the prefilter`(useTransport: Boolean) {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(
             messages = createMessages(
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
-                MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
-                MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 1300)),
-                MessageData("D", "4".toValue(), getMessageTimestamp(checkpointTimestamp, 1500)),
-                MessageData("E", "5".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
+                useTransport,
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 100)),
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 500)),
+                MessageData("B", "2", getTimestamp(checkpointTimestamp, 1000)),
+                MessageData("C", "3", getTimestamp(checkpointTimestamp, 1300)),
+                MessageData("D", "4", getTimestamp(checkpointTimestamp, 1500)),
+                MessageData("E", "5", getTimestamp(checkpointTimestamp, 1600)),
                 // should be skipped because of message timeout
-                MessageData("F", "6".toValue(), getMessageTimestamp(checkpointTimestamp, 1600))
+                MessageData("F", "6", getTimestamp(checkpointTimestamp, 1600))
             )
         )
 
@@ -83,19 +87,21 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         })
     }
 
-    @Test
-    fun `with messages outside the prefilter`() {
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `with messages outside the prefilter`(useTransport: Boolean) {
         val checkpointTimestamp = Instant.now()
         val messageTimeout = 1500L
         val streams = createStreams(
             messages = createMessages(
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 50)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
-                MessageData("B", "2".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
-                MessageData("C", "3".toValue(), getMessageTimestamp(checkpointTimestamp, 700)),
-                MessageData("D", "4".toValue(), getMessageTimestamp(checkpointTimestamp, 1600)),
+                useTransport,
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 50)),
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 100)),
+                MessageData("B", "2", getTimestamp(checkpointTimestamp, 500)),
+                MessageData("C", "3", getTimestamp(checkpointTimestamp, 700)),
+                MessageData("D", "4", getTimestamp(checkpointTimestamp, 1600)),
                 // should be skipped because of message timeout
-                MessageData("E", "5".toValue(), getMessageTimestamp(checkpointTimestamp, 1700))
+                MessageData("E", "5", getTimestamp(checkpointTimestamp, 1700))
             )
         )
 
@@ -132,16 +138,18 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         })
     }
 
-    @Test
-    fun `check messages without message timeout`() {
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `check messages without message timeout`(useTransport: Boolean) {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(
             messages = createMessages(
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 100)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 500)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 700)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1000)),
-                MessageData("A", "1".toValue(), getMessageTimestamp(checkpointTimestamp, 1300))
+                useTransport,
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 100)),
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 500)),
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 700)),
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 1000)),
+                MessageData("A", "1", getTimestamp(checkpointTimestamp, 1300))
             )
         )
 
@@ -181,17 +189,49 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
 
 
     private fun createMessages(
+        useTransport: Boolean,
         vararg messageData: MessageData,
-        sessionAlias: String = SESSION_ALIAS,
-        messageType: String = MESSAGE_TYPE,
-        direction: Direction = Direction.FIRST
+    ): List<MessageWrapper> = if (useTransport) {
+        createTransportMessages(*messageData)
+    } else {
+        createProtoMessages(*messageData)
+    }
+
+    private fun createProtoMessages(
+        vararg messageData: MessageData,
     ): List<MessageWrapper> {
         var sequence = 1L
         return messageData.map { data ->
             ProtoMessageWrapper(
-                constructMessage(sequence++, sessionAlias, messageType, direction, data.timestamp)
-                    .putFields(data.fieldName, data.value)
+                constructProtoMessage(
+                    sequence++,
+                    SESSION_ALIAS,
+                    MESSAGE_TYPE,
+                    Direction.FIRST,
+                    data.timestamp.toTimestamp()
+                ).putFields(data.fieldName, data.value.toValue())
                     .build()
+            )
+        }
+    }
+
+    private fun createTransportMessages(
+        vararg messageData: MessageData,
+    ): List<MessageWrapper> {
+        var sequence = 1L
+        return messageData.map { data ->
+            TransportMessageWrapper(
+                constructTransportMessage(
+                    sequence++,
+                    SESSION_ALIAS,
+                    MESSAGE_TYPE,
+                    TransportDirection.INCOMING,
+                    data.timestamp
+                ).apply {
+                    body = mutableMapOf(data.fieldName to data.value)
+                },
+                BOOK_NAME,
+                ""
             )
         }
     }
@@ -214,5 +254,5 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
     }
 
 
-    data class MessageData(val fieldName: String, val value: Value, val timestamp: Timestamp)
+    data class MessageData(val fieldName: String, val value: String, val timestamp: Instant)
 }

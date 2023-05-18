@@ -34,6 +34,9 @@ import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.Direction.INCOMING
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageId
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMessage
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -47,6 +50,7 @@ import io.reactivex.Observable
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.Direction as TransportDirection
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
@@ -72,7 +76,7 @@ abstract class AbstractCheckTaskTest {
         )
     }
 
-    fun constructMessage(
+    fun constructProtoMessage(
         sequence: Long = 1,
         alias: String = SESSION_ALIAS,
         type: String = MESSAGE_TYPE,
@@ -91,6 +95,22 @@ abstract class AbstractCheckTaskTest {
         }
     }
 
+    fun constructTransportMessage(
+        sequence: Long = 1,
+        alias: String = SESSION_ALIAS,
+        type: String = MESSAGE_TYPE,
+        direction: TransportDirection = INCOMING,
+        timestamp: Instant = Instant.now()
+    ): ParsedMessage = ParsedMessage().apply {
+        this.type = type
+        id = MessageId(
+            alias,
+            direction,
+            sequence,
+            timestamp = timestamp
+        )
+    }
+
     protected fun createRootEventId(): EventID {
         return createEventId(ROOT_ID)
     }
@@ -99,8 +119,9 @@ abstract class AbstractCheckTaskTest {
         return requireNotNull(EventUtils.toEventID(Instant.now(), BOOK_NAME, id))
     }
 
-    protected fun getMessageTimestamp(start: Instant, delta: Long): Timestamp =
-        start.plusMillis(delta).toTimestamp()
+    protected fun getProtoTimestamp(start: Instant, delta: Long): Timestamp = getTimestamp(start, delta).toTimestamp()
+
+    protected fun getTimestamp(start: Instant, delta: Long): Instant = start.plusMillis(delta)
 
     protected fun createCheckpoint(timestamp: Instant? = null, sequence: Long = -1): Checkpoint =
         Checkpoint.newBuilder().apply {

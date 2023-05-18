@@ -45,13 +45,13 @@ class NoMessageCheckTask(
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+        PROTO_CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
         protoPreMessageFilter.toCompareSettings()
     )
 
     private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
         SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+            PROTO_CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
     }

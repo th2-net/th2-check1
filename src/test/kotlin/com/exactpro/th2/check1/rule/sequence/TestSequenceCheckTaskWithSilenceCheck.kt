@@ -39,7 +39,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
     fun `reports about extra messages when timeout exceeded`() {
         val streams = createStreams(messages = (1..3L).map {
             ProtoMessageWrapper(
-                constructMessage(sequence = it)
+                constructProtoMessage(sequence = it)
                     .putFields("A", 42.toValue())
                     .putFields("B", it.toValue())
                     .build()
@@ -103,7 +103,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
     fun `reports no extra messages found when timeout exceeded`() {
         val streams = createStreams(messages = (1..2L).map {
             ProtoMessageWrapper(
-                constructMessage(sequence = it)
+                constructProtoMessage(sequence = it)
                     .putFields("A", 42.toValue())
                     .putFields("B", it.toValue())
                     .build()
@@ -157,7 +157,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
     fun `does not report if next rule is subscribed in chain before beginning`() {
         val streams = createStreams(messages = (1..3L).map {
             ProtoMessageWrapper(
-                constructMessage(sequence = it)
+                constructProtoMessage(sequence = it)
                     .putFields("A", 42.toValue())
                     .putFields("B", it.toValue())
                     .build()
@@ -243,7 +243,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
     fun `does not report when next rule added to the chain before timeout exceeds`() {
         val streams = createStreams(messages = (1..2L).map {
             ProtoMessageWrapper(
-                constructMessage(sequence = it)
+                constructProtoMessage(sequence = it)
                     .putFields("A", 42.toValue())
                     .putFields("B", it.toValue())
                     .build()

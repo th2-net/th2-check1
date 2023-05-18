@@ -198,8 +198,8 @@ nexusPublishing {
 }
 
 signing {
-    def signingKey = findProperty("signingKey")
-    def signingPassword = findProperty("signingPassword")
+    String signingKey = findProperty("signingKey")
+    String signingPassword = findProperty("signingPassword")
     useInMemoryPgpKeys(signingKey, signingPassword)
     sign publishing.publications.mavenJava
 }
@@ -207,8 +207,8 @@ signing {
 dependencies {
     api platform('com.exactpro.th2:bom:4.2.0')
     implementation 'com.exactpro.th2:grpc-check1:4.1.0-dev'
-    implementation 'com.exactpro.th2:common:5.2.0-separate-executor-4807123825-9449978-SNAPSHOT'
-    implementation('com.exactpro.th2:sailfish-utils:4.0.0-TH2-4891-4805811652-8645b9c-SNAPSHOT') {
+    implementation 'com.exactpro.th2:common:5.2.0-json-raw-body-5014253802-34f0e61-SNAPSHOT'
+    implementation('com.exactpro.th2:sailfish-utils:4.0.0-TH2-4891-5014517637-6d5e8c8-SNAPSHOT') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
         // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability

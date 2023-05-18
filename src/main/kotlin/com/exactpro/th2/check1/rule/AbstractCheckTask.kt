@@ -48,6 +48,7 @@ import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.sailfish.utils.FilterSettings
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter.createParameters
+import com.exactpro.th2.sailfish.utils.transport.TransportToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
 import com.google.protobuf.Timestamp
 import com.google.protobuf.util.Durations
@@ -589,7 +590,13 @@ abstract class AbstractCheckTask(
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
 
         @JvmField
-        val CONVERTER = ProtoToIMessageConverter(
+        val TRANSPORT_CONVERTER = TransportToIMessageConverter(
+            VerificationUtil.FACTORY_PROXY,
+            // TODO: converter doesn't support createParameters().setUseMarkerForNullsInMessage(true)
+        )
+
+        @JvmField
+        val PROTO_CONVERTER = ProtoToIMessageConverter(
             VerificationUtil.FACTORY_PROXY,
             null,
             null,
@@ -722,7 +729,7 @@ abstract class AbstractCheckTask(
     }
 
     private fun Observable<MessageWrapper>.mapToMessageContainer(): Observable<MessageContainer> =
-        map { message -> MessageContainer(message, message.toSailfishMessage()) }
+        map { message -> MessageContainer(message, message.message) }
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then

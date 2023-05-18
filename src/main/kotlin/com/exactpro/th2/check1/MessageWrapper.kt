@@ -17,48 +17,48 @@
 package com.exactpro.th2.check1
 
 import com.exactpro.sf.common.messages.IMessage
-import com.exactpro.th2.check1.rule.AbstractCheckTask.Companion.CONVERTER
+import com.exactpro.th2.check1.rule.AbstractCheckTask.Companion.PROTO_CONVERTER
+import com.exactpro.th2.check1.rule.AbstractCheckTask.Companion.TRANSPORT_CONVERTER
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.message.messageType
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMessage
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.toProto
 
 sealed interface MessageWrapper {
-
-    val properties: Map<String, String>
     val id: MessageID
     val messageType: String
+    val properties: Map<String, String>
 
-    fun toSailfishMessage(): IMessage
-
-    fun toMetadataMessage(): IMessage
+    val message: IMessage
+    val metadata: IMessage
 }
 
-class TransportMessageWrapper : MessageWrapper {
-    override val id: MessageID
-        get() = TODO("Not yet implemented")
+class TransportMessageWrapper(
+    private val transport: ParsedMessage,
+    private val book: String,
+    private val sessionGroup: String
+) : MessageWrapper {
+    override val id: MessageID by lazy { this.transport.id.toProto(book, sessionGroup) }
     override val messageType: String
-        get() = TODO("Not yet implemented")
+        get() = this.transport.type
     override val properties: Map<String, String>
-        get() = TODO("Not yet implemented")
+        get() = this.transport.metadata
 
-    override fun toSailfishMessage(): IMessage {
-        TODO("Not yet implemented")
-    }
-
-    override fun toMetadataMessage(): IMessage {
-        TODO("Not yet implemented")
-    }
+    override val message: IMessage by lazy { TRANSPORT_CONVERTER.fromTransport(book, sessionGroup, transport, false) }
+    override val metadata: IMessage by lazy { VerificationUtil.toSailfishMessage(this.transport.metadata) }
 }
 
 class ProtoMessageWrapper(
-    private val message: Message
+    private val proto: Message
 ) : MessageWrapper {
-    override val id: MessageID = message.metadata.id
-    override val messageType: String = message.messageType
-    override val properties: Map<String, String> = message.metadata.propertiesMap
+    override val id: MessageID
+        get() = this.proto.metadata.id
+    override val messageType: String
+        get() = this.proto.messageType
+    override val properties: Map<String, String> = this.proto.metadata.propertiesMap
 
-    //FIXME: move CONVERTER this this class
-    override fun toSailfishMessage(): IMessage = CONVERTER.fromProtoMessage(message, false)
-    override fun toMetadataMessage(): IMessage = VerificationUtil.toMessage(message.metadata)
+    override val message: IMessage by lazy { PROTO_CONVERTER.fromProtoMessage(this.proto, false) }
+    override val metadata: IMessage by lazy { VerificationUtil.toSailfishMessage(properties) }
 }

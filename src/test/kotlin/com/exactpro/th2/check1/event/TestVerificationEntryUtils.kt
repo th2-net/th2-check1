@@ -29,8 +29,6 @@ import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.value.nullValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
-import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
-import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter.createParameters
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -42,7 +40,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
 class TestVerificationEntryUtils {
-    private val converter = AbstractCheckTask.CONVERTER
+    private val converter = AbstractCheckTask.PROTO_CONVERTER
 
     @Test
     fun `null value in message`() {
@@ -67,7 +65,10 @@ class TestVerificationEntryUtils {
         val entry = VerificationEntryUtils.createVerificationEntry(result)
         entry.fields["A"].assertNotNull { "Field A must be set in entry: ${entry.toDebugString()}" }
             .also {
-                Assertions.assertEquals("#", it.expected) { "Expected value is different in entry: ${it.toDebugString()}" }
+                Assertions.assertEquals(
+                    "#",
+                    it.expected
+                ) { "Expected value is different in entry: ${it.toDebugString()}" }
                 Assertions.assertNull(it.actual) { "Actual value must be null in entry: ${it.toDebugString()}" }
             }
         entry.fields["B"].assertNotNull { "Field B must be set in entry: ${entry.toDebugString()}" }
@@ -81,29 +82,52 @@ class TestVerificationEntryUtils {
     fun `key field in reordered collection`() {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
             .setMessageType("Test")
-            .setMessageFilter(MessageFilter.newBuilder()
-                .putFields("collection", ValueFilter.newBuilder()
-                    .setListFilter(ListValueFilter.newBuilder().apply {
-                        addValues(ValueFilter.newBuilder()
-                            .setMessageFilter(MessageFilter.newBuilder().putFields("B", ValueFilter.newBuilder().setSimpleFilter("2").build()).build())
-                            .build())
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putFields("collection", ValueFilter.newBuilder()
+                        .setListFilter(ListValueFilter.newBuilder().apply {
+                            addValues(
+                                ValueFilter.newBuilder()
+                                    .setMessageFilter(
+                                        MessageFilter.newBuilder()
+                                            .putFields("B", ValueFilter.newBuilder().setSimpleFilter("2").build())
+                                            .build()
+                                    )
+                                    .build()
+                            )
 
-                        addValues(ValueFilter.newBuilder()
-                            .setMessageFilter(MessageFilter.newBuilder().putFields("A", ValueFilter.newBuilder().setKey(true).setSimpleFilter("1").build())
-                                .build())
-                            .build())
-                    }).build())
-                .putFields("msg", ValueFilter.newBuilder()
-                    .setMessageFilter(MessageFilter.newBuilder().putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build()).build())
-                    .build())
-                .build())
+                            addValues(
+                                ValueFilter.newBuilder()
+                                    .setMessageFilter(
+                                        MessageFilter.newBuilder().putFields(
+                                            "A",
+                                            ValueFilter.newBuilder().setKey(true).setSimpleFilter("1").build()
+                                        )
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                        }).build()
+                    )
+                    .putFields(
+                        "msg", ValueFilter.newBuilder()
+                            .setMessageFilter(
+                                MessageFilter.newBuilder()
+                                    .putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build()).build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
             .build()
 
         val actual = message("Test").apply {
-            putFields("collection", listOf(
-                message().putFields("A", "1".toValue()).build(),
-                message().putFields("B", "2".toValue()).build()
-            ).toValue())
+            putFields(
+                "collection", listOf(
+                    message().putFields("A", "1".toValue()).build(),
+                    message().putFields("B", "2".toValue()).build()
+                ).toValue()
+            )
             putFields("msg", message().putFields("A", "1".toValue()).toValue())
         }.build()
 
@@ -120,12 +144,13 @@ class TestVerificationEntryUtils {
             settings
         )
         val entry = VerificationEntryUtils.createVerificationEntry(result)
-        val collectionEntry = entry.fields["collection"].assertNotNull { "collection field is missing in ${entry.toDebugString()}" }
+        val collectionEntry =
+            entry.fields["collection"].assertNotNull { "collection field is missing in ${entry.toDebugString()}" }
         assertAll(
             {
                 collectionEntry.fields["0"].assertNotNull { "no 0 element in ${collectionEntry.toDebugString()}" }
                     .fields["A"].assertNotNull { "no filed A in ${collectionEntry.toDebugString()}" }.apply {
-                        Assertions.assertTrue(isKey) { "field A is not a key ${collectionEntry.toDebugString()}" }
+                    Assertions.assertTrue(isKey) { "field A is not a key ${collectionEntry.toDebugString()}" }
                 }
             },
             {
@@ -141,30 +166,51 @@ class TestVerificationEntryUtils {
     fun `collection as key field`() {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
             .setMessageType("Test")
-            .setMessageFilter(MessageFilter.newBuilder()
-                .putFields("collection", ValueFilter.newBuilder()
-                    .setKey(true)
-                    .setListFilter(ListValueFilter.newBuilder().apply {
-                        addValues(ValueFilter.newBuilder()
-                            .setMessageFilter(MessageFilter.newBuilder().putFields("B", ValueFilter.newBuilder().setSimpleFilter("2").build()).build())
-                            .build())
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putFields("collection", ValueFilter.newBuilder()
+                        .setKey(true)
+                        .setListFilter(ListValueFilter.newBuilder().apply {
+                            addValues(
+                                ValueFilter.newBuilder()
+                                    .setMessageFilter(
+                                        MessageFilter.newBuilder()
+                                            .putFields("B", ValueFilter.newBuilder().setSimpleFilter("2").build())
+                                            .build()
+                                    )
+                                    .build()
+                            )
 
-                        addValues(ValueFilter.newBuilder()
-                            .setMessageFilter(MessageFilter.newBuilder().putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build())
-                                .build())
-                            .build())
-                    }).build())
-                .putFields("msg", ValueFilter.newBuilder()
-                    .setMessageFilter(MessageFilter.newBuilder().putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build()).build())
-                    .build())
-                .build())
+                            addValues(
+                                ValueFilter.newBuilder()
+                                    .setMessageFilter(
+                                        MessageFilter.newBuilder()
+                                            .putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build())
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                        }).build()
+                    )
+                    .putFields(
+                        "msg", ValueFilter.newBuilder()
+                            .setMessageFilter(
+                                MessageFilter.newBuilder()
+                                    .putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build()).build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
             .build()
 
         val actual = message("Test").apply {
-            putFields("collection", listOf(
-                message().putFields("A", "1".toValue()).build(),
-                message().putFields("B", "2".toValue()).build()
-            ).toValue())
+            putFields(
+                "collection", listOf(
+                    message().putFields("A", "1".toValue()).build(),
+                    message().putFields("B", "2".toValue()).build()
+                ).toValue()
+            )
             putFields("msg", message().putFields("A", "1".toValue()).toValue())
         }.build()
 
@@ -181,7 +227,8 @@ class TestVerificationEntryUtils {
             settings
         )
         val entry = VerificationEntryUtils.createVerificationEntry(result)
-        val collectionEntry = entry.fields["collection"].assertNotNull { "collection field is missing in ${entry.toDebugString()}" }
+        val collectionEntry =
+            entry.fields["collection"].assertNotNull { "collection field is missing in ${entry.toDebugString()}" }
         Assertions.assertTrue(collectionEntry.isKey) { "collection is not a key field in ${collectionEntry.toDebugString()}" }
     }
 
@@ -189,30 +236,51 @@ class TestVerificationEntryUtils {
     fun `message as key field`() {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
             .setMessageType("Test")
-            .setMessageFilter(MessageFilter.newBuilder()
-                .putFields("collection", ValueFilter.newBuilder()
-                    .setListFilter(ListValueFilter.newBuilder().apply {
-                        addValues(ValueFilter.newBuilder()
-                            .setMessageFilter(MessageFilter.newBuilder().putFields("B", ValueFilter.newBuilder().setSimpleFilter("2").build()).build())
-                            .build())
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putFields("collection", ValueFilter.newBuilder()
+                        .setListFilter(ListValueFilter.newBuilder().apply {
+                            addValues(
+                                ValueFilter.newBuilder()
+                                    .setMessageFilter(
+                                        MessageFilter.newBuilder()
+                                            .putFields("B", ValueFilter.newBuilder().setSimpleFilter("2").build())
+                                            .build()
+                                    )
+                                    .build()
+                            )
 
-                        addValues(ValueFilter.newBuilder()
-                            .setMessageFilter(MessageFilter.newBuilder().putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build())
-                                .build())
-                            .build())
-                    }).build())
-                .putFields("msg", ValueFilter.newBuilder()
-                    .setKey(true)
-                    .setMessageFilter(MessageFilter.newBuilder().putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build()).build())
-                    .build())
-                .build())
+                            addValues(
+                                ValueFilter.newBuilder()
+                                    .setMessageFilter(
+                                        MessageFilter.newBuilder()
+                                            .putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build())
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                        }).build()
+                    )
+                    .putFields(
+                        "msg", ValueFilter.newBuilder()
+                            .setKey(true)
+                            .setMessageFilter(
+                                MessageFilter.newBuilder()
+                                    .putFields("A", ValueFilter.newBuilder().setSimpleFilter("1").build()).build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
             .build()
 
         val actual = message("Test").apply {
-            putFields("collection", listOf(
-                message().putFields("A", "1".toValue()).build(),
-                message().putFields("B", "2".toValue()).build()
-            ).toValue())
+            putFields(
+                "collection", listOf(
+                    message().putFields("A", "1".toValue()).build(),
+                    message().putFields("B", "2".toValue()).build()
+                ).toValue()
+            )
             putFields("msg", message().putFields("A", "1".toValue()).toValue())
         }.build()
 
@@ -236,11 +304,13 @@ class TestVerificationEntryUtils {
     @Test
     fun `expected value converted as null value`() {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
-                .setMessageType("Test")
-                .setMessageFilter(MessageFilter.newBuilder()
-                        .putFields("A", "1".toValueFilter())
-                        .build())
-                .build()
+            .setMessageType("Test")
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putFields("A", "1".toValueFilter())
+                    .build()
+            )
+            .build()
 
         val actual = message("Test").apply {
             putFields("A", "1".toValue())
@@ -255,9 +325,9 @@ class TestVerificationEntryUtils {
         val actualIMessage = converter.fromProtoMessage(actual, false)
         val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
         val result = MessageComparator.compare(
-                actualIMessage,
-                filterIMessage,
-                settings
+            actualIMessage,
+            filterIMessage,
+            settings
         )
 
         val entry = VerificationEntryUtils.createVerificationEntry(result)
@@ -268,12 +338,14 @@ class TestVerificationEntryUtils {
     @Test
     fun `actual value converted as null value`() {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
-                .setMessageType("Test")
-                .setMessageFilter(MessageFilter.newBuilder()
-                        .putFields("A", "1".toValueFilter())
-                        .putFields("B", "2".toValueFilter())
-                        .build())
-                .build()
+            .setMessageType("Test")
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putFields("A", "1".toValueFilter())
+                    .putFields("B", "2".toValueFilter())
+                    .build()
+            )
+            .build()
 
         val actual = message("Test").apply {
             putFields("A", "1".toValue())
@@ -287,9 +359,9 @@ class TestVerificationEntryUtils {
         val actualIMessage = converter.fromProtoMessage(actual, false)
         val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
         val result = MessageComparator.compare(
-                actualIMessage,
-                filterIMessage,
-                settings
+            actualIMessage,
+            filterIMessage,
+            settings
         )
 
         val entry = VerificationEntryUtils.createVerificationEntry(result)
@@ -299,15 +371,20 @@ class TestVerificationEntryUtils {
 
     @ParameterizedTest
     @MethodSource("unexpectedTypeMismatch")
-    fun `verify messages with different value type`(actualValue: Value, expectedValueFilter: ValueFilter, expectedHint: String?) {
+    fun `verify messages with different value type`(
+        actualValue: Value,
+        expectedValueFilter: ValueFilter,
+        expectedHint: String?
+    ) {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
-                .setMessageType("Test")
-                .setMessageFilter(
-                        messageFilter().apply {
-                            putFields("A", "1".toValueFilter())
-                            putFields("B", expectedValueFilter)
-                        }.build())
-                .build()
+            .setMessageType("Test")
+            .setMessageFilter(
+                messageFilter().apply {
+                    putFields("A", "1".toValueFilter())
+                    putFields("B", expectedValueFilter)
+                }.build()
+            )
+            .build()
 
         val actual = message("Test").apply {
             putFields("A", "1".toValue())
@@ -317,9 +394,9 @@ class TestVerificationEntryUtils {
         val actualIMessage = converter.fromProtoMessage(actual, false)
         val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
         val result = MessageComparator.compare(
-                actualIMessage,
-                filterIMessage,
-                ComparatorSettings()
+            actualIMessage,
+            filterIMessage,
+            ComparatorSettings()
         )
 
         val entry = VerificationEntryUtils.createVerificationEntry(result)
@@ -337,57 +414,57 @@ class TestVerificationEntryUtils {
 
         @JvmStatic
         fun unexpectedTypeMismatch(): Stream<Arguments> = Stream.of(
-                arguments("2".toValue(), "2".toValueFilter(), null),
-                arguments(
-                        message().putFields("A", "1".toValue()).toValue(),
-                        messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
-                        null
-                ),
-                arguments(
-                        listOf("2".toValue()).toValue(),
-                        listOf("2".toValueFilter()).toValueFilter(),
-                        null
-                ),
-                arguments(
-                        "2".toValue(),
-                        messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
-                        "Value type mismatch - actual: String, expected: Message"
-                ),
-                arguments(
-                        "2".toValue(),
-                        listOf(messageFilter().putFields("A", "1".toValueFilter())).toValueFilter(),
-                        "Value type mismatch - actual: String, expected: Collection of Messages"
-                ),
-                arguments(
-                        message().putFields("A", "1".toValue()).toValue(),
-                        listOf(messageFilter().putFields("A", "1".toValueFilter())).toValueFilter(),
-                        "Value type mismatch - actual: Message, expected: Collection of Messages"
-                ),
-                arguments(
-                        "2".toValue(),
-                        listOf("2".toValueFilter()).toValueFilter(),
-                        "Value type mismatch - actual: String, expected: Collection"
-                ),
-                arguments(
-                        message().putFields("A", "1".toValue()).toValue(),
-                        "2".toValueFilter(),
-                        "Value type mismatch - actual: Message, expected: String"
-                ),
-                arguments(
-                        listOf(message().putFields("A", "1".toValue()).build()).toValue(),
-                        "2".toValueFilter(),
-                        "Value type mismatch - actual: Collection of Messages, expected: String"
-                ),
-                arguments(
-                        listOf(message().putFields("A", "1".toValue()).build()).toValue(),
-                        messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
-                        "Value type mismatch - actual: Collection of Messages, expected: Message"
-                ),
-                arguments(
-                        message().putFields("A", "1".toValue()).toValue(),
-                        listOf("2".toValueFilter()).toValueFilter(),
-                        "Value type mismatch - actual: Message, expected: Collection"
-                )
+            arguments("2".toValue(), "2".toValueFilter(), null),
+            arguments(
+                message().putFields("A", "1".toValue()).toValue(),
+                messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
+                null
+            ),
+            arguments(
+                listOf("2".toValue()).toValue(),
+                listOf("2".toValueFilter()).toValueFilter(),
+                null
+            ),
+            arguments(
+                "2".toValue(),
+                messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
+                "Value type mismatch - actual: String, expected: Message"
+            ),
+            arguments(
+                "2".toValue(),
+                listOf(messageFilter().putFields("A", "1".toValueFilter())).toValueFilter(),
+                "Value type mismatch - actual: String, expected: Collection of Messages"
+            ),
+            arguments(
+                message().putFields("A", "1".toValue()).toValue(),
+                listOf(messageFilter().putFields("A", "1".toValueFilter())).toValueFilter(),
+                "Value type mismatch - actual: Message, expected: Collection of Messages"
+            ),
+            arguments(
+                "2".toValue(),
+                listOf("2".toValueFilter()).toValueFilter(),
+                "Value type mismatch - actual: String, expected: Collection"
+            ),
+            arguments(
+                message().putFields("A", "1".toValue()).toValue(),
+                "2".toValueFilter(),
+                "Value type mismatch - actual: Message, expected: String"
+            ),
+            arguments(
+                listOf(message().putFields("A", "1".toValue()).build()).toValue(),
+                "2".toValueFilter(),
+                "Value type mismatch - actual: Collection of Messages, expected: String"
+            ),
+            arguments(
+                listOf(message().putFields("A", "1".toValue()).build()).toValue(),
+                messageFilter().putFields("A", "1".toValueFilter()).toValueFilter(),
+                "Value type mismatch - actual: Collection of Messages, expected: Message"
+            ),
+            arguments(
+                message().putFields("A", "1".toValue()).toValue(),
+                listOf("2".toValueFilter()).toValueFilter(),
+                "Value type mismatch - actual: Message, expected: Collection"
+            )
         )
     }
 }

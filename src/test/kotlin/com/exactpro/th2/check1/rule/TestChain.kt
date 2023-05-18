@@ -15,6 +15,7 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
+import com.exactpro.th2.check1.TransportMessageWrapper
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
@@ -36,6 +37,8 @@ import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -46,9 +49,10 @@ class TestChain : AbstractCheckTaskTest() {
         .putFields(KEY_FIELD, ValueFilter.newBuilder().setKey(true).setOperation(FilterOperation.NOT_EMPTY).build())
         .build()
 
-    @Test
-    fun `simple rules - two succeed`() {
-        val streams = createStreams(messages = (1..3).map(::createMessage))
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `simple rules - two succeed`(useTransport: Boolean) {
+        val streams = createStreams(messages = (1..3).map { createMessage(it, useTransport) })
 
         val task = checkRuleTask(1, eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(2, 2)
@@ -59,9 +63,10 @@ class TestChain : AbstractCheckTaskTest() {
         checkSimpleVerifySuccess(eventList, 3)
     }
 
-    @Test
-    fun `simple rules - failed, succeed`() {
-        val streams = createStreams(messages = (1..3).map(::createMessage))
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `simple rules - failed, succeed`(useTransport: Boolean) {
+        val streams = createStreams(messages = (1..3).map { createMessage(it, useTransport) })
 
         val task = checkRuleTask(4, eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(2, 2)
@@ -72,9 +77,10 @@ class TestChain : AbstractCheckTaskTest() {
         checkSimpleVerifySuccess(eventList, 1)
     }
 
-    @Test
-    fun `sequence rules - two succeed`() {
-        val streams = createStreams(messages = (1..4).map(::createMessage))
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `sequence rules - two succeed`(useTransport: Boolean) {
+        val streams = createStreams(messages = (1..4).map { createMessage(it, useTransport) })
 
         val task = sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
@@ -85,9 +91,10 @@ class TestChain : AbstractCheckTaskTest() {
         checkSequenceVerifySuccess(eventList, listOf(3, 4))
     }
 
-    @Test
-    fun `sequence rules - full failed, succeed`() {
-        val streams = createStreams(messages = (1..2).map(::createMessage))
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `sequence rules - full failed, succeed`(useTransport: Boolean) {
+        val streams = createStreams(messages = (1..2).map { createMessage(it, useTransport) })
 
         val task = sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
@@ -100,9 +107,10 @@ class TestChain : AbstractCheckTaskTest() {
         checkSequenceVerifySuccess(eventList, listOf(1, 2))
     }
 
-    @Test
-    fun `sequence rules - part failed, succeed`() {
-        val streams = createStreams(messages = (1..3).map(::createMessage))
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `sequence rules - part failed, succeed`(useTransport: Boolean) {
+        val streams = createStreams(messages = (1..3).map { createMessage(it, useTransport) })
 
         val task = sequenceCheckRuleTask(listOf(1, 4), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
@@ -115,9 +123,10 @@ class TestChain : AbstractCheckTaskTest() {
         checkSequenceVerifySuccess(eventList, listOf(2, 3))
     }
 
-    @Test
-    fun `make long chain before begin`() {
-        val streams = createStreams(messages = (1..4).map(::createMessage))
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `make long chain before begin`(useTransport: Boolean) {
+        val streams = createStreams(messages = (1..4).map { createMessage(it, useTransport) })
 
         val task = checkRuleTask(1, eventID, streams).also { one ->
             one.subscribeNextTask(checkRuleTask(2, eventID, streams).also { two ->
@@ -144,7 +153,7 @@ class TestChain : AbstractCheckTaskTest() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
             ProtoMessageWrapper(
-                constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
                         mapOf(
                             KEY_FIELD to "$KEY_FIELD$it".toValue(),
@@ -182,7 +191,7 @@ class TestChain : AbstractCheckTaskTest() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
             ProtoMessageWrapper(
-                constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
                         mapOf(
                             KEY_FIELD to "$KEY_FIELD$it".toValue(),
@@ -220,7 +229,7 @@ class TestChain : AbstractCheckTaskTest() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
             ProtoMessageWrapper(
-                constructMessage(it, timestamp = getMessageTimestamp(checkpointTimestamp, it * 1000))
+                constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
                         mapOf(
                             KEY_FIELD to "$KEY_FIELD$it".toValue(),
@@ -334,14 +343,31 @@ class TestChain : AbstractCheckTaskTest() {
         )
     }
 
-    private fun createMessage(sequence: Int) = ProtoMessageWrapper(
-        constructMessage(sequence.toLong())
+    private fun createMessage(sequence: Int, useTransport: Boolean) = if (useTransport) {
+        createTransportMessage(sequence)
+    } else {
+        createProtoMessage(sequence)
+    }
+
+    private fun createProtoMessage(sequence: Int) = ProtoMessageWrapper(
+        constructProtoMessage(sequence.toLong())
             .putAllFields(
                 mapOf(
                     KEY_FIELD to "$KEY_FIELD$sequence".toValue(),
                     NOT_KEY_FIELD to "$NOT_KEY_FIELD$sequence".toValue()
                 )
             ).build()
+    )
+
+    private fun createTransportMessage(sequence: Int) = TransportMessageWrapper(
+        constructTransportMessage(sequence.toLong()).apply {
+            body = mutableMapOf(
+                KEY_FIELD to "$KEY_FIELD$sequence",
+                NOT_KEY_FIELD to "$NOT_KEY_FIELD$sequence"
+            )
+        },
+        BOOK_NAME,
+        ""
     )
 
     private fun createMessageFilter(sequence: Int) = RootMessageFilter.newBuilder()
