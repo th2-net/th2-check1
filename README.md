@@ -242,6 +242,11 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 + Support for listening to messages using th2 transport protocol from a queue
 
+#### Changed:
+
++ Migrated to common `5.???`
++ Migrated to sailfish-utils `4.???`
+
 ### 4.0.1
 
 #### Added:
