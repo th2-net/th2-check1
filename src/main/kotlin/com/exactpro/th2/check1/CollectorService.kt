@@ -36,6 +36,9 @@ import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageGroup
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMessage
+import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
+import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable

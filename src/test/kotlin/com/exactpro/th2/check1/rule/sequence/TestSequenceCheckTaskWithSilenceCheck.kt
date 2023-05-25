@@ -13,7 +13,6 @@
 
 package com.exactpro.th2.check1.rule.sequence
 
-import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
@@ -27,6 +26,7 @@ import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.message.rootMessageFilter
 import com.exactpro.th2.common.message.toJson
+import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
 import com.exactpro.th2.common.value.toValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test

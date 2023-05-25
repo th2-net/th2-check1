@@ -12,10 +12,8 @@
  */
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
-import com.exactpro.th2.check1.TransportMessageWrapper
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.check.CheckRuleTask
@@ -33,6 +31,8 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.ValueFilter
+import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
+import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
 import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
@@ -361,11 +361,13 @@ class TestChain : AbstractCheckTaskTest() {
 
     private fun createTransportMessage(sequence: Int) = TransportMessageWrapper(
         constructTransportMessage(sequence.toLong()).apply {
-            body = mutableMapOf(
-                KEY_FIELD to "$KEY_FIELD$sequence",
-                NOT_KEY_FIELD to "$NOT_KEY_FIELD$sequence"
+            setBody(
+                hashMapOf(
+                    KEY_FIELD to "$KEY_FIELD$sequence",
+                    NOT_KEY_FIELD to "$NOT_KEY_FIELD$sequence"
+                )
             )
-        },
+        }.build(),
         BOOK_NAME,
         ""
     )

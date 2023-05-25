@@ -12,7 +12,6 @@
  */
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.check1.MessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
@@ -37,6 +36,7 @@ import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.Direction.INCOMING
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageId
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMessage
+import com.exactpro.th2.common.utils.message.MessageWrapper
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -54,7 +54,7 @@ import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.Direction 
 
 abstract class AbstractCheckTaskTest {
     protected val clientStub: MessageRouter<EventBatch> = spy { }
-    protected val configuration = Check1Configuration()
+    private val configuration = Check1Configuration()
 
     fun awaitEventBatchRequest(timeoutValue: Long = 1000L, times: Int): List<EventBatch> {
         val argumentCaptor = argumentCaptor<EventBatch>()
@@ -101,13 +101,15 @@ abstract class AbstractCheckTaskTest {
         type: String = MESSAGE_TYPE,
         direction: TransportDirection = INCOMING,
         timestamp: Instant = Instant.now()
-    ): ParsedMessage = ParsedMessage().apply {
-        this.type = type
-        id = MessageId(
-            alias,
-            direction,
-            sequence,
-            timestamp = timestamp
+    ): ParsedMessage.FromMapBuilder = ParsedMessage.builder().apply {
+        setType(type)
+        setId(
+            MessageId(
+                alias,
+                direction,
+                sequence,
+                timestamp = timestamp
+            )
         )
     }
 
@@ -157,7 +159,7 @@ abstract class AbstractCheckTaskTest {
     protected fun List<Event>.findEventByType(eventType: String): Event? =
         this.find { it.type == eventType }
 
-    protected fun extractEventBody(verificationEvent: Event): List<IBodyData> {
+    private fun extractEventBody(verificationEvent: Event): List<IBodyData> {
         return jacksonObjectMapper()
             .addMixIn(IBodyData::class.java, IBodyDataMixIn::class.java)
             .readValue(verificationEvent.body.toByteArray())
@@ -170,7 +172,7 @@ abstract class AbstractCheckTaskTest {
         return verification
     }
 
-    protected fun assertVerificationEntries(
+    private fun assertVerificationEntries(
         expectedVerificationEntries: Map<String, VerificationEntry>,
         actualVerificationEntries: Map<String, VerificationEntry>?,
         asserts: (VerificationEntry, VerificationEntry) -> Unit

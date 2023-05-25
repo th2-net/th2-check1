@@ -13,8 +13,6 @@
 
 package com.exactpro.th2.check1.rule
 
-import com.exactpro.th2.check1.MessageWrapper
-import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.configuration.Check1Configuration
@@ -37,6 +35,8 @@ import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout

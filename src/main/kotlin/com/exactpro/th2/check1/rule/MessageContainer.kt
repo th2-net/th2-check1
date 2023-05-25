@@ -15,16 +15,16 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.sf.common.impl.messages.DefaultMessageFactory
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
-import com.exactpro.th2.check1.MessageWrapper
-import com.exactpro.th2.check1.ProtoMessageWrapper
+import com.exactpro.th2.check1.util.VerificationUtil.toSailfishMessage
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
 
 class MessageContainer(
     val messageWrapper: MessageWrapper,
     val sailfishMessage: IMessage
 ) {
-    val metadataMessage: IMessage
-        get() = messageWrapper.metadata
+    val metadataMessage: IMessage by lazy { toSailfishMessage(messageWrapper.properties) }
 
     companion object {
         private val EMPTY_MESSAGE = DefaultMessageFactory.getFactory().createMessage("empty", "empty")

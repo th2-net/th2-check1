@@ -13,6 +13,7 @@
 
 package com.exactpro.th2.check1
 
+import com.exactpro.th2.common.utils.message.MessageWrapper
 import io.reactivex.Observable
 
 class StreamContainer(

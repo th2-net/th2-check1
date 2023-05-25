@@ -12,11 +12,8 @@
  */
 package com.exactpro.th2.check1.rule.sequence
 
-import com.exactpro.th2.check1.MessageWrapper
-import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
-import com.exactpro.th2.check1.TransportMessageWrapper
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.exception.RuleInternalException
 import com.exactpro.th2.check1.grpc.PreFilter
@@ -39,6 +36,9 @@ import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.messageFilter
+import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
+import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
@@ -105,11 +105,13 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         ),
         TransportMessageWrapper(
             constructTransportMessage(2, SESSION_ALIAS, MESSAGE_TYPE).apply {
-                body = mutableMapOf(
-                    "A" to "43",
-                    "B" to "BBB"
+                setBody(
+                    hashMapOf(
+                        "A" to "43",
+                        "B" to "BBB"
+                    )
                 )
-            },
+            }.build(),
             BOOK_NAME,
             ""
         ),

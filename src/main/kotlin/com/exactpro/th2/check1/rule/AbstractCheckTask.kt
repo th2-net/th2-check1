@@ -19,7 +19,6 @@ import com.exactpro.sf.comparison.ComparisonResult
 import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.AbstractSessionObserver
-import com.exactpro.th2.check1.MessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
 import com.exactpro.th2.check1.entities.CheckpointData
@@ -32,6 +31,7 @@ import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.check1.utils.convert
 import com.exactpro.th2.check1.utils.getStatusType
 import com.exactpro.th2.check1.utils.isAfter
+import com.exactpro.th2.check1.utils.toSailfishMessage
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
@@ -45,9 +45,11 @@ import com.exactpro.th2.common.message.toJavaDuration
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.utils.message.MessageWrapper
 import com.exactpro.th2.sailfish.utils.FilterSettings
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter.createParameters
+import com.exactpro.th2.sailfish.utils.ToSailfishParameters
 import com.exactpro.th2.sailfish.utils.transport.TransportToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
 import com.google.protobuf.Timestamp
@@ -592,7 +594,7 @@ abstract class AbstractCheckTask(
         @JvmField
         val TRANSPORT_CONVERTER = TransportToIMessageConverter(
             VerificationUtil.FACTORY_PROXY,
-            // TODO: converter doesn't support createParameters().setUseMarkerForNullsInMessage(true)
+            parameters = ToSailfishParameters(useMarkerForNullsInMessage = true)
         )
 
         @JvmField
@@ -729,7 +731,7 @@ abstract class AbstractCheckTask(
     }
 
     private fun Observable<MessageWrapper>.mapToMessageContainer(): Observable<MessageContainer> =
-        map { message -> MessageContainer(message, message.message) }
+        map { message -> MessageContainer(message, message.toSailfishMessage()) }
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then

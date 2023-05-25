@@ -13,11 +13,8 @@
 
 package com.exactpro.th2.check1.rule.nomessage
 
-import com.exactpro.th2.check1.MessageWrapper
-import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
-import com.exactpro.th2.check1.TransportMessageWrapper
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
@@ -26,6 +23,9 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.message.toTimestamp
+import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
+import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
 import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.assertAll
@@ -227,9 +227,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
                     MESSAGE_TYPE,
                     TransportDirection.INCOMING,
                     data.timestamp
-                ).apply {
-                    body = mutableMapOf(data.fieldName to data.value)
-                },
+                ).setBody(hashMapOf(data.fieldName to data.value)).build(),
                 BOOK_NAME,
                 ""
             )

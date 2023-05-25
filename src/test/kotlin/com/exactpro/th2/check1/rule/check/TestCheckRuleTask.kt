@@ -13,10 +13,8 @@
 
 package com.exactpro.th2.check1.rule.check
 
-import com.exactpro.th2.check1.ProtoMessageWrapper
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.check1.StreamContainer
-import com.exactpro.th2.check1.TransportMessageWrapper
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.util.createDefaultMessage
@@ -39,6 +37,8 @@ import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.message.rootMessageFilter
+import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
+import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
 import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.listValue
 import com.exactpro.th2.common.value.toValue
@@ -111,17 +111,19 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
                 TransportMessageWrapper(
-                    constructTransportMessage().apply {
-                        metadata = mutableMapOf(
-                            "keyProp" to "42",
-                            "notKeyProp" to "abc"
-                        )
-                        body = mutableMapOf(
-                            "keyFieldInt" to 42,
-                            "keyFieldFloat" to 123456789.12345,
-                            "notKeyField" to "abc"
-                        )
-                    },
+                    constructTransportMessage()
+                        .setMetadata(
+                            hashMapOf(
+                                "keyProp" to "42",
+                                "notKeyProp" to "abc"
+                            )
+                        ).setBody(
+                            hashMapOf(
+                                "keyFieldInt" to 42,
+                                "keyFieldFloat" to 123456789.12345,
+                                "notKeyField" to "abc"
+                            )
+                        ).build(),
                     BOOK_NAME,
                     ""
                 )
