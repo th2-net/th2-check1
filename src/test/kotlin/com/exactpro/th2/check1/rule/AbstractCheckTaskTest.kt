@@ -36,7 +36,7 @@ import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.Direction.INCOMING
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageId
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMessage
-import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -65,7 +65,7 @@ abstract class AbstractCheckTaskTest {
     fun createStreams(
         alias: String = SESSION_ALIAS,
         direction: Direction = FIRST,
-        messages: List<MessageWrapper>
+        messages: List<MessageHolder>
     ): Observable<StreamContainer> {
         return Observable.just(
             StreamContainer(

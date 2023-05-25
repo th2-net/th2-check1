@@ -13,16 +13,16 @@
 
 package com.exactpro.th2.check1
 
-import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
 import io.reactivex.Observable
 
 class StreamContainer(
     val sessionKey: SessionKey,
     limitSize: Int,
-    messageObservable: Observable<MessageWrapper>
+    messageObservable: Observable<MessageHolder>
 ) {
-    val bufferedMessages: Observable<MessageWrapper>
-    private val currentMessage: Observable<MessageWrapper>
+    val bufferedMessages: Observable<MessageHolder>
+    private val currentMessage: Observable<MessageHolder>
 
     init {
         val replay = messageObservable.replay(1)
@@ -33,7 +33,7 @@ class StreamContainer(
         replay.connect()
     }
 
-    val lastMessage: MessageWrapper
+    val lastMessage: MessageHolder
         get() = currentMessage.firstElement().blockingGet()
 
     override fun equals(other: Any?): Boolean =

@@ -35,8 +35,8 @@ import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.exactpro.th2.common.utils.message.MessageWrapper
-import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.nhaarman.mockitokotlin2.argumentCaptor
 import com.nhaarman.mockitokotlin2.spy
 import com.nhaarman.mockitokotlin2.timeout
@@ -57,7 +57,7 @@ class RuleFactoryTest {
             SESSION_ALIAS,
             Direction.FIRST,
             listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -255,7 +255,7 @@ class RuleFactoryTest {
     private fun createStreams(
         alias: String = SESSION_ALIAS,
         direction: Direction = Direction.FIRST,
-        messages: List<MessageWrapper>
+        messages: List<MessageHolder>
     ): Observable<StreamContainer> {
         return Observable.just(
             StreamContainer(

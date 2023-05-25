@@ -45,7 +45,7 @@ import com.exactpro.th2.common.message.toJavaDuration
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
-import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.sailfish.utils.FilterSettings
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter.createParameters
@@ -556,7 +556,7 @@ abstract class AbstractCheckTask(
             if (LOGGER.isDebugEnabled) {
                 LOGGER.debug(
                     "Metadata for message {} does not match the filter by key fields. Skip message checking",
-                    messageContainer.messageWrapper.id.toJson()
+                    messageContainer.messageHolder.id.toJson()
                 )
             }
             return AggregatedFilterResult.EMPTY
@@ -576,7 +576,7 @@ abstract class AbstractCheckTask(
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
             if (significant) {
-                messageContainer.messageWrapper.apply {
+                messageContainer.messageHolder.apply {
                     lastSequence = id.sequence
                     lastMessageTimestamp = id.timestamp
                 }
@@ -626,7 +626,7 @@ abstract class AbstractCheckTask(
         }
 
     protected fun Event.appendEventWithVerification(
-        messageWrapper: MessageWrapper,
+        messageHolder: MessageHolder,
         protoFilter: RootMessageFilter,
         comparisonResult: ComparisonResult
     ): Event {
@@ -635,7 +635,7 @@ abstract class AbstractCheckTask(
             verificationComponent.verification(key, value, protoFilter.messageFilter, true)
         }
 
-        with(messageWrapper) {
+        with(messageHolder) {
             name("Verification '${messageType}' message")
                 .type("Verification")
                 .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
@@ -649,7 +649,7 @@ abstract class AbstractCheckTask(
     }
 
     protected fun Event.appendEventWithVerification(
-        messageWrapper: MessageWrapper,
+        messageHolder: MessageHolder,
         metadataFilter: MetadataFilter,
         comparisonResult: ComparisonResult
     ): Event {
@@ -658,7 +658,7 @@ abstract class AbstractCheckTask(
             verificationComponent.verification(key, value, metadataFilter)
         }
 
-        with(messageWrapper) {
+        with(messageHolder) {
             name("Verification '${messageType}' metadata")
                 .type("Verification")
                 .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
@@ -693,14 +693,14 @@ abstract class AbstractCheckTask(
         val protoFilter = comparisonContainer.protoFilter
         addSubEventWithSamePeriod()
             .appendEventWithVerification(
-                comparisonContainer.wrapperActual,
+                comparisonContainer.holderActual,
                 protoFilter,
                 comparisonContainer.result.messageResult!!
             )
         if (protoFilter.hasMetadataFilter()) {
             addSubEventWithSamePeriod()
                 .appendEventWithVerification(
-                    comparisonContainer.wrapperActual,
+                    comparisonContainer.holderActual,
                     protoFilter.metadataFilter,
                     comparisonContainer.result.metadataResult!!
                 )
@@ -730,7 +730,7 @@ abstract class AbstractCheckTask(
         return fromProtoFilter(protoPreMessageFilter.messageFilter, filterSettings, messageName)
     }
 
-    private fun Observable<MessageWrapper>.mapToMessageContainer(): Observable<MessageContainer> =
+    private fun Observable<MessageHolder>.mapToMessageContainer(): Observable<MessageContainer> =
         map { message -> MessageContainer(message, message.toSailfishMessage()) }
 
     /**
@@ -740,7 +740,7 @@ abstract class AbstractCheckTask(
     private fun Observable<StreamContainer>.continueObserve(
         sessionKey: SessionKey,
         sequence: Long
-    ): Observable<MessageWrapper> =
+    ): Observable<MessageHolder> =
         filter { streamContainer -> streamContainer.sessionKey == sessionKey }
             .flatMap(StreamContainer::bufferedMessages)
             .filter { message ->
@@ -779,7 +779,7 @@ abstract class AbstractCheckTask(
     /**
      * Provides the ability to stop observing if a message timeout is set.
      */
-    private fun Observable<MessageWrapper>.takeWhileMessagesInTimeout(): Observable<MessageWrapper> =
+    private fun Observable<MessageHolder>.takeWhileMessagesInTimeout(): Observable<MessageHolder> =
         takeWhile {
             checkOnMessageTimeout(it.id.timestamp).also { continueObservation ->
                 hasMessagesInTimeoutInterval = hasMessagesInTimeoutInterval or continueObservation

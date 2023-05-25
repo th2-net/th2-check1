@@ -17,20 +17,20 @@ import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
 import com.exactpro.th2.check1.util.VerificationUtil.toSailfishMessage
 import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.utils.message.MessageWrapper
-import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 
 class MessageContainer(
-    val messageWrapper: MessageWrapper,
+    val messageHolder: MessageHolder,
     val sailfishMessage: IMessage
 ) {
-    val metadataMessage: IMessage by lazy { toSailfishMessage(messageWrapper.properties) }
+    val metadataMessage: IMessage by lazy { toSailfishMessage(messageHolder.properties) }
 
     companion object {
         private val EMPTY_MESSAGE = DefaultMessageFactory.getFactory().createMessage("empty", "empty")
 
         @JvmField
-        val FAKE = MessageContainer(ProtoMessageWrapper(Message.getDefaultInstance()), EMPTY_MESSAGE)
+        val FAKE = MessageContainer(ProtoMessageHolder(Message.getDefaultInstance()), EMPTY_MESSAGE)
     }
 }
 

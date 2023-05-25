@@ -28,7 +28,7 @@ fun AbstractCheckTask.preFilterBy(
 ): Observable<MessageContainer> =
     stream.map { messageContainer -> // Compare the message with pre-filter
         if (logger.isDebugEnabled) {
-            logger.debug("Pre-filtering message with id: {}", messageContainer.messageWrapper.id.toJson())
+            logger.debug("Pre-filtering message with id: {}", messageContainer.messageHolder.id.toJson())
         }
         val result =
             matchFilter(messageContainer, messagePreFilter, metadataPreFilter, matchNames = false, significant = false)

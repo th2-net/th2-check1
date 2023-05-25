@@ -18,7 +18,7 @@ import com.exactpro.sf.scriptrunner.StatusType
 import com.exactpro.th2.check1.utils.FilterUtils
 import com.exactpro.th2.check1.utils.FilterUtils.fullMatch
 import com.exactpro.th2.common.grpc.RootMessageFilter
-import com.exactpro.th2.common.utils.message.MessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
 
 class ComparisonContainer(
     val messageContainer: MessageContainer,
@@ -28,8 +28,8 @@ class ComparisonContainer(
     val sailfishActual: IMessage
         get() = messageContainer.sailfishMessage
 
-    val wrapperActual: MessageWrapper
-        get() = messageContainer.messageWrapper
+    val holderActual: MessageHolder
+        get() = messageContainer.messageHolder
 
     /**
      * If [RootMessageFilter.hasMetadataFilter] for [protoFilter] is `true`

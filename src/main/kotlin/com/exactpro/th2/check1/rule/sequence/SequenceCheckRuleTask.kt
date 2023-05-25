@@ -132,9 +132,9 @@ class SequenceCheckRuleTask(
         ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(wrapperActual.id)
+                preFilterEvent.messageID(holderActual.id)
 
-                preFilteringResults[wrapperActual.id] = preFilterContainer
+                preFilteringResults[holderActual.id] = preFilterContainer
             }
         }
 
@@ -156,7 +156,7 @@ class SequenceCheckRuleTask(
 
                 messageFilters.removeAt(index)
 
-                messageFilteringResults[messageContainer.messageWrapper.id] = comparisonContainer
+                messageFilteringResults[messageContainer.messageHolder.id] = comparisonContainer
                 matchedByKeys.add(messageFilterContainer)
 
                 requireNotNull(result.messageResult) {
@@ -217,7 +217,7 @@ class SequenceCheckRuleTask(
                 container?.let {
                     CheckSequenceUtils.createBothSide(
                         it.sailfishActual,
-                        it.wrapperActual.properties,
+                        it.holderActual.properties,
                         it.protoFilter,
                         sessionKey.sessionAlias
                     )

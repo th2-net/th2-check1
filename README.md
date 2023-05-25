@@ -245,6 +245,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 #### Changed:
 
 + Migrated to common `5.3.0-dev`
++ Migrated to common-utils `2.1.0-dev`
 + Migrated to sailfish-utils `4.0.0-dev`
 
 ### 4.0.1

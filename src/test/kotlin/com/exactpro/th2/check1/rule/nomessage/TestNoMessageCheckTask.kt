@@ -23,9 +23,9 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.message.toTimestamp
-import com.exactpro.th2.common.utils.message.MessageWrapper
-import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
-import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
+import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.assertAll
@@ -191,7 +191,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
     private fun createMessages(
         useTransport: Boolean,
         vararg messageData: MessageData,
-    ): List<MessageWrapper> = if (useTransport) {
+    ): List<MessageHolder> = if (useTransport) {
         createTransportMessages(*messageData)
     } else {
         createProtoMessages(*messageData)
@@ -199,10 +199,10 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
 
     private fun createProtoMessages(
         vararg messageData: MessageData,
-    ): List<MessageWrapper> {
+    ): List<MessageHolder> {
         var sequence = 1L
         return messageData.map { data ->
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     sequence++,
                     SESSION_ALIAS,
@@ -217,10 +217,10 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
 
     private fun createTransportMessages(
         vararg messageData: MessageData,
-    ): List<MessageWrapper> {
+    ): List<MessageHolder> {
         var sequence = 1L
         return messageData.map { data ->
-            TransportMessageWrapper(
+            TransportMessageHolder(
                 constructTransportMessage(
                     sequence++,
                     SESSION_ALIAS,

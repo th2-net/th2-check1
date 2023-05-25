@@ -18,12 +18,11 @@ package com.exactpro.th2.check1.utils
 
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.th2.check1.rule.AbstractCheckTask
-import com.exactpro.th2.common.utils.message.MessageWrapper
-import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
-import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
+import com.exactpro.th2.common.utils.message.TransportMessageHolder
 
-fun MessageWrapper.toSailfishMessage(): IMessage = when (this) {
-    is ProtoMessageWrapper -> AbstractCheckTask.PROTO_CONVERTER.fromProtoMessage(source, false)
-    is TransportMessageWrapper -> AbstractCheckTask.TRANSPORT_CONVERTER.fromTransport(book, sessionGroup, source, false)
-    else -> error("Unsupported ${this::class.java} type")
+fun MessageHolder.toSailfishMessage(): IMessage = when (this) {
+    is ProtoMessageHolder -> AbstractCheckTask.PROTO_CONVERTER.fromProtoMessage(source, false)
+    is TransportMessageHolder -> AbstractCheckTask.TRANSPORT_CONVERTER.fromTransport(book, sessionGroup, source, false)
 }

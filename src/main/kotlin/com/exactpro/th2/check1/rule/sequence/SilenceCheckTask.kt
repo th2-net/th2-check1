@@ -114,12 +114,12 @@ class SilenceCheckTask(
         ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(wrapperActual.id)
+                preFilterEvent.messageID(holderActual.id)
             }
         }
 
     override fun onNext(container: MessageContainer) {
-        container.messageWrapper.apply {
+        container.messageHolder.apply {
             extraMessagesCounter++
             resultEvent.messageID(id)
         }

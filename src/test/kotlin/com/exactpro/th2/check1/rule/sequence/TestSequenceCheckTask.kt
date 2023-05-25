@@ -36,9 +36,9 @@ import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.messageFilter
-import com.exactpro.th2.common.utils.message.MessageWrapper
-import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
-import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
+import com.exactpro.th2.common.utils.message.MessageHolder
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
+import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
@@ -92,8 +92,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             ).build()
     )
 
-    private val protoMessagesInCorrectOrder: List<MessageWrapper> = listOf(
-        ProtoMessageWrapper(
+    private val protoMessagesInCorrectOrder: List<MessageHolder> = listOf(
+        ProtoMessageHolder(
             constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(
                     mapOf(
@@ -103,7 +103,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 )
                 .build()
         ),
-        TransportMessageWrapper(
+        TransportMessageHolder(
             constructTransportMessage(2, SESSION_ALIAS, MESSAGE_TYPE).apply {
                 setBody(
                     hashMapOf(
@@ -115,7 +115,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             BOOK_NAME,
             ""
         ),
-        ProtoMessageWrapper(
+        ProtoMessageHolder(
             constructProtoMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
                 .putAllFields(
                     mapOf(
@@ -228,8 +228,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @ParameterizedTest(name = "check order: {0}")
     @MethodSource("checkOrderToSwitch")
     fun `check sequence should drop a message filter after match by key fields`(checkOrder: Boolean) {
-        val messagesWithKeyFields: List<MessageWrapper> = listOf(
-            ProtoMessageWrapper(
+        val messagesWithKeyFields: List<MessageHolder> = listOf(
+            ProtoMessageHolder(
                 constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -239,7 +239,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(2, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -300,8 +300,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
     @Test
     fun `check sequence of messages with the same value of key field`() {
-        val messagesWithKeyFields: List<MessageWrapper> = listOf(
-            ProtoMessageWrapper(
+        val messagesWithKeyFields: List<MessageHolder> = listOf(
+            ProtoMessageHolder(
                 constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -311,7 +311,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(2, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -321,7 +321,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -382,8 +382,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `check sequence of messages with the same value of key field and message timeout`() {
         val checkpointTimestamp = Instant.now()
-        val messagesWithKeyFields: List<MessageWrapper> = listOf(
-            ProtoMessageWrapper(
+        val messagesWithKeyFields: List<MessageHolder> = listOf(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     0,
                     SESSION_ALIAS,
@@ -398,7 +398,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     1,
                     SESSION_ALIAS,
@@ -413,7 +413,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
@@ -428,7 +428,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     3,
                     SESSION_ALIAS,
@@ -500,8 +500,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `check sequence of messages with the same value of key field and expired message timeout`() {
         val checkpointTimestamp = Instant.now()
-        val messagesWithKeyFields: List<MessageWrapper> = listOf(
-            ProtoMessageWrapper(
+        val messagesWithKeyFields: List<MessageHolder> = listOf(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     0,
                     SESSION_ALIAS,
@@ -516,7 +516,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     1,
                     SESSION_ALIAS,
@@ -531,7 +531,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
@@ -546,7 +546,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     3,
                     SESSION_ALIAS,
@@ -613,8 +613,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `check sequence of messages with the same value of key field and one missed message due to message timeout`() {
         val checkpointTimestamp = Instant.now()
-        val messagesWithKeyFields: List<MessageWrapper> = listOf(
-            ProtoMessageWrapper(
+        val messagesWithKeyFields: List<MessageHolder> = listOf(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     1,
                     SESSION_ALIAS,
@@ -629,7 +629,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
@@ -701,8 +701,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     @Test
     fun `check sequence of messages with message timeout and missed sequence`() {
         val checkpointTimestamp = Instant.now()
-        val messagesWithKeyFields: List<MessageWrapper> = listOf(
-            ProtoMessageWrapper(
+        val messagesWithKeyFields: List<MessageHolder> = listOf(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     1,
                     SESSION_ALIAS,
@@ -717,7 +717,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
@@ -785,8 +785,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
     @Test
     fun `check ordering is not failed in case key fields are matches the order but the rest are not`() {
-        val messagesWithKeyFields: List<MessageWrapper> = listOf(
-            ProtoMessageWrapper(
+        val messagesWithKeyFields: List<MessageHolder> = listOf(
+            ProtoMessageHolder(
                 constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -796,7 +796,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(2, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -806,7 +806,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -877,8 +877,8 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
     @Test
     fun `rules stops when all filters found match by key fields`() {
-        val messagesWithKeyFields: List<MessageWrapper> = listOf(
-            ProtoMessageWrapper(
+        val messagesWithKeyFields: List<MessageHolder> = listOf(
+            ProtoMessageHolder(
                 constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -888,7 +888,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
@@ -901,7 +901,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -911,7 +911,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(4, SESSION_ALIAS, MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
@@ -921,7 +921,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     )
                     .build()
             ),
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(5, SESSION_ALIAS, MESSAGE_TYPE) // should not be processed
                     .putAllFields(
                         mapOf(
@@ -972,7 +972,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `failed rule creation due to invalid regex operation in the message filter`() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()

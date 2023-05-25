@@ -31,8 +31,8 @@ import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.ValueFilter
-import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
-import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
+import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
@@ -152,7 +152,7 @@ class TestChain : AbstractCheckTaskTest() {
     fun `sequence rules - untrusted execution`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
                         mapOf(
@@ -190,7 +190,7 @@ class TestChain : AbstractCheckTaskTest() {
     fun `no messages sequence rules - untrusted execution`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
                         mapOf(
@@ -228,7 +228,7 @@ class TestChain : AbstractCheckTaskTest() {
     fun `simple rules - ignored untrusted execution`() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(messages = (1..5L).map {
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
                         mapOf(
@@ -349,7 +349,7 @@ class TestChain : AbstractCheckTaskTest() {
         createProtoMessage(sequence)
     }
 
-    private fun createProtoMessage(sequence: Int) = ProtoMessageWrapper(
+    private fun createProtoMessage(sequence: Int) = ProtoMessageHolder(
         constructProtoMessage(sequence.toLong())
             .putAllFields(
                 mapOf(
@@ -359,7 +359,7 @@ class TestChain : AbstractCheckTaskTest() {
             ).build()
     )
 
-    private fun createTransportMessage(sequence: Int) = TransportMessageWrapper(
+    private fun createTransportMessage(sequence: Int) = TransportMessageHolder(
         constructTransportMessage(sequence.toLong()).apply {
             setBody(
                 hashMapOf(

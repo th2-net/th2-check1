@@ -26,7 +26,7 @@ import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.message.rootMessageFilter
 import com.exactpro.th2.common.message.toJson
-import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.value.toValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -38,7 +38,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
     @Test
     fun `reports about extra messages when timeout exceeded`() {
         val streams = createStreams(messages = (1..3L).map {
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(sequence = it)
                     .putFields("A", 42.toValue())
                     .putFields("B", it.toValue())
@@ -102,7 +102,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
     @Test
     fun `reports no extra messages found when timeout exceeded`() {
         val streams = createStreams(messages = (1..2L).map {
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(sequence = it)
                     .putFields("A", 42.toValue())
                     .putFields("B", it.toValue())
@@ -156,7 +156,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
     @Test
     fun `does not report if next rule is subscribed in chain before beginning`() {
         val streams = createStreams(messages = (1..3L).map {
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(sequence = it)
                     .putFields("A", 42.toValue())
                     .putFields("B", it.toValue())
@@ -242,7 +242,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
     @Test
     fun `does not report when next rule added to the chain before timeout exceeds`() {
         val streams = createStreams(messages = (1..2L).map {
-            ProtoMessageWrapper(
+            ProtoMessageHolder(
                 constructProtoMessage(sequence = it)
                     .putFields("A", 42.toValue())
                     .putFields("B", it.toValue())

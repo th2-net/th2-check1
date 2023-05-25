@@ -37,8 +37,8 @@ import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.message.rootMessageFilter
-import com.exactpro.th2.common.utils.message.proto.ProtoMessageWrapper
-import com.exactpro.th2.common.utils.message.transport.TransportMessageWrapper
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
+import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.listValue
 import com.exactpro.th2.common.value.toValue
@@ -76,7 +76,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `success verification`() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -110,7 +110,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `success transport verification`() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                TransportMessageWrapper(
+                TransportMessageHolder(
                     constructTransportMessage()
                         .setMetadata(
                             hashMapOf(
@@ -158,7 +158,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     internal fun `very little value of max event batch content size`() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -192,7 +192,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     internal fun `exceeds max event batch content size`() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -238,7 +238,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     internal fun findsMessageByMetadata() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -276,7 +276,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     internal fun ignoresMessageIfMetadataDoesNotMatchByKeys() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -315,7 +315,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `handle error if the timeout is zero or negative`(timeout: Long) {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -347,7 +347,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `check that the order is kept in repeating groups`() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .putFields(
                             "legs", listValue()
@@ -439,7 +439,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `check verification description`(includeDescription: Boolean) {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .putFields("A", "1".toValue())
                         .build()
@@ -473,7 +473,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -487,7 +487,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                         )
                         .build()
                 ),
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -526,7 +526,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -566,7 +566,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val checkpointTimestamp = Instant.now()
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -580,7 +580,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                         )
                         .build()
                 ),
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .mergeMetadata(
                             MessageMetadata.newBuilder()
@@ -618,7 +618,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
     fun `verify repeating groups according to defined filters`() {
         val streams = createStreams(
             SESSION_ALIAS, Direction.FIRST, listOf(
-                ProtoMessageWrapper(
+                ProtoMessageHolder(
                     createDefaultMessage()
                         .putFields(
                             "legs", listValue()

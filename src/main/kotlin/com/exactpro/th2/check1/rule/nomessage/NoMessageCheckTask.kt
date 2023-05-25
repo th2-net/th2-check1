@@ -83,7 +83,7 @@ class NoMessageCheckTask(
         ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(wrapperActual.id)
+                preFilterEvent.messageID(holderActual.id)
             }
         }
 
@@ -96,7 +96,7 @@ class NoMessageCheckTask(
     }
 
     override fun onNext(messageContainer: MessageContainer) {
-        messageContainer.messageWrapper.apply {
+        messageContainer.messageHolder.apply {
             extraMessagesCounter++
             resultEvent.messageID(id)
         }
