@@ -70,6 +70,9 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import com.exactpro.th2.check1.utils.toMessageID
+import com.exactpro.th2.common.event.EventUtils.createMessageBean
+import com.exactpro.th2.common.util.toInstant
 
 /**
  * Implements common logic for check task.
@@ -152,7 +155,7 @@ abstract class AbstractCheckTask(
     @Volatile
     protected var started = false
 
-    protected fun createRootEvent() = Event.from(submitTime).description(description)
+    protected fun createRootEvent(): Event = Event.from(submitTime).description(description)
 
     final override fun onStart() {
         super.onStart()
@@ -170,7 +173,7 @@ abstract class AbstractCheckTask(
         super.onError(e)
 
         refs.rootEvent.status(FAILED)
-            .bodyData(EventUtils.createMessageBean(e.message))
+            .exception(e, true)
         end(State.ERROR, "Error ${e.message} received in message stream")
     }
 
@@ -311,6 +314,7 @@ abstract class AbstractCheckTask(
         this.checkpointTimeout = calculateCheckpointTimeout(checkpointTimestamp, taskTimeout.messageTimeout)
         this.isDefaultSequence = sequence == DEFAULT_SEQUENCE
         val scheduler = Schedulers.from(executorService)
+        addStartInfo(refs.rootEvent.addSubEventWithSamePeriod(), sequence, checkpointTimestamp)
 
         endFuture = Single.timer(taskTimeout.timeout, MILLISECONDS, Schedulers.computation())
             .subscribe { _ -> end(State.TIMEOUT, "Timeout is exited") }
@@ -352,6 +356,30 @@ abstract class AbstractCheckTask(
         }
     }
 
+    private fun addStartInfo(event: Event, lastSequence: Long, checkpointTimestamp: Timestamp?) {
+        with(event) {
+            name(
+                if (lastSequence == DEFAULT_SEQUENCE) {
+                    "Rule works from the beginning of the cache"
+                } else {
+                    "Rule works from the $lastSequence sequence in session ${sessionKey.sessionAlias} and direction ${sessionKey.direction}"
+                }
+            )
+            status(PASSED)
+            type("ruleStartPoint")
+            if (lastSequence != DEFAULT_SEQUENCE) {
+                messageID(sessionKey.toMessageID(lastSequence))
+            }
+            bodyData(createMessageBean("The rule starts working from " +
+                    (if (lastSequence == DEFAULT_SEQUENCE) "start of cache" else "sequence $lastSequence") +
+                    (checkpointTimestamp?.let {
+                        val instant = checkpointTimestamp.toInstant()
+                        " and expects messages between $instant and ${instant.plusMillis(taskTimeout.messageTimeout)}"
+                    } ?: "")))
+            bodyData(createMessageBean("Rule timeout is set to ${taskTimeout.timeout} mls"))
+        }
+    }
+
     private fun taskFinished() {
         var ruleEventStatus = EventStatus.FAILED
         try {
@@ -371,8 +399,8 @@ abstract class AbstractCheckTask(
                     .name("Check rule $description problem")
                     .type("Exception")
                     .status(FAILED)
-                    .bodyData(EventUtils.createMessageBean(message))
-                    .bodyData(EventUtils.createMessageBean(ex.message))
+                    .bodyData(createMessageBean(message))
+                    .bodyData(createMessageBean(ex.message))
                     .toProto(parentEventID))
                 .build())
         } finally {
@@ -424,6 +452,9 @@ abstract class AbstractCheckTask(
 
     protected open val skipPublication: Boolean = false
 
+    protected open val errorEventOnTimeout: Boolean
+        get() = true
+
     protected fun isCheckpointLastReceivedMessage(): Boolean = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
 
     /**
@@ -466,6 +497,9 @@ abstract class AbstractCheckTask(
     private fun completeEventOrReportError(prevState: State): Boolean {
         return try {
             if (started) {
+                if (errorEventOnTimeout && prevState in TIMEOUT_STATES) {
+                    addTimeoutEvent(prevState)
+                }
                 completeEvent(prevState)
                 doAfterCompleteEvent()
                 false
@@ -482,12 +516,54 @@ abstract class AbstractCheckTask(
             refs.rootEvent.addSubEventWithSamePeriod()
                     .name("Check result event cannot build completely")
                     .type("eventNotComplete")
-                    .bodyData(EventUtils.createMessageBean("An unexpected exception has been thrown during result check build"))
-                    .bodyData(EventUtils.createMessageBean(e.message))
+                    .bodyData(createMessageBean("An unexpected exception has been thrown during result check build"))
+                    .bodyData(createMessageBean(e.message))
                     .status(FAILED)
             true
         }
     }
+
+    private fun addTimeoutEvent(timeoutType: State) {
+        val timeoutValue: Long = when (timeoutType) {
+            State.TIMEOUT -> taskTimeout.timeout
+            State.MESSAGE_TIMEOUT -> taskTimeout.messageTimeout
+            else -> error("unexpected timeout state: $timeoutType")
+        }
+        refs.rootEvent.addSubEventWithSamePeriod()
+            .status(FAILED)
+            .type(
+                when (timeoutType) {
+                    State.TIMEOUT -> "CheckTimeoutInterrupted"
+                    State.MESSAGE_TIMEOUT -> "CheckMessageTimeoutInterrupted"
+                    else -> error("unexpected timeout state: $timeoutType")
+                }
+            ).name("Rule processed $handledMessageCounter message(s) and was interrupted due to $timeoutValue mls ${timeoutType.name.lowercase()}")
+            .bodyData(
+                createMessageBean(
+                    when (timeoutType) {
+                        State.TIMEOUT -> timeoutText()
+                        State.MESSAGE_TIMEOUT -> messageTimeoutText()
+                        else -> error("unexpected timeout state: $timeoutType")
+                    }
+                )
+            )
+    }
+
+    private fun messageTimeoutText(): String = "Check task was interrupted because the timestamp on the last processed message exceeds the message timeout. " +
+            (checkpointTimeout
+                ?.toInstant()
+                ?.let {
+                    "Rule expects messages between $it and ${it.plusMillis(taskTimeout.messageTimeout)} " +
+                            "but processed one outside this range. Check the messages attached to the root rule event to find all processed messages."
+                } ?: "But the message timeout is not specified. Contact the developers.")
+
+    private fun timeoutText(): String =
+        """
+            |Check task was interrupted because the task execution took longer than ${taskTimeout.timeout} mls. The possible reasons are:
+            |* incorrect message filter - rule didn't find a match for all requested messages and kept working until the timeout exceeded (check key fields)
+            |* incorrect point of start - some of the expected messages were behind the start point and rule couldn't find them (check the checkpoint)
+            |* lack of the resources - rule might perform slow and didn't get to the expected messages in specified timeout (check component resources)
+        """.trimMargin()
 
     private fun configureRootEvent() {
         refs.rootEvent.name(name()).type(type())
@@ -585,6 +661,7 @@ abstract class AbstractCheckTask(
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
         @JvmField
         val CONVERTER = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null, createParameters().setUseMarkerForNullsInMessage(true))
+        private val TIMEOUT_STATES: Set<State> = setOf(State.TIMEOUT, State.MESSAGE_TIMEOUT)
         val EMPTY_STATUS_CONSUMER: (EventStatus) -> Unit = {}
     }
 

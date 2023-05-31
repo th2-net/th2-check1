@@ -107,6 +107,9 @@ class NoMessageCheckTask(
 
     override fun type(): String = "noMessageCheck"
 
+    override val errorEventOnTimeout: Boolean
+        get() = false
+
     override fun setup(rootEvent: Event) {
         rootEvent.bodyData(EventUtils.createMessageBean("No message check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)" }}"))
     }
