@@ -152,12 +152,13 @@ abstract class AbstractCheckTask(
 
     final override fun onStart() {
         super.onStart()
-        started = true
 
         //Init or re-init variable in TASK_SCHEDULER thread
         handledMessageCounter = 0
 
         onStartInit()
+
+        started = true
     }
 
     protected abstract fun onStartInit()
