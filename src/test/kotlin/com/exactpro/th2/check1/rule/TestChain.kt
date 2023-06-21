@@ -339,6 +339,6 @@ class TestChain: AbstractCheckTaskTest() {
     companion object {
         private const val KEY_FIELD = "key"
         private const val NOT_KEY_FIELD = "not_key"
-        private const val UNTRUSTED_EXECUTION_EVENT_NAME: String = "The current check is untrusted because the start point of the check interval has been selected approximately"
+        private const val UNTRUSTED_EXECUTION_EVENT_NAME: String = "The current check is untrusted because previous rule in the chain started from approximate start point"
     }
 }

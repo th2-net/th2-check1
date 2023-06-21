@@ -572,9 +572,11 @@ abstract class AbstractCheckTask(
     private fun fillUntrustedExecutionEvent() {
         refs.rootEvent.addSubEvent(
             Event.start()
-                .name("The current check is untrusted because the start point of the check interval has been selected approximately")
+                .name("The current check is untrusted because previous rule in the chain started from approximate start point")
                 .status(FAILED)
                 .type("untrustedExecution")
+                .bodyData(createMessageBean("The previous rule in the chain didn't found the start point in the messages cache. " +
+                        "That means this rule might be started from an unexpected position. Be careful with its work results"))
         )
     }
 
