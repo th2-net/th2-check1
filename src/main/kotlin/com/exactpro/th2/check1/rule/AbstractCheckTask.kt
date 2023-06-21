@@ -392,7 +392,14 @@ abstract class AbstractCheckTask(
         } finally {
             RuleMetric.decrementActiveRule(type())
             refsKeeper.eraseRefs()
-            sequenceSubject.onSuccess(Legacy(executorService, SequenceData(lastSequence, lastMessageTimestamp, !hasMessagesInTimeoutInterval)))
+            val sequenceData = SequenceData(
+                lastSequence = lastSequence,
+                lastMessageTimestamp = lastMessageTimestamp,
+                // we use started here because we don't want to fail next rule in the chain
+                // if the current rule was not initialized
+                untrusted = !hasMessagesInTimeoutInterval && started,
+            )
+            sequenceSubject.onSuccess(Legacy(executorService, sequenceData))
         }
     }
 
