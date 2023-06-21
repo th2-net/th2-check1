@@ -15,9 +15,7 @@
  */
 package com.exactpro.th2.check1.util;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import com.exactpro.sf.aml.AMLLangConst;
@@ -85,7 +83,7 @@ public class VerificationUtil {
                                         Set<String> keyFields, boolean listItemAsSeparate) {
         if (value.hasMessageFilter()) {
             parent.add(fieldName, toMetaContainer(value.getMessageFilter(), listItemAsSeparate));
-        } else if (value.hasListFilter() && value.getListFilter().getValues(0).hasMessageFilter()) {
+        } else if (value.hasListFilter() && containsMessageFilter(value.getListFilter())) {
             if (listItemAsSeparate) {
                 convertListAsSeparateContainers(parent, fieldName, value.getListFilter());
             } else {
@@ -115,5 +113,9 @@ public class VerificationUtil {
             }
         }
         parent.add(fieldName, result);
+    }
+
+    private static boolean containsMessageFilter(ListValueFilter listFilter) {
+        return listFilter.getValuesCount() > 0 && listFilter.getValues(0).hasMessageFilter();
     }
 }
