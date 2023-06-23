@@ -6,7 +6,7 @@ plugins {
     id 'java-library'
     id 'application'
     id 'maven-publish'
-    id "org.owasp.dependencycheck" version "8.1.2"
+    id "org.owasp.dependencycheck" version "8.2.1"
 }
 
 ext {
@@ -205,9 +205,9 @@ signing {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.2.0')
+    api platform('com.exactpro.th2:bom:4.4.0-update-libs-5345334944-c71fdc9-SNAPSHOT')
     implementation 'com.exactpro.th2:grpc-check1:4.1.0-dev'
-    implementation 'com.exactpro.th2:common:5.3.0-json-raw-body-5111091854-6528835-SNAPSHOT'
+    implementation 'com.exactpro.th2:common:5.3.0-separate-executor-5347518176-63bc4ea-SNAPSHOT'
     implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5111641574-c00bdcf-SNAPSHOT'
     implementation('com.exactpro.th2:sailfish-utils:4.0.0-TH2-4891-5111848206-3d59c47-SNAPSHOT') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
@@ -232,7 +232,7 @@ dependencies {
     }
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
 }
