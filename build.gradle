@@ -10,7 +10,6 @@ plugins {
 }
 
 ext {
-    sharedDir = file("${project.rootDir}/shared")
     sailfishVersion = '3.3.93'
 }
 
@@ -36,11 +35,6 @@ ext.excludeSailfish = { rcd ->
 }
 
 repositories {
-    maven {
-        name 'MavenLocal'
-        url sharedDir
-    }
-
     maven {
         name 'Sonatype_snapshots'
         url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
@@ -81,7 +75,7 @@ repositories {
     mavenCentral()
     mavenLocal()
 
-    configurations.all {
+    configurations.configureEach {
         resolutionStrategy {
             cacheChangingModulesFor 0, 'seconds'
             cacheDynamicVersionsFor 0, 'seconds'
@@ -113,7 +107,7 @@ jar {
 }
 
 // conditionals for publications
-tasks.withType(PublishToMavenRepository) {
+tasks.withType(PublishToMavenRepository).configureEach {
     onlyIf {
         (repository == publishing.repositories.nexus &&
                 project.hasProperty('nexus_user') &&
@@ -121,18 +115,17 @@ tasks.withType(PublishToMavenRepository) {
                 project.hasProperty('nexus_url')) ||
                 (repository == publishing.repositories.sonatype &&
                         project.hasProperty('sonatypeUsername') &&
-                        project.hasProperty('sonatypePassword')) ||
-                (repository == publishing.repositories.local)
+                        project.hasProperty('sonatypePassword'))
     }
 }
-tasks.withType(Sign) {
+tasks.withType(Sign).configureEach {
     onlyIf {
         project.hasProperty('signingKey') &&
                 project.hasProperty('signingPassword')
     }
 }
 // disable running task 'initializeSonatypeStagingRepository' on a gitlab
-tasks.whenTaskAdded { task ->
+tasks.configureEach { task ->
     if (task.name.equals('initializeSonatypeStagingRepository') &&
             !(project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword'))
     ) {
@@ -172,10 +165,6 @@ publishing {
         }
     }
     repositories {
-        maven {
-            name = 'local'
-            url = sharedDir
-        }
         //Nexus repo to publish from gitlab
         maven {
             name = 'nexus'
@@ -206,10 +195,10 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:4.4.0-update-libs-5345334944-c71fdc9-SNAPSHOT')
-    implementation 'com.exactpro.th2:grpc-check1:4.1.0-dev'
+    implementation 'com.exactpro.th2:grpc-check1:4.2.0-TH2-4906-5378806719-6199f63-SNAPSHOT'
     implementation 'com.exactpro.th2:common:5.3.0-separate-executor-5347518176-63bc4ea-SNAPSHOT'
-    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5111641574-c00bdcf-SNAPSHOT'
-    implementation('com.exactpro.th2:sailfish-utils:4.0.0-TH2-4891-5111848206-3d59c47-SNAPSHOT') {
+    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5347774882-e4aa8e6-SNAPSHOT'
+    implementation('com.exactpro.th2:sailfish-utils:4.0.0-TH2-4891-5376991740-142b0a9-SNAPSHOT') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
         // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
