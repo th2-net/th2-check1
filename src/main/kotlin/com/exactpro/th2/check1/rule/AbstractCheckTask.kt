@@ -601,7 +601,6 @@ abstract class AbstractCheckTask(
         val PROTO_CONVERTER = ProtoToIMessageConverter(
             VerificationUtil.FACTORY_PROXY,
             null,
-            null,
             createParameters().setUseMarkerForNullsInMessage(true)
         )
     }

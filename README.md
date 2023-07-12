@@ -20,12 +20,10 @@ Available requests are described
 in [this repository](https://gitlab.exactpro.com/vivarium/th2/th2-core-open-source/th2-grpc-check1)
 
 - CheckSequenceRuleRequest - prefilters the messages and verify all of them by filter. Order checking configured from
-  request.
-  Depending on the request and check1 configuration **SilenceCheckRule** can be added after the CheckSequenceRule.
-  It verifies that there were not any messages matching the pre-filter in the original request.
-  It awaits for realtime timeout that is equal to clean-up timeout.
-  Reports about unexpected messages only after the timeout is exceeded. Reports nothing if any task is added to the
-  chain.
+  request. Depending on the request and check1 configuration **SilenceCheckRule** can be added after the
+  CheckSequenceRule. It verifies that there were not any messages matching the pre-filter in the original request. It
+  awaits for realtime timeout that is equal to clean-up timeout. Reports about unexpected messages only after the
+  timeout is exceeded. Reports nothing if any task is added to the chain.
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in
   case of empty cache or message absence.
 - NoMessageCheckRequest - prefilters messages and verifies that no other messages have been received.
@@ -150,8 +148,8 @@ The number of messages for each stream (alias + direction) that will be buffered
 
 #### cleanup-older-than
 
-The time before the verification chain (from a task that is complete) will be removed.
-The value will be interpreted as time unit defined in _cleanup-time-unit_ setting. _The default value is set to 60_
+The time before the verification chain (from a task that is complete) will be removed. The value will be interpreted as
+time unit defined in _cleanup-time-unit_ setting. _The default value is set to 60_
 
 #### cleanup-time-unit
 
@@ -244,6 +242,9 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 #### Changed:
 
++ Used `saifish-common` instead of `sailfish-core`
+
++ Migrated to bom `4.4.0`
 + Migrated to common `5.3.0-dev`
 + Migrated to common-utils `2.1.0-dev`
 + Migrated to sailfish-utils `4.0.0-dev`
@@ -367,8 +368,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 #### Changed:
 
 + The root event name is now shorter. The additional information about session alias and direction is moved to the event
-  body.
-  The user's description should be displayed more clearly in the report.
+  body. The user's description should be displayed more clearly in the report.
 
 ### 3.7.1
 

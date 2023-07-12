@@ -9,10 +9,6 @@ plugins {
     id "org.owasp.dependencycheck" version "8.2.1"
 }
 
-ext {
-    sailfishVersion = '3.3.93'
-}
-
 group = 'com.exactpro.th2'
 version = release_version
 
@@ -194,11 +190,11 @@ signing {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.4.0-update-libs-5345334944-c71fdc9-SNAPSHOT')
-    implementation 'com.exactpro.th2:grpc-check1:4.2.0-TH2-4906-5378806719-6199f63-SNAPSHOT'
-    implementation 'com.exactpro.th2:common:5.3.0-separate-executor-5347518176-63bc4ea-SNAPSHOT'
-    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5347774882-e4aa8e6-SNAPSHOT'
-    implementation('com.exactpro.th2:sailfish-utils:4.0.0-TH2-4891-5376991740-142b0a9-SNAPSHOT') {
+    api platform('com.exactpro.th2:bom:4.4.0')
+    implementation 'com.exactpro.th2:grpc-check1:4.2.0-TH2-4906-+'
+    implementation 'com.exactpro.th2:common:5.3.0-separate-executor-+'
+    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-+'
+    implementation('com.exactpro.th2:sailfish-utils:4.0.0-TH2-4891-+') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
         // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
@@ -207,10 +203,7 @@ dependencies {
 
     implementation "org.slf4j:slf4j-api"
 
-    implementation("com.exactpro.sf:sailfish-core:${sailfishVersion}") {
-        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
-        // because of the vulnerability
-        exclude group: 'junit', module: 'junit' // because of the vulnerability
+    implementation("com.exactpro.sf:sailfish-common") {
         exclude group: 'com.exactpro.mina', module: 'apache-mina-core' // because of the vulnerability
     }
 

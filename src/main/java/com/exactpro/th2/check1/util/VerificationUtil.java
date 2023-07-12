@@ -15,11 +15,11 @@
  */
 package com.exactpro.th2.check1.util;
 
-import com.exactpro.sf.aml.AMLLangConst;
 import com.exactpro.sf.aml.script.MetaContainer;
 import com.exactpro.sf.common.messages.IMessage;
-import com.exactpro.sf.externalapi.IMessageFactoryProxy;
-import com.exactpro.th2.check1.DefaultMessageFactoryProxy;
+import com.exactpro.sf.common.messages.IMessageFactory;
+import com.exactpro.sf.comparison.ComparatorConst;
+import com.exactpro.th2.check1.MessageFactory;
 import com.exactpro.th2.common.grpc.FailUnexpected;
 import com.exactpro.th2.common.grpc.ListValueFilter;
 import com.exactpro.th2.common.grpc.MessageFilter;
@@ -32,10 +32,10 @@ import java.util.Set;
 
 public class VerificationUtil {
     public static final String METADATA_MESSAGE_NAME = "Th2MetadataMessage";
-    public static final IMessageFactoryProxy FACTORY_PROXY = new DefaultMessageFactoryProxy();
+    public static final IMessageFactory FACTORY_PROXY = new MessageFactory();
 
     public static IMessage toSailfishMessage(Map<String, String> properties) {
-        IMessage message = FACTORY_PROXY.createMessage(null, METADATA_MESSAGE_NAME);
+        IMessage message = FACTORY_PROXY.createMessage(METADATA_MESSAGE_NAME, null);
         properties.forEach(message::addField);
         return message;
     }
@@ -61,9 +61,9 @@ public class VerificationUtil {
             FailUnexpected failUnexpected = messageFilter.getComparisonSettings().getFailUnexpected();
 
             if (failUnexpected == FailUnexpected.FIELDS) {
-                metaContainer.setFailUnexpected(AMLLangConst.YES);
+                metaContainer.setFailUnexpected(ComparatorConst.YES);
             } else if (failUnexpected == FailUnexpected.FIELDS_AND_MESSAGES) {
-                metaContainer.setFailUnexpected(AMLLangConst.ALL);
+                metaContainer.setFailUnexpected(ComparatorConst.ALL);
             }
         }
 
