@@ -196,9 +196,9 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:4.4.0')
-    implementation 'com.exactpro.th2:grpc-check1:4.2.0-dev'
+    implementation 'com.exactpro.th2:grpc-check1:4.2.1'
     implementation 'com.exactpro.th2:common:5.3.1-dev'
-    implementation 'com.exactpro.th2:common-utils:2.1.0-dev'
+    implementation 'com.exactpro.th2:common-utils:2.1.0'
     implementation('com.exactpro.th2:sailfish-utils:4.0.0-dev') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
         // because of the vulnerability
