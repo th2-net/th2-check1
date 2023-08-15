@@ -3,7 +3,7 @@ import com.github.jk1.license.render.JsonReportRenderer
 
 plugins {
     id 'com.palantir.docker' version '0.25.0'
-    id 'org.jetbrains.kotlin.jvm' version '1.6.21'
+    id 'org.jetbrains.kotlin.jvm' version '1.8.22'
     id "io.github.gradle-nexus.publish-plugin" version "1.0.0"
     id 'signing'
     id 'java-library'
@@ -195,11 +195,11 @@ signing {
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.4.0')
+    api platform('com.exactpro.th2:bom:4.5.0-TH2-5035-+')
     implementation 'com.exactpro.th2:grpc-check1:4.2.0-dev'
-    implementation 'com.exactpro.th2:common:5.3.1-dev'
-    implementation 'com.exactpro.th2:common-utils:2.1.0-dev'
-    implementation('com.exactpro.th2:sailfish-utils:4.0.0-dev') {
+    implementation 'com.exactpro.th2:common:5.4.0-TH2-5035-+'
+    implementation 'com.exactpro.th2:common-utils:2.2.0-TH2-5035-+'
+    implementation('com.exactpro.th2:sailfish-utils:4.1.0-TH2-5035-+') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
         // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
