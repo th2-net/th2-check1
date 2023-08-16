@@ -234,6 +234,16 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ## Release Notes
 
+### 4.2.0
+
+#### Updated:
+
+* bom: `4.5.0-dev`
+* common: `5.4.0-dev`
+* common-utils: `2.2.0-dev`
+* sailfish-utils: `4.1.0-dev`
+* kotlin: `1.8.22`
+
 ### 4.1.0
 
 #### Added:
