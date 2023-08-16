@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -45,13 +45,13 @@ class NoMessageCheckTask(
 
     private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
     private val messagePreFilter = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+        PROTO_CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
         protoPreMessageFilter.toCompareSettings()
     )
 
     private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
         SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+            PROTO_CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
     }
@@ -74,10 +74,16 @@ class NoMessageCheckTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, protoPreMessageFilter, messagePreFilter, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(
+            this,
+            protoPreMessageFilter,
+            messagePreFilter,
+            metadataPreFilter,
+            LOGGER
+        ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(protoActual.metadata.id)
+                preFilterEvent.messageID(holderActual.id)
             }
         }
 
@@ -90,7 +96,7 @@ class NoMessageCheckTask(
     }
 
     override fun onNext(messageContainer: MessageContainer) {
-        messageContainer.protoMessage.metadata.apply {
+        messageContainer.messageHolder.apply {
             extraMessagesCounter++
             resultEvent.messageID(id)
         }
@@ -108,8 +114,8 @@ class NoMessageCheckTask(
 
         if (taskState == State.TIMEOUT || taskState == State.STREAM_COMPLETED) {
             val executionStopEvent = Event.start()
-                    .name("Task has been completed because: ${taskState.name}")
-                    .type("noMessageCheckExecutionStop")
+                .name("Task has been completed because: ${taskState.name}")
+                .type("noMessageCheckExecutionStop")
             if (taskState != State.TIMEOUT || !isCheckpointLastReceivedMessage()) {
                 executionStopEvent.status(Event.Status.FAILED)
             }

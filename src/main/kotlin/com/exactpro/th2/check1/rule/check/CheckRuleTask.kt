@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -46,12 +46,12 @@ class CheckRuleTask(
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     private val messageFilter: SailfishFilter = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoMessageFilter),
+        PROTO_CONVERTER.fromProtoPreFilter(protoMessageFilter),
         protoMessageFilter.toCompareSettings()
     )
     private val metadataFilter: SailfishFilter? = protoMessageFilter.metadataFilterOrNull()?.let {
         SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
+            PROTO_CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
             it.toComparisonSettings()
         )
     }
@@ -92,6 +92,6 @@ class CheckRuleTask(
     override fun type(): String = "Check rule"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(EventUtils.createMessageBean("Check rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)"} }"))
+        rootEvent.bodyData(EventUtils.createMessageBean("Check rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)" }}"))
     }
 }

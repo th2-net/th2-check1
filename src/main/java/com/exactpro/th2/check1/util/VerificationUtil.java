@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,30 +15,28 @@
  */
 package com.exactpro.th2.check1.util;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import com.exactpro.sf.aml.AMLLangConst;
 import com.exactpro.sf.aml.script.MetaContainer;
 import com.exactpro.sf.common.messages.IMessage;
-import com.exactpro.sf.externalapi.IMessageFactoryProxy;
-import com.exactpro.th2.check1.DefaultMessageFactoryProxy;
+import com.exactpro.sf.common.messages.IMessageFactory;
+import com.exactpro.sf.comparison.ComparatorConst;
+import com.exactpro.th2.check1.MessageFactory;
 import com.exactpro.th2.common.grpc.FailUnexpected;
 import com.exactpro.th2.common.grpc.ListValueFilter;
 import com.exactpro.th2.common.grpc.MessageFilter;
-import com.exactpro.th2.common.grpc.MessageMetadataOrBuilder;
 import com.exactpro.th2.common.grpc.MetadataFilter;
 import com.exactpro.th2.common.grpc.ValueFilter;
 
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 public class VerificationUtil {
     public static final String METADATA_MESSAGE_NAME = "Th2MetadataMessage";
-    public static final IMessageFactoryProxy FACTORY_PROXY = new DefaultMessageFactoryProxy();
+    public static final IMessageFactory FACTORY_PROXY = new MessageFactory();
 
-    public static IMessage toMessage(MessageMetadataOrBuilder metadata) {
-        IMessage message = FACTORY_PROXY.createMessage(null, METADATA_MESSAGE_NAME);
-        metadata.getPropertiesMap().forEach(message::addField);
+    public static IMessage toSailfishMessage(Map<String, String> properties) {
+        IMessage message = FACTORY_PROXY.createMessage(METADATA_MESSAGE_NAME, null);
+        properties.forEach(message::addField);
         return message;
     }
 
@@ -63,17 +61,16 @@ public class VerificationUtil {
             FailUnexpected failUnexpected = messageFilter.getComparisonSettings().getFailUnexpected();
 
             if (failUnexpected == FailUnexpected.FIELDS) {
-                metaContainer.setFailUnexpected(AMLLangConst.YES);
+                metaContainer.setFailUnexpected(ComparatorConst.YES);
             } else if (failUnexpected == FailUnexpected.FIELDS_AND_MESSAGES) {
-                metaContainer.setFailUnexpected(AMLLangConst.ALL);
+                metaContainer.setFailUnexpected(ComparatorConst.ALL);
             }
         }
-        
+
         Set<String> keyFields = new HashSet<>();
 
-        messageFilter.getFieldsMap().forEach((name, value) -> {
-            toMetaContainer(name, value, metaContainer, keyFields, listItemAsSeparate);
-        });
+        messageFilter.getFieldsMap().forEach((name, value) ->
+                toMetaContainer(name, value, metaContainer, keyFields, listItemAsSeparate));
 
 
         metaContainer.setKeyFields(keyFields);
@@ -81,8 +78,10 @@ public class VerificationUtil {
         return metaContainer;
     }
 
-    private static void toMetaContainer(String fieldName, ValueFilter value, MetaContainer parent,
-                                        Set<String> keyFields, boolean listItemAsSeparate) {
+    private static void toMetaContainer(
+            String fieldName, ValueFilter value, MetaContainer parent,
+            Set<String> keyFields, boolean listItemAsSeparate
+    ) {
         if (value.hasMessageFilter()) {
             parent.add(fieldName, toMetaContainer(value.getMessageFilter(), listItemAsSeparate));
         } else if (value.hasListFilter() && value.getListFilter().getValues(0).hasMessageFilter()) {
@@ -105,8 +104,10 @@ public class VerificationUtil {
         }
     }
 
-    private static void convertListAsSeparateContainers(MetaContainer parent, String fieldName,
-                                                        ListValueFilter listFilter) {
+    private static void convertListAsSeparateContainers(
+            MetaContainer parent, String fieldName,
+            ListValueFilter listFilter
+    ) {
         MetaContainer result = new MetaContainer();
         int i = 0;
         for (ValueFilter valueFilter : listFilter.getValuesList()) {

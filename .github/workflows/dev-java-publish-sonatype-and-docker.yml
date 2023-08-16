@@ -6,7 +6,6 @@ on:
       - master
       - version-*
       - dependabot*
-      - dev-version-*
     paths-ignore:
       - README.md
     # paths:
