@@ -421,12 +421,15 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 "legs" to createVerificationEntry(
                     "0" to createVerificationEntry(
                         "A" to createVerificationEntry(VerificationStatus.PASSED),
-                        "B" to createVerificationEntry(VerificationStatus.FAILED)
+                        "B" to createVerificationEntry(VerificationStatus.FAILED),
+                        status = VerificationStatus.FAILED,
                     ),
                     "1" to createVerificationEntry(
                         "A" to createVerificationEntry(VerificationStatus.PASSED),
-                        "B" to createVerificationEntry(VerificationStatus.PASSED)
-                    )
+                        "B" to createVerificationEntry(VerificationStatus.PASSED),
+                        status = VerificationStatus.PASSED,
+                    ),
+                    status = VerificationStatus.FAILED,
                 )
             )
 
@@ -700,14 +703,17 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                         "A" to createVerificationEntry(VerificationStatus.NA),
                         "B" to createVerificationEntry(VerificationStatus.NA),
                         "C" to createVerificationEntry(VerificationStatus.FAILED),
-                        "D" to createVerificationEntry(VerificationStatus.FAILED)
+                        "D" to createVerificationEntry(VerificationStatus.FAILED),
+                        status = VerificationStatus.FAILED,
                     ),
                     "1" to createVerificationEntry(
                         "C" to createVerificationEntry(VerificationStatus.NA),
                         "D" to createVerificationEntry(VerificationStatus.NA),
                         "A" to createVerificationEntry(VerificationStatus.FAILED),
-                        "B" to createVerificationEntry(VerificationStatus.FAILED)
-                    )
+                        "B" to createVerificationEntry(VerificationStatus.FAILED),
+                        status = VerificationStatus.FAILED,
+                    ),
+                    status = VerificationStatus.FAILED,
                 )
             )
 
