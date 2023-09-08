@@ -1,4 +1,4 @@
-# th2 check1 (4.2.0)
+# th2 check1 (4.2.1)
 
 ## Overview
 
@@ -233,6 +233,12 @@ The `th2_check1_actual_cache_number` metric separate messages with three labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 4.2.1
+
+#### Changed:
+
+* verification event now displays the field as failed if it has nested failed field(s)
 
 ### 4.2.0
 
