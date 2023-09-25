@@ -43,9 +43,13 @@ fun createVerificationEntry(status: VerificationStatus): VerificationEntry = Ver
     this.status = status
 }
 
-fun createVerificationEntry(vararg verificationEntries: Pair<String, VerificationEntry>): VerificationEntry =
+fun createVerificationEntry(
+    vararg verificationEntries: Pair<String, VerificationEntry>,
+    status: VerificationStatus? = null,
+): VerificationEntry =
     VerificationEntry().apply {
         fields = linkedMapOf(*verificationEntries)
+        this.status = status
     }
 
 inline fun <reified T : Throwable> assertThrowsWithMessages(

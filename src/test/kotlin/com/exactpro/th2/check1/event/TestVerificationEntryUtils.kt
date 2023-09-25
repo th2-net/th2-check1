@@ -18,9 +18,11 @@ import com.exactpro.sf.comparison.MessageComparator
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.common.event.bean.VerificationEntry
+import com.exactpro.th2.common.event.bean.VerificationStatus
 import com.exactpro.th2.common.grpc.FilterOperation
 import com.exactpro.th2.common.grpc.ListValueFilter
 import com.exactpro.th2.common.grpc.MessageFilter
+import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
@@ -404,6 +406,35 @@ class TestVerificationEntryUtils {
         Assertions.assertEquals(expectedHint, keyEntry.hint, "Hint must be equal")
     }
 
+    @Test
+    fun `fail in nested field visible from outside`() {
+        val expected = MessageFilter.newBuilder()
+            .putFields(
+                "A", messageFilter()
+                    .putFields("B", 42.toValueFilter())
+                    .toValueFilter()
+            ).build()
+        val actualMessage = message("Test")
+            .putFields(
+                "A", message()
+                    .putFields("B", 41.toValue())
+                    .toValue()
+            ).build()
+        val settings = ComparatorSettings()
+
+        val result = MessageComparator.compare(
+            converter.fromProtoFilter(expected, "Test"),
+            converter.fromProtoMessage(actualMessage, false),
+            settings,
+        )
+        Assertions.assertNotNull(result, "null comparison result")
+        val verification = VerificationEntryUtils.createVerificationEntry(result)
+        Assertions.assertEquals(VerificationStatus.FAILED, verification.status, "unexpected root status")
+        val entryA = verification.fields["A"].assertNotNull { "cannot find entry A" }
+        Assertions.assertEquals(VerificationStatus.FAILED, entryA.status, "unexpected status for A")
+        val entryB = entryA.fields["B"].assertNotNull { "cannot find entry B" }
+        Assertions.assertEquals(VerificationStatus.FAILED, entryB.status, "unexpected status for B")
+    }
 
     companion object {
         private fun VerificationEntry.toDebugString(): String = ObjectMapper().writeValueAsString(this)

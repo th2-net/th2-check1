@@ -16,6 +16,7 @@
 package com.exactpro.th2.check1.event;
 
 import com.exactpro.sf.comparison.ComparisonResult;
+import com.exactpro.sf.comparison.ComparisonUtil;
 import com.exactpro.sf.comparison.Formatter;
 import com.exactpro.sf.comparison.IComparisonFilter;
 import com.exactpro.sf.scriptrunner.StatusType;
@@ -37,7 +38,7 @@ public class VerificationEntryUtils {
         VerificationEntry verificationEntry = new VerificationEntry();
         verificationEntry.setActual(convertActual(result));
         verificationEntry.setExpected(convertExpectedResult(result));
-        verificationEntry.setStatus(toVerificationStatus(result.getStatus()));
+        verificationEntry.setStatus(toVerificationStatus(result));
         verificationEntry.setKey(result.isKey());
         verificationEntry.setOperation(resolveOperation(result));
         verificationEntry.setHint(extractHint(result));
@@ -85,9 +86,10 @@ public class VerificationEntryUtils {
         return FilterOperation.EQUAL.name();
     }
 
-    private static VerificationStatus toVerificationStatus(StatusType statusType) {
+    private static VerificationStatus toVerificationStatus(ComparisonResult result) {
+        StatusType statusType = result.getStatus();
         if (statusType == null) {
-            return null;
+            statusType = ComparisonUtil.getStatusType(result);
         }
 
         switch (statusType) {
