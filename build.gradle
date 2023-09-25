@@ -199,7 +199,7 @@ dependencies {
     implementation 'com.exactpro.th2:grpc-check1:4.2.0-dev'
     implementation 'com.exactpro.th2:common:5.4.0-dev'
     implementation 'com.exactpro.th2:common-utils:2.2.0-dev'
-    implementation('com.exactpro.th2:sailfish-utils:4.1.1-th2-5060-6169330490-ca55540-SNAPSHOT') {
+    implementation('com.exactpro.th2:sailfish-utils:4.1.1-dev') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
         // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
