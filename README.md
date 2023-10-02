@@ -240,6 +240,11 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 * verification event now displays the field as failed if it has nested failed field(s)
 
+#### Fixed:
+
+* `sailfish-utils` could not work with `BigInteger` that is decoded in th2 transport parsed messages
+  (when value does not fit into `Long`)
+
 ### 4.2.0
 
 #### Updated:
