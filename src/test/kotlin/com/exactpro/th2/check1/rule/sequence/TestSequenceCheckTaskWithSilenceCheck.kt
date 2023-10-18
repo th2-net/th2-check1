@@ -26,6 +26,7 @@ import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.message.rootMessageFilter
 import com.exactpro.th2.common.message.toJson
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.value.toValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -36,23 +37,34 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
 
     @Test
     fun `reports about extra messages when timeout exceeded`() {
-        val streams = createStreams(messages = (0..2L).map {
-            constructMessage(sequence = it)
-                .putFields("A", 42.toValue())
-                .putFields("B", it.toValue())
-                .build()
+        val streams = createStreams(messages = (1..3L).map {
+            ProtoMessageHolder(
+                constructProtoMessage(sequence = it)
+                    .putFields("A", 42.toValue())
+                    .putFields("B", it.toValue())
+                    .build()
+            )
         })
         val factory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
-                .setMessageFilter(messageFilter()
-                    .putFields("A", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42").setKey(true).build())
-                    .putFields("B", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter(it.toString()).build())
+                .setMessageFilter(
+                    messageFilter()
+                        .putFields(
+                            "A",
+                            ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42")
+                                .setKey(true).build()
+                        )
+                        .putFields(
+                            "B",
+                            ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter(it.toString())
+                                .build()
+                        )
                 ).build()
         }
-        val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val preFilter = createPreFilter("A", "42")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -61,6 +73,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .addAllRootMessageFilters(filters)
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
+            .setBookName(BOOK_NAME)
             .build()
         val sequenceRule = factory.createSequenceCheckRule(request, true)
         val silenceCheck = factory.createSilenceCheck(request, 1000)
@@ -72,9 +85,14 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
         val result = events.first { it.type == "noMessagesCheckResult" && it.parentId == silenceCheckRoot }
         assertAll(
             { assertEquals(EventStatus.FAILED, result.status) { "Unexpected status for event: ${result.toJson()}" } },
-            { assertEquals("Check failed: 1 extra messages were found.", result.name) { "Unexpected name for event: ${result.toJson()}" } },
             {
-                assertEquals(listOf(2L), result.attachedMessageIdsList.map { it.sequence }) {
+                assertEquals(
+                    "Check failed: 1 extra messages were found.",
+                    result.name
+                ) { "Unexpected name for event: ${result.toJson()}" }
+            },
+            {
+                assertEquals(listOf(3L), result.attachedMessageIdsList.map { it.sequence }) {
                     "Unexpected messages attached: ${result.attachedMessageIdsList.map { it.toJson() }}"
                 }
             }
@@ -83,23 +101,34 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
 
     @Test
     fun `reports no extra messages found when timeout exceeded`() {
-        val streams = createStreams(messages = (0..1L).map {
-            constructMessage(sequence = it)
-                .putFields("A", 42.toValue())
-                .putFields("B", it.toValue())
-                .build()
+        val streams = createStreams(messages = (1..2L).map {
+            ProtoMessageHolder(
+                constructProtoMessage(sequence = it)
+                    .putFields("A", 42.toValue())
+                    .putFields("B", it.toValue())
+                    .build()
+            )
         })
         val factory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
-                .setMessageFilter(messageFilter()
-                    .putFields("A", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42").setKey(true).build())
-                    .putFields("B", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter(it.toString()).build())
+                .setMessageFilter(
+                    messageFilter()
+                        .putFields(
+                            "A",
+                            ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42")
+                                .setKey(true).build()
+                        )
+                        .putFields(
+                            "B",
+                            ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter(it.toString())
+                                .build()
+                        )
                 ).build()
         }
-        val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val preFilter = createPreFilter("A", "42")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -108,6 +137,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .addAllRootMessageFilters(filters)
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
+            .setBookName(BOOK_NAME)
             .build()
         val sequenceRule = factory.createSequenceCheckRule(request, true)
         val silenceCheck = factory.createSilenceCheck(request, 1000)
@@ -125,23 +155,34 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
 
     @Test
     fun `does not report if next rule is subscribed in chain before beginning`() {
-        val streams = createStreams(messages = (0..2L).map {
-            constructMessage(sequence = it)
-                .putFields("A", 42.toValue())
-                .putFields("B", it.toValue())
-                .build()
+        val streams = createStreams(messages = (1..3L).map {
+            ProtoMessageHolder(
+                constructProtoMessage(sequence = it)
+                    .putFields("A", 42.toValue())
+                    .putFields("B", it.toValue())
+                    .build()
+            )
         })
         val factory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
-                .setMessageFilter(messageFilter()
-                    .putFields("A", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42").setKey(true).build())
-                    .putFields("B", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter(it.toString()).build())
+                .setMessageFilter(
+                    messageFilter()
+                        .putFields(
+                            "A",
+                            ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42")
+                                .setKey(true).build()
+                        )
+                        .putFields(
+                            "B",
+                            ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter(it.toString())
+                                .build()
+                        )
                 ).build()
         }
-        val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val preFilter = createPreFilter("A", "42")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -151,15 +192,27 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .addAllRootMessageFilters(filters)
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
+            .setBookName(BOOK_NAME)
             .build()
         val anotherRequest = request.toBuilder()
             .clearRootMessageFilters()
             .setDescription("2")
-            .addRootMessageFilters(rootMessageFilter(MESSAGE_TYPE)
-                .setMessageFilter(messageFilter()
-                    .putFields("A", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42").setKey(true).build())
-                    .putFields("B", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("2").build())
-                ).build())
+            .addRootMessageFilters(
+                rootMessageFilter(MESSAGE_TYPE)
+                    .setMessageFilter(
+                        messageFilter()
+                            .putFields(
+                                "A",
+                                ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42")
+                                    .setKey(true).build()
+                            )
+                            .putFields(
+                                "B",
+                                ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("2")
+                                    .build()
+                            )
+                    ).build()
+            )
             .build()
         val sequenceRule = factory.createSequenceCheckRule(request, true)
         val silenceCheck = factory.createSilenceCheck(request, 1000)
@@ -188,23 +241,34 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
 
     @Test
     fun `does not report when next rule added to the chain before timeout exceeds`() {
-        val streams = createStreams(messages = (0..1L).map {
-            constructMessage(sequence = it)
-                .putFields("A", 42.toValue())
-                .putFields("B", it.toValue())
-                .build()
+        val streams = createStreams(messages = (1..2L).map {
+            ProtoMessageHolder(
+                constructProtoMessage(sequence = it)
+                    .putFields("A", 42.toValue())
+                    .putFields("B", it.toValue())
+                    .build()
+            )
         })
         val factory = RuleFactory(Check1Configuration(), streams, clientStub)
 
         val filters = (0..1).map {
             rootMessageFilter(MESSAGE_TYPE)
-                .setMessageFilter(messageFilter()
-                    .putFields("A", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42").setKey(true).build())
-                    .putFields("B", ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter(it.toString()).build())
+                .setMessageFilter(
+                    messageFilter()
+                        .putFields(
+                            "A",
+                            ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter("42")
+                                .setKey(true).build()
+                        )
+                        .putFields(
+                            "B",
+                            ValueFilter.newBuilder().setOperation(FilterOperation.EQUAL).setSimpleFilter(it.toString())
+                                .build()
+                        )
                 ).build()
         }
-        val preFilter = createPreFilter("A", "42", FilterOperation.EQUAL)
-        val parentId = createEvent("root")
+        val preFilter = createPreFilter("A", "42")
+        val parentId = createRootEventId()
 
         val request = CheckSequenceRuleRequest.newBuilder()
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
@@ -214,6 +278,7 @@ class TestSequenceCheckTaskWithSilenceCheck : AbstractCheckTaskTest() {
             .addAllRootMessageFilters(filters)
             .setPreFilter(preFilter)
             .setParentEventId(parentId)
+            .setBookName(BOOK_NAME)
             .build()
         val silenceCheck = factory.createSilenceCheck(request, 1000)
         val sequenceRule = factory.createSequenceCheckRule(request.toBuilder().setDescription("2").build(), true)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,14 +13,16 @@
 
 package com.exactpro.th2.check1
 
-import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.utils.message.MessageHolder
 import io.reactivex.Observable
 
-class StreamContainer(val sessionKey : SessionKey,
-                      limitSize : Int,
-                      messageObservable : Observable<Message>) {
-    val bufferedMessages : Observable<Message>
-    private val currentMessage : Observable<Message>
+class StreamContainer(
+    val sessionKey: SessionKey,
+    limitSize: Int,
+    messageObservable: Observable<MessageHolder>
+) {
+    val bufferedMessages: Observable<MessageHolder>
+    private val currentMessage: Observable<MessageHolder>
 
     init {
         val replay = messageObservable.replay(1)
@@ -31,7 +33,7 @@ class StreamContainer(val sessionKey : SessionKey,
         replay.connect()
     }
 
-    val lastMessage : Message
+    val lastMessage: MessageHolder
         get() = currentMessage.firstElement().blockingGet()
 
     override fun equals(other: Any?): Boolean =

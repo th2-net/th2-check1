@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -66,12 +66,12 @@ class SilenceCheckTask(
             rootEvent = createRootEvent(),
             protoPreMessageFilter = protoPreMessageFilter,
             messagePreFilter = SailfishFilter(
-                CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+                PROTO_CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
                 protoPreMessageFilter.toCompareSettings()
             ),
             metadataPreFilter = protoPreMessageFilter.metadataFilterOrNull()?.let {
                 SailfishFilter(
-                    CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                    PROTO_CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
                     it.toComparisonSettings()
                 )
             }
@@ -79,7 +79,6 @@ class SilenceCheckTask(
     })
 
     private val refs get() = refsKeeper.refs
-
     private var extraMessagesCounter: Int = 0
 
     private val isCanceled = AtomicBoolean()
@@ -120,19 +119,25 @@ class SilenceCheckTask(
     override fun type(): String = "AutoSilenceCheck"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(createMessageBean("AutoSilenceCheck for session ${sessionKey.run { "$sessionAlias ($direction)" }}"))
+        rootEvent.bodyData(createMessageBean("AutoSilenceCheck for session ${sessionKey.run { "$bookName $sessionAlias ($direction)" }}"))
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, refs.protoPreMessageFilter, refs.messagePreFilter, refs.metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(
+            this,
+            refs.protoPreMessageFilter,
+            refs.messagePreFilter,
+            refs.metadataPreFilter,
+            LOGGER
+        ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 refs.preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                refs.preFilterEvent.messageID(protoActual.metadata.id)
+                refs.preFilterEvent.messageID(holderActual.id)
             }
         }
 
     override fun onNext(container: MessageContainer) {
-        container.protoMessage.metadata.apply {
+        container.messageHolder.apply {
             extraMessagesCounter++
             refs.resultEvent.messageID(id)
         }

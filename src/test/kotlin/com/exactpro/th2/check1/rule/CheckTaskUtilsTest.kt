@@ -12,6 +12,7 @@
  */
 package com.exactpro.th2.check1.rule
 
+import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.BOOK_NAME
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.event.EventUtils.createMessageBean
@@ -23,13 +24,11 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import java.time.Instant
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class CheckTaskUtilsTest {
-
-    //FIXME: correct the contract in the EventUtils.toEventID method
-    private val parentEventId: EventID = EventUtils.toEventID("parentEventId")!!
+    private val parentEventId: EventID = EventUtils.toEventID(Instant.now(), BOOK_NAME, "parentEventId")
     private val data = createMessageBean("0123456789".repeat(20))
     private val dataSize = OBJECT_MAPPER.writeValueAsBytes(listOf(data)).size
     private val bigData = createMessageBean("0123456789".repeat(30))

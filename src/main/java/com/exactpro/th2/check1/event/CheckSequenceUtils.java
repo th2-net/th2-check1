@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -12,18 +12,18 @@
  */
 package com.exactpro.th2.check1.event;
 
-import java.util.List;
-import java.util.Map.Entry;
-
+import com.exactpro.sf.common.messages.IMessage;
 import com.exactpro.th2.check1.event.bean.CheckSequenceRow;
 import com.exactpro.th2.common.grpc.FilterOperation;
 import com.exactpro.th2.common.grpc.MessageFilter;
-import com.exactpro.th2.common.grpc.MessageMetadata;
 import com.exactpro.th2.common.grpc.MetadataFilter;
 import com.exactpro.th2.common.grpc.MetadataFilter.SimpleFilter;
 import com.exactpro.th2.common.grpc.RootMessageFilter;
 import com.exactpro.th2.common.grpc.ValueFilter;
-import com.exactpro.sf.common.messages.IMessage;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 public class CheckSequenceUtils {
 
@@ -45,10 +45,10 @@ public class CheckSequenceUtils {
     /**
      * In the case when actual message was found for the MessageFilter.
      */
-    public static CheckSequenceRow createBothSide(IMessage actual, MessageMetadata metadata, RootMessageFilter filter, String sessionAlias) {
+    public static CheckSequenceRow createBothSide(IMessage actual, Map<String, String> properties, RootMessageFilter filter, String sessionAlias) {
         CheckSequenceRow row = new CheckSequenceRow();
         row.setActualMessage(actual.getName() + ", " + sessionAlias + getKeyFields(actual, filter.getMessageFilter()));
-        row.setActualMetadata("Metadata, " + sessionAlias + getKeyFields(metadata, filter.getMetadataFilter()));
+        row.setActualMetadata("Metadata, " + sessionAlias + getKeyFields(properties, filter.getMetadataFilter()));
         row.setExpectedMessage(filter.getMessageType() + ", " + sessionAlias + getKeyFields(filter.getMessageFilter()));
         row.setExpectedMetadata("Metadata, " + sessionAlias + getKeyFields(filter.getMetadataFilter()));
         return row;
@@ -66,10 +66,10 @@ public class CheckSequenceUtils {
         return row;
     }
 
-    private static String getKeyFields(MessageMetadata metadata, MetadataFilter metadataFilter) {
+    private static String getKeyFields(Map<String, String> properties, MetadataFilter metadataFilter) {
         StringBuilder builder = new StringBuilder();
         for (Entry<String, SimpleFilter> filters : metadataFilter.getPropertyFiltersMap().entrySet()) {
-            String value = metadata.getPropertiesMap().get(filters.getKey());
+            String value = properties.get(filters.getKey());
             if (value == null) {
                 continue;
             }
@@ -98,9 +98,7 @@ public class CheckSequenceUtils {
 
     private static String getKeyFields(IMessage actual, MessageFilter messageFilter) {
         StringBuilder result = new StringBuilder();
-        messageFilter.getFieldsMap().forEach((key, filter) -> {
-            result.append(getKeyFields(key, actual.getField(key), filter));
-        });
+        messageFilter.getFieldsMap().forEach((key, filter) -> result.append(getKeyFields(key, actual.getField(key), filter)));
         return result.toString();
     }
 
@@ -111,14 +109,14 @@ public class CheckSequenceUtils {
         StringBuilder result = new StringBuilder();
         if (filter.hasMessageFilter()) {
             if (actual instanceof IMessage) {
-                filter.getMessageFilter().getFieldsMap().forEach((childName, valFilter) -> result.append(getKeyFields(childName, ((IMessage)actual).getField(childName), valFilter)));
+                filter.getMessageFilter().getFieldsMap().forEach((childName, valFilter) -> result.append(getKeyFields(childName, ((IMessage) actual).getField(childName), valFilter)));
             }
         } else if (filter.hasListFilter()) {
             if (actual instanceof List) {
                 List<ValueFilter> listFilter = filter.getListFilter().getValuesList();
                 for (int i = 0; i < listFilter.size(); i++) {
-                    if (((List)actual).size() > i) {
-                        result.append(getKeyFields(name, ((List)actual).get(i), listFilter.get(i)));
+                    if (((List<?>) actual).size() > i) {
+                        result.append(getKeyFields(name, ((List<?>) actual).get(i), listFilter.get(i)));
                     }
                 }
             }

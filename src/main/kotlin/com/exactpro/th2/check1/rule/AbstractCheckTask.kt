@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,6 +31,7 @@ import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.check1.utils.convert
 import com.exactpro.th2.check1.utils.getStatusType
 import com.exactpro.th2.check1.utils.isAfter
+import com.exactpro.th2.check1.utils.toSailfishMessage
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
@@ -38,18 +39,18 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.grpc.MessageFilter
-import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toJavaDuration
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.sailfish.utils.FilterSettings
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter.createParameters
+import com.exactpro.th2.sailfish.utils.ToSailfishParameters
+import com.exactpro.th2.sailfish.utils.transport.TransportToIMessageConverter
 import com.google.protobuf.TextFormat.shortDebugString
 import com.google.protobuf.Timestamp
 import com.google.protobuf.util.Durations
@@ -72,7 +73,6 @@ import com.exactpro.th2.common.util.toInstant
 
 /**
  * Implements common logic for check task.
- * @param maxEventBatchContentSize max size in bytes of summary events content in a batch
  * **Class in not thread-safe**
  */
 abstract class AbstractCheckTask(
@@ -105,8 +105,10 @@ abstract class AbstractCheckTask(
     private val sequenceSubject = SingleSubject.create<Legacy>()
     private val hasNextTask = AtomicBoolean(false)
     private val taskState = AtomicReference(State.CREATED)
+
     @Volatile
     private var streamCompletedState = State.STREAM_COMPLETED
+
     @Volatile
     private var completed = false
     protected var isParentCompleted: Boolean? = null
@@ -189,10 +191,21 @@ abstract class AbstractCheckTask(
             onChainedTaskSubscription()
             sequenceSubject.subscribe { legacy ->
                 legacy.sequenceData.apply {
-                    checkTask.begin(lastSequence, lastMessageTimestamp, executorService, PreviousExecutionData(untrusted, completed))
+                    checkTask.begin(
+                        lastSequence,
+                        lastMessageTimestamp,
+                        executorService,
+                        PreviousExecutionData(untrusted, completed)
+                    )
                 }
             }
-            LOGGER.info("Task {} ({}) subscribed to task {} ({})", checkTask.description, checkTask.hashCode(), description, hashCode())
+            LOGGER.info(
+                "Task {} ({}) subscribed to task {} ({})",
+                checkTask.description,
+                checkTask.hashCode(),
+                description,
+                hashCode()
+            )
         } else {
             error("Subscription to last sequence for task $description (${hashCode()}) is already executed, subscriber ${checkTask.description} (${checkTask.hashCode()})")
         }
@@ -235,14 +248,29 @@ abstract class AbstractCheckTask(
 
         when (prevValue) {
             State.TIMEOUT -> {
-                LOGGER.info("Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed", description, sessionKey)
+                LOGGER.info(
+                    "Task '{}' for session alias '{}' is completed right after timeout exited. Consider it as completed",
+                    description,
+                    sessionKey
+                )
             }
+
             State.MESSAGE_TIMEOUT -> {
-                LOGGER.info("Task '{}' for session alias '{}' is completed right after message timeout exited. Consider it as completed", description, sessionKey)
+                LOGGER.info(
+                    "Task '{}' for session alias '{}' is completed right after message timeout exited. Consider it as completed",
+                    description,
+                    sessionKey
+                )
             }
+
             State.STREAM_COMPLETED -> {
-                LOGGER.info("Task '{}' for session alias '{}' is completed right after the end of streaming messages. Consider it as completed", description, sessionKey)
+                LOGGER.info(
+                    "Task '{}' for session alias '{}' is completed right after the end of streaming messages. Consider it as completed",
+                    description,
+                    sessionKey
+                )
             }
+
             else -> {
                 LOGGER.debug("Task '{}' for session alias '{}' is completed normally", description, sessionKey)
             }
@@ -252,7 +280,7 @@ abstract class AbstractCheckTask(
     /**
      * Provides a feature to define custom filter for observe.
      */
-    protected open fun Observable<MessageContainer>.taskPipeline() : Observable<MessageContainer> = this
+    protected open fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> = this
 
     /**
      * @return `true` if another task has been subscribed to the result of the current task.
@@ -271,8 +299,6 @@ abstract class AbstractCheckTask(
      * @param sequence message sequence from the previous task.
      * @param checkpointTimestamp checkpoint timestamp from the previous task
      * @param executorService executor to schedule pipeline execution.
-     * @param untrusted flag is guarantee that the previous sequence data is correct
-     * @param parentTaskCompleted indicates whether the parent task was completed normally. `null` if no parent task exists.
      * @throws IllegalStateException when method is called more than once.
      */
     private fun begin(
@@ -286,7 +312,12 @@ abstract class AbstractCheckTask(
         if (!taskState.compareAndSet(State.CREATED, State.BEGIN)) {
             error("Task $description already has been started")
         }
-        LOGGER.info("Check begin for session alias '{}' with sequence '{}' and task timeout '{}'", sessionKey, sequence, taskTimeout)
+        LOGGER.info(
+            "Check begin for session alias '{}' with sequence '{}' and task timeout '{}'",
+            sessionKey,
+            sequence,
+            taskTimeout
+        )
         RuleMetric.incrementActiveRule(type())
         this.lastSequence = sequence
         this.executorService = executorService
@@ -301,36 +332,36 @@ abstract class AbstractCheckTask(
 
         try {
             messageStream.observeOn(scheduler) // Defined scheduler to execution in one thread to avoid race-condition.
-                    .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
+                .doFinally(this::taskFinished) // will be executed if the source is complete or an error received or the timeout is exited.
 
-                    // All sources above will be disposed on this scheduler.
-                    //
-                    // This method should be called as close as possible
-                    // to the actual dispose that you want to execute on this scheduler
-                    // because other operations are executed on the same single-thread scheduler.
-                    //
-                    // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
-                    // In the worst-case scenario, it might never happen.
-                    .unsubscribeOn(scheduler)
-                    .continueObserve(sessionKey, sequence)
-                    .doOnNext {
-                        handledMessageCounter++
+                // All sources above will be disposed on this scheduler.
+                //
+                // This method should be called as close as possible
+                // to the actual dispose that you want to execute on this scheduler
+                // because other operations are executed on the same single-thread scheduler.
+                //
+                // If we move [Observable#unsubscribeOn] after them, they won't be disposed until the scheduler is free.
+                // In the worst-case scenario, it might never happen.
+                .unsubscribeOn(scheduler)
+                .continueObserve(sessionKey, sequence)
+                .doOnNext {
+                    handledMessageCounter++
 
-                        with(it.metadata.id) {
-                            refs.rootEvent.messageID(this)
-                        }
+                    with(it.id) {
+                        refs.rootEvent.messageID(this)
                     }
-                    .takeWhileMessagesInTimeout()
-                    .mapToMessageContainer()
-                    .taskPipeline()
-                    .subscribe(this)
+                }
+                .takeWhileMessagesInTimeout()
+                .mapToMessageContainer()
+                .taskPipeline()
+                .subscribe(this)
         } catch (exception: Exception) {
             LOGGER.error("An internal error occurred while executing rule", exception)
             refs.rootEvent.addSubEventWithSamePeriod()
-                    .name("An error occurred while executing rule")
-                    .type("internalError")
-                    .status(FAILED)
-                    .exception(exception, true)
+                .name("An error occurred while executing rule")
+                .type("internalError")
+                .status(FAILED)
+                .exception(exception, true)
             taskFinished()
             throw RuleInternalException("An internal error occurred while executing rule", exception)
         }
@@ -379,16 +410,19 @@ abstract class AbstractCheckTask(
         } catch (ex: Exception) {
             val message = "Cannot finish task '$description'"
             LOGGER.error(message, ex)
-            eventBatchRouter.send(EventBatch.newBuilder()
-                .setParentEventId(parentEventID)
-                .addEvents(Event.start()
-                    .name("Check rule $description problem")
-                    .type("Exception")
-                    .status(FAILED)
-                    .bodyData(createMessageBean(message))
-                    .bodyData(createMessageBean(ex.message))
-                    .toProto(parentEventID))
-                .build())
+            eventBatchRouter.send(
+                EventBatch.newBuilder()
+                    .setParentEventId(parentEventID)
+                    .addEvents(
+                        Event.start()
+                            .name("Check rule $description problem")
+                            .type("Exception")
+                            .status(FAILED)
+                            .bodyData(createMessageBean(message))
+                            .bodyData(createMessageBean(ex.message))
+                            .toProto(parentEventID)
+                    ).build()
+            )
         } finally {
             RuleMetric.decrementActiveRule(type())
             refsKeeper.eraseRefs()
@@ -422,11 +456,20 @@ abstract class AbstractCheckTask(
      */
     private fun end(state: State, reason: String) {
         if (taskState.compareAndSet(State.BEGIN, state)) {
-            LOGGER.info("Stop task for session alias '{}' with sequence '{}' because: {}", sessionKey, lastSequence, reason)
+            LOGGER.info(
+                "Stop task for session alias '{}' with sequence '{}' because: {}",
+                sessionKey,
+                lastSequence,
+                reason
+            )
             dispose()
             endFuture.dispose()
         } else {
-            LOGGER.debug("Task for session alias '{}' is already completed. Ignore 'end' method call with reason: {}", sessionKey, reason)
+            LOGGER.debug(
+                "Task for session alias '{}' is already completed. Ignore 'end' method call with reason: {}",
+                sessionKey,
+                reason
+            )
         }
     }
 
@@ -446,7 +489,8 @@ abstract class AbstractCheckTask(
     protected open val errorEventOnTimeout: Boolean
         get() = true
 
-    protected fun isCheckpointLastReceivedMessage(): Boolean = bufferContainsStartMessage && !hasMessagesInTimeoutInterval
+    protected fun isCheckpointLastReceivedMessage(): Boolean =
+        bufferContainsStartMessage && !hasMessagesInTimeoutInterval
 
     /**
      * Publishes the event to [eventBatchRouter].
@@ -501,11 +545,11 @@ abstract class AbstractCheckTask(
         } catch (e: Exception) {
             LOGGER.error("Result event cannot be completed", e)
             refs.rootEvent.addSubEventWithSamePeriod()
-                    .name("Check result event cannot build completely")
-                    .type("eventNotComplete")
-                    .bodyData(createMessageBean("An unexpected exception has been thrown during result check build"))
-                    .bodyData(createMessageBean(e.message))
-                    .status(FAILED)
+                .name("Check result event cannot build completely")
+                .type("eventNotComplete")
+                .bodyData(createMessageBean("An unexpected exception has been thrown during result check build"))
+                .bodyData(createMessageBean(e.message))
+                .status(FAILED)
             true
         }
     }
@@ -616,8 +660,10 @@ abstract class AbstractCheckTask(
         }
         if (metadataFilter != null && metadataComparisonResult == null) {
             if (LOGGER.isDebugEnabled) {
-                LOGGER.debug("Metadata for message {} does not match the filter by key fields. Skip message checking",
-                        messageContainer.protoMessage.metadata.id.toJson())
+                LOGGER.debug(
+                    "Metadata for message {} does not match the filter by key fields. Skip message checking",
+                    messageContainer.messageHolder.id.toJson()
+                )
             }
             return AggregatedFilterResult.EMPTY
         }
@@ -626,17 +672,19 @@ abstract class AbstractCheckTask(
         }
 
         if (comparisonResult == null) {
-            LOGGER.debug("Comparison result for the message '{}' with the message `{}` does not match the filter by key fields or message type",
-                    messageContainer.sailfishMessage.name, messageFilter.message.name)
+            LOGGER.debug(
+                "Comparison result for the message '{}' with the message `{}` does not match the filter by key fields or message type",
+                messageContainer.sailfishMessage.name, messageFilter.message.name
+            )
         } else {
             LOGGER.debug("Compare message '{}' result\n{}", messageContainer.sailfishMessage.name, comparisonResult)
         }
 
         return if (comparisonResult != null || metadataComparisonResult != null) {
             if (significant) {
-                messageContainer.protoMessage.metadata.apply {
+                messageContainer.messageHolder.apply {
                     lastSequence = id.sequence
-                    lastMessageTimestamp = timestamp
+                    lastMessageTimestamp = id.timestamp
                 }
             }
             AggregatedFilterResult(comparisonResult, metadataComparisonResult)
@@ -648,8 +696,19 @@ abstract class AbstractCheckTask(
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
+
         @JvmField
-        val CONVERTER = ProtoToIMessageConverter(VerificationUtil.FACTORY_PROXY, null, null, createParameters().setUseMarkerForNullsInMessage(true))
+        val TRANSPORT_CONVERTER = TransportToIMessageConverter(
+            VerificationUtil.FACTORY_PROXY,
+            parameters = ToSailfishParameters(useMarkerForNullsInMessage = true)
+        )
+
+        @JvmField
+        val PROTO_CONVERTER = ProtoToIMessageConverter(
+            VerificationUtil.FACTORY_PROXY,
+            null,
+            createParameters().setUseMarkerForNullsInMessage(true)
+        )
         private val TIMEOUT_STATES: Set<State> = setOf(State.TIMEOUT, State.MESSAGE_TIMEOUT)
     }
 
@@ -674,23 +733,22 @@ abstract class AbstractCheckTask(
             }
         }
 
-    protected fun MessageFilter.toCompareSettings(): ComparatorSettings =
-        ComparatorSettings().also {
-            it.metaContainer = VerificationUtil.toMetaContainer(this, false)
-        }
-
     protected fun MetadataFilter.toComparisonSettings(): ComparatorSettings =
         ComparatorSettings().also {
             it.metaContainer = VerificationUtil.toMetaContainer(this)
         }
 
-    protected fun Event.appendEventWithVerification(protoMessage: Message, protoFilter: RootMessageFilter, comparisonResult: ComparisonResult): Event {
+    protected fun Event.appendEventWithVerification(
+        messageHolder: MessageHolder,
+        protoFilter: RootMessageFilter,
+        comparisonResult: ComparisonResult
+    ): Event {
         val verificationComponent = VerificationBuilder()
         comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
             verificationComponent.verification(key, value, protoFilter.messageFilter, true)
         }
 
-        with(protoMessage.metadata) {
+        with(messageHolder) {
             name("Verification '${messageType}' message")
                 .type("Verification")
                 .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
@@ -703,23 +761,30 @@ abstract class AbstractCheckTask(
         return this
     }
 
-    protected fun Event.appendEventWithVerification(metadata: MessageMetadata, metadataFilter: MetadataFilter, comparisonResult: ComparisonResult): Event {
+    protected fun Event.appendEventWithVerification(
+        messageHolder: MessageHolder,
+        metadataFilter: MetadataFilter,
+        comparisonResult: ComparisonResult
+    ): Event {
         val verificationComponent = VerificationBuilder()
         comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
             verificationComponent.verification(key, value, metadataFilter)
         }
 
-        with(metadata) {
+        with(messageHolder) {
             name("Verification '${messageType}' metadata")
-                    .type("Verification")
-                    .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
-                    .messageID(id)
-                    .bodyData(verificationComponent.build())
+                .type("Verification")
+                .status(if (comparisonResult.getStatusType() == StatusType.FAILED) FAILED else PASSED)
+                .messageID(id)
+                .bodyData(verificationComponent.build())
         }
         return this
     }
 
-    protected fun Event.appendEventWithVerificationsAndFilters(protoMessageFilters: Collection<RootMessageFilter>, comparisonContainers: Collection<ComparisonContainer>): Event {
+    protected fun Event.appendEventWithVerificationsAndFilters(
+        protoMessageFilters: Collection<RootMessageFilter>,
+        comparisonContainers: Collection<ComparisonContainer>
+    ): Event {
         for (messageFilter in protoMessageFilters) {
             val comparisonContainer = comparisonContainers.firstOrNull { it.protoFilter === messageFilter }
             comparisonContainer?.let {
@@ -740,15 +805,25 @@ abstract class AbstractCheckTask(
     protected fun Event.appendEventsWithVerification(comparisonContainer: ComparisonContainer): Event = this.apply {
         val protoFilter = comparisonContainer.protoFilter
         addSubEventWithSamePeriod()
-            .appendEventWithVerification(comparisonContainer.protoActual, protoFilter, comparisonContainer.result.messageResult!!)
+            .appendEventWithVerification(
+                comparisonContainer.holderActual,
+                protoFilter,
+                comparisonContainer.result.messageResult!!
+            )
         if (protoFilter.hasMetadataFilter()) {
             addSubEventWithSamePeriod()
-                .appendEventWithVerification(comparisonContainer.protoActual.metadata, protoFilter.metadataFilter, comparisonContainer.result.metadataResult!!)
+                .appendEventWithVerification(
+                    comparisonContainer.holderActual,
+                    protoFilter.metadataFilter,
+                    comparisonContainer.result.metadataResult!!
+                )
         }
     }
 
-    protected fun ProtoToIMessageConverter.fromProtoPreFilter(protoPreMessageFilter: RootMessageFilter,
-                                                              messageName: String = protoPreMessageFilter.messageType): IMessage {
+    protected fun ProtoToIMessageConverter.fromProtoPreFilter(
+        protoPreMessageFilter: RootMessageFilter,
+        messageName: String = protoPreMessageFilter.messageType
+    ): IMessage {
         val filterSettings = protoPreMessageFilter.comparisonSettings.run {
             FilterSettings().apply {
                 decimalPrecision = if (this@run.decimalPrecision.isBlank()) {
@@ -768,40 +843,41 @@ abstract class AbstractCheckTask(
         return fromProtoFilter(protoPreMessageFilter.messageFilter, filterSettings, messageName)
     }
 
-    private fun Observable<Message>.mapToMessageContainer(): Observable<MessageContainer> =
-        map { message -> MessageContainer(message, CONVERTER.fromProtoMessage(message, false)) }
+    private fun Observable<MessageHolder>.mapToMessageContainer(): Observable<MessageContainer> =
+        map { message -> MessageContainer(message, message.toSailfishMessage()) }
 
     /**
      * Filters incoming {@link StreamContainer} via session alias and then
      * filters the message which its sequence is greater than passed
      */
-    private fun Observable<StreamContainer>.continueObserve(sessionKey: SessionKey, sequence: Long): Observable<Message> =
+    private fun Observable<StreamContainer>.continueObserve(
+        sessionKey: SessionKey,
+        sequence: Long
+    ): Observable<MessageHolder> =
         filter { streamContainer -> streamContainer.sessionKey == sessionKey }
             .flatMap(StreamContainer::bufferedMessages)
             .filter { message ->
-                if (message.metadata.id.sequence == sequence) {
+                if (message.id.sequence == sequence) {
                     bufferContainsStartMessage = true
                 }
-                message.metadata.id.sequence > sequence
+                message.id.sequence > sequence
             }
 
     private fun Checkpoint.getCheckpointData(sessionKey: SessionKey): CheckpointData {
-        val checkpointData = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
-            ?.directionToCheckpointDataMap?.get(sessionKey.direction.number)
+        val checkpointData =
+            bookNameToSessionAliasToDirectionCheckpointMap[sessionKey.bookName]?.sessionAliasToDirectionCheckpointMap?.get(
+                sessionKey.sessionAlias
+            )?.directionToCheckpointDataMap?.get(sessionKey.direction.number)
 
         if (checkpointData == null) {
             if (LOGGER.isWarnEnabled) {
-                LOGGER.warn("Checkpoint '{}' doesn't contain checkpoint data for session '{}'", this.toJson(), sessionKey)
+                LOGGER.warn(
+                    "Checkpoint '{}' doesn't contain checkpoint data for session '{}'",
+                    this.toJson(),
+                    sessionKey
+                )
             }
-            val sequence = sessionAliasToDirectionCheckpointMap[sessionKey.sessionAlias]
-                ?.directionToSequenceMap?.get(sessionKey.direction.number)
-            if (sequence == null) {
-                if (LOGGER.isWarnEnabled) {
-                    LOGGER.warn("Checkpoint '{}' doesn't contain sequence for session '{}'", this.toJson(), sessionKey)
-                }
-                return CheckpointData(DEFAULT_SEQUENCE)
-            }
-            return CheckpointData(sequence)
+            return CheckpointData(DEFAULT_SEQUENCE)
         }
 
         return checkpointData.convert().apply {
@@ -816,9 +892,9 @@ abstract class AbstractCheckTask(
     /**
      * Provides the ability to stop observing if a message timeout is set.
      */
-    private fun Observable<Message>.takeWhileMessagesInTimeout() : Observable<Message> =
+    private fun Observable<MessageHolder>.takeWhileMessagesInTimeout(): Observable<MessageHolder> =
         takeWhile {
-            checkOnMessageTimeout(it.metadata.timestamp).also { continueObservation ->
+            checkOnMessageTimeout(it.id.timestamp).also { continueObservation ->
                 hasMessagesInTimeoutInterval = hasMessagesInTimeoutInterval or continueObservation
                 if (!continueObservation) {
                     streamCompletedState = State.MESSAGE_TIMEOUT
@@ -834,7 +910,12 @@ abstract class AbstractCheckTask(
         }
 
     private data class Legacy(val executorService: ExecutorService, val sequenceData: SequenceData)
-    private data class SequenceData(val lastSequence: Long, val lastMessageTimestamp: Timestamp?, val untrusted: Boolean)
+    private data class SequenceData(
+        val lastSequence: Long,
+        val lastMessageTimestamp: Timestamp?,
+        val untrusted: Boolean
+    )
+
     private data class PreviousExecutionData(
         /**
          * `true` if the previous rule in the chain marked as untrusted

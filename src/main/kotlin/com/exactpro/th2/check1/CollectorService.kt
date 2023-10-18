@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -30,14 +30,21 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
-import com.exactpro.th2.common.schema.message.MessageListener
+import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageGroup
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMessage
+import com.exactpro.th2.common.utils.message.MessageHolder
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
+import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
+import org.slf4j.LoggerFactory
 import mu.KotlinLogging
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -49,10 +56,11 @@ import java.util.concurrent.TimeUnit
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 import com.exactpro.th2.check1.utils.toMessageID
 import com.exactpro.th2.common.message.toJson
+import com.exactpro.th2.common.schema.message.MessageListener
 
 class CollectorService(
-    private val messageRouter: MessageRouter<MessageBatch>,
-    private val eventBatchRouter: MessageRouter<EventBatch>,
+    protoMessageRouter: MessageRouter<MessageBatch>,
+   transportMessageRouter: MessageRouter<GroupBatch>, private val eventBatchRouter: MessageRouter<EventBatch>,
     private val configuration: Check1Configuration,
 ) {
 
@@ -61,10 +69,11 @@ class CollectorService(
     /**
      * Queue name to subscriber. Messages with different connectivity can be transferred with one queue.
      */
-    private val subscriberMonitor: SubscriberMonitor
+    private val protoSubscriberMonitor: SubscriberMonitor?
+    private val transportSubscriberMonitor: SubscriberMonitor?
     private val streamObservable: Observable<StreamContainer>
     private val checkpointSubscriber: CheckpointSubscriber
-    private val mqSubject: PublishSubject<MessageBatch>
+    private val mqSubject: PublishSubject<MessageHolder>
     private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, AbstractCheckTask> = ConcurrentHashMap()
 
     private val olderThanDelta = configuration.cleanupOlderThan
@@ -80,14 +89,41 @@ class CollectorService(
 
         val limitSize = configuration.messageCacheSize
         mqSubject = PublishSubject.create()
-
-        subscriberMonitor = subscribe(MessageListener { _: String, batch: MessageBatch -> mqSubject.onNext(batch) })
-        streamObservable = mqSubject.flatMapIterable(MessageBatch::getMessagesList)
-                .groupBy { message ->
-                    message.metadata.id.run {
-                        SessionKey(connectionId.sessionAlias, direction)
-                    }.also(BufferMetric::processMessage)
+        protoSubscriberMonitor = runCatching {
+            checkNotNull(protoMessageRouter.subscribeAll({ _: DeliveryMetadata, batch: MessageBatch ->
+                batch.messagesList.forEach {
+                    mqSubject.onNext(ProtoMessageHolder(it))
                 }
+            }))
+        }.onFailure {
+            logger.warn("Can not subscribe for listening protobuf messages", it)
+        }.getOrNull()
+        transportSubscriberMonitor = runCatching {
+            checkNotNull(transportMessageRouter.subscribeAll({ _: DeliveryMetadata, batch: GroupBatch ->
+                val book = batch.book
+                val sessionGroup = batch.sessionGroup
+                batch.groups.asSequence()
+                    .flatMap(MessageGroup::messages)
+                    .forEach { message ->
+                        when (message) {
+                            is ParsedMessage -> mqSubject.onNext(TransportMessageHolder(message, book, sessionGroup))
+                            else -> error("Transport group contains not parsed message $message")
+                        }
+                    }
+            }))
+        }.onFailure {
+            logger.warn("Can not subscribe for listening transport messages", it)
+        }.getOrNull()
+
+        if (protoSubscriberMonitor == null && transportSubscriberMonitor == null) {
+            error("Subscribe pin should be declared at least one of protobuf or transport protocols")
+        }
+
+        streamObservable = mqSubject.groupBy { wrapper ->
+            wrapper.id.run {
+                SessionKey(wrapper.id.bookName, connectionId.sessionAlias, direction)
+            }.also(BufferMetric::processMessage)
+        }
             .map { group -> StreamContainer(group.key!!, limitSize, group) }
             .replay().apply { connect() }
 
@@ -224,8 +260,14 @@ class CollectorService(
     }
 
     fun close() {
-        runCatching(subscriberMonitor::unsubscribe).onFailure {
-            logger.error(it) { "Close subscriber failure" }
+        protoSubscriberMonitor?.let {
+            runCatching(protoSubscriberMonitor::unsubscribe)
+                .onFailure { logger.error("Close protobuf subscriber failure", it) }
+        }
+        transportSubscriberMonitor?.let {
+            runCatching(transportSubscriberMonitor::unsubscribe)
+                .onFailure { logger.error("Close transport subscriber failure", it) }
+            mqSubject.onComplete()
         }
         mqSubject.onComplete()
         runCatching {
@@ -242,10 +284,6 @@ class CollectorService(
         }
     }
 
-    private fun subscribe(listener: MessageListener<MessageBatch>): SubscriberMonitor {
-        return checkNotNull(messageRouter.subscribeAll(listener)) { "Can not subscribe to queues" }
-    }
-
     private fun publishCheckpoint(request: CheckpointRequestOrBuilder, checkpoint: Checkpoint, event: Event) {
         if (!request.hasParentEventId()) {
             if (logger.isWarnEnabled) {
@@ -259,26 +297,46 @@ class CollectorService(
             .description(request.description)
             .endTimestamp()
             .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
-        if (!configuration.enableCheckpointEventsPublication) {
-            rootEvent.bodyData(EventUtils.createMessageBean("Checkpoints publication is disabled. Check the component configuration to enable it"))
-        }
-        checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
-            val messageID = sessionKey.toMessageID(checkpointData.sequence)
-            rootEvent.messageID(messageID)
-            if (configuration.enableCheckpointEventsPublication) {
-                rootEvent.addSubEventWithSamePeriod()
-                    .name("Checkpoint for session alias '${sessionKey.sessionAlias}' direction '${sessionKey.direction}' sequence '${checkpointData.sequence}'")
-                    .type("Checkpoint for session")
-                    .messageID(messageID)
+        try {
+            if (!configuration.enableCheckpointEventsPublication) {
+                rootEvent.bodyData(EventUtils.createMessageBean("Checkpoints publication is disabled. Check the component configuration to enable it"))
+            }
+            checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
+                val messageID = sessionKey.toMessageID(checkpointData)
+                rootEvent.messageID(messageID)
+                if (configuration.enableCheckpointEventsPublication) {
+                    rootEvent.addSubEventWithSamePeriod()
+                        .name("Checkpoint for book name '${sessionKey.bookName}', session alias '${sessionKey.sessionAlias}', direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
+                        .type("Checkpoint for session")
+                        .messageID(messageID)
+                }
+            }
+        } finally {
+            try {
+                if (request.hasParentEventId()) {
+                    sendEvents(request.parentEventId, rootEvent)
+                } else {
+                    logger.warn("Parent id missed in request")
+                }
+            } catch (e: Exception) {
+                logger.error(
+                    "Sending events '{}' with a parent '{}' failed ",
+                    rootEvent, request.parentEventId, e
+                )
             }
         }
-        try {
-            sendEvents(request.parentEventId, rootEvent)
-        } catch (e: Exception) {
-            logger.error(
-                "Sending events '{}' with a parent '{}' failed ",
-                rootEvent, request.parentEventId, e
-            )
-        }
     }
+
+    private fun SessionKey.toMessageID(data: CheckpointData) = MessageID.newBuilder()
+        .setBookName(bookName)
+        .setConnectionId(
+            ConnectionID
+                .newBuilder()
+                .setSessionAlias(sessionAlias)
+                .build()
+        )
+        .setTimestamp(requireNotNull(data.timestamp) { "timestamp is not set for session $this" })
+        .setSequence(data.sequence)
+        .setDirection(direction)
+        .build()
 }

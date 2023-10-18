@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,12 +100,12 @@ class SequenceCheckRuleTask(
             protoMessageFilters = protoMessageFilters,
             protoPreMessageFilter = protoPreMessageFilter,
             messagePreFilter = SailfishFilter(
-                CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+                PROTO_CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
                 protoPreMessageFilter.toCompareSettings()
             ),
             metadataPreFilter = protoPreMessageFilter.metadataFilterOrNull()?.let {
                 SailfishFilter(
-                    CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                    PROTO_CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
                     it.toComparisonSettings()
                 )
             }
@@ -120,10 +120,12 @@ class SequenceCheckRuleTask(
         refs.messageFilters = refs.protoMessageFilters.map {
             MessageFilterContainer(
                 it,
-                SailfishFilter(CONVERTER.fromProtoPreFilter(it), it.toCompareSettings()),
+                SailfishFilter(PROTO_CONVERTER.fromProtoPreFilter(it), it.toCompareSettings()),
                 it.metadataFilterOrNull()?.let { metadataFilter ->
-                    SailfishFilter(CONVERTER.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
-                        metadataFilter.toComparisonSettings())
+                    SailfishFilter(
+                        PROTO_CONVERTER.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
+                        metadataFilter.toComparisonSettings()
+                    )
                 }
             )
         }.toMutableList()
@@ -132,11 +134,17 @@ class SequenceCheckRuleTask(
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, refs.protoPreMessageFilter, refs.messagePreFilter, refs.metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(
+            this,
+            refs.protoPreMessageFilter,
+            refs.messagePreFilter,
+            refs.metadataPreFilter,
+            LOGGER
+        ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
                 refs.preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                refs.preFilterEvent.messageID(protoActual.metadata.id)
-                refs.preFilteringResults[protoActual.metadata.id] = preFilterContainer
+                refs.preFilterEvent.messageID(holderActual.id)
+                refs.preFilteringResults[holderActual.id] = preFilterContainer
             }
         }
 
@@ -158,12 +166,12 @@ class SequenceCheckRuleTask(
 
                 refs.messageFilters.removeAt(index)
 
-                refs.messageFilteringResults[messageContainer.protoMessage.metadata.id] = comparisonContainer
+                refs.messageFilteringResults[messageContainer.messageHolder.id] = comparisonContainer
                 refs.matchedByKeys.add(messageFilterContainer)
 
                 requireNotNull(result.messageResult) {
                     "Message result must not be null because the result said the message is matched by key fields. Filter: " +
-                        shortDebugString(messageFilterContainer.protoMessageFilter)
+                            shortDebugString(messageFilterContainer.protoMessageFilter)
                 }
                 break
             }
@@ -187,7 +195,7 @@ class SequenceCheckRuleTask(
     override fun type(): String = "checkSequenceRule"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
+        rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)" }}"))
     }
 
     /**
@@ -216,26 +224,45 @@ class SequenceCheckRuleTask(
             val container = refs.messageFilteringResults[messageID]
             sequenceTable.row(
                 container?.let {
-                    CheckSequenceUtils.createBothSide(it.sailfishActual, it.protoActual.metadata, it.protoFilter, sessionKey.sessionAlias)
-                } ?: CheckSequenceUtils.createOnlyActualSide(comparisonContainer.sailfishActual, sessionKey.sessionAlias)
+                    CheckSequenceUtils.createBothSide(
+                        it.sailfishActual,
+                        it.holderActual.properties,
+                        it.protoFilter,
+                        sessionKey.sessionAlias
+                    )
+                } ?: CheckSequenceUtils.createOnlyActualSide(
+                    comparisonContainer.sailfishActual,
+                    sessionKey.sessionAlias
+                )
             )
         }
         refs.messageFilters.forEach { messageFilter: MessageFilterContainer ->
-            sequenceTable.row(CheckSequenceUtils.createOnlyExpectedSide(messageFilter.protoMessageFilter, sessionKey.sessionAlias))
+            sequenceTable.row(
+                CheckSequenceUtils.createOnlyExpectedSide(
+                    messageFilter.protoMessageFilter,
+                    sessionKey.sessionAlias
+                )
+            )
         }
 
         refs.rootEvent.addSubEventWithSamePeriod()
             .name("Check sequence (expected ${refs.protoMessageFilters.size} / actual ${refs.preFilteringResults.size} , check order $checkOrder)")
             .type("checkSequence")
-            .status(if (refs.protoMessageFilters.size == refs.preFilteringResults.size
-                && !(checkOrder && reordered)) PASSED else FAILED)
-            .bodyData(MessageBuilder()
-                .text("Expected ${refs.protoMessageFilters.size}, Actual ${refs.preFilteringResults.size}" +
-                    if (checkOrder)
-                        ", " + if (reordered) "Out of order"
-                        else "In order"
-                    else "")
-                .build())
+            .status(
+                if (refs.protoMessageFilters.size == refs.preFilteringResults.size
+                    && !(checkOrder && reordered)
+                ) PASSED else FAILED
+            )
+            .bodyData(
+                MessageBuilder()
+                    .text(
+                        "Expected ${refs.protoMessageFilters.size}, Actual ${refs.preFilteringResults.size}" +
+                                if (checkOrder)
+                                    ", " + if (reordered) "Out of order"
+                                    else "In order"
+                                else ""
+                    ).build()
+            )
             .bodyData(sequenceTable.build())
     }
 
