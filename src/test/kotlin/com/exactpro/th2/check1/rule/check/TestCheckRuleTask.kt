@@ -546,6 +546,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                 "0" to verificationEntry,
                 "1" to verificationEntry,
                 "2" to verificationEntry,
+                status = verificationEntry.status
             ))
 
             assertVerificationByStatus(verification, expected)
