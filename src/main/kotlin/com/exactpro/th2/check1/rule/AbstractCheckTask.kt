@@ -31,11 +31,12 @@ import com.exactpro.th2.check1.util.VerificationUtil
 import com.exactpro.th2.check1.utils.convert
 import com.exactpro.th2.check1.utils.getStatusType
 import com.exactpro.th2.check1.utils.isAfter
+import com.exactpro.th2.check1.utils.toMessageID
 import com.exactpro.th2.check1.utils.toSailfishMessage
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.Event.Status.PASSED
-import com.exactpro.th2.common.event.EventUtils
+import com.exactpro.th2.common.event.EventUtils.createMessageBean
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
@@ -45,6 +46,7 @@ import com.exactpro.th2.common.message.toJavaDuration
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.util.toInstant
 import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.sailfish.utils.FilterSettings
 import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
@@ -67,9 +69,6 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import com.exactpro.th2.check1.utils.toMessageID
-import com.exactpro.th2.common.event.EventUtils.createMessageBean
-import com.exactpro.th2.common.util.toInstant
 
 /**
  * Implements common logic for check task.
@@ -378,15 +377,15 @@ abstract class AbstractCheckTask(
             )
             status(PASSED)
             type("ruleStartPoint")
-            if (lastSequence != DEFAULT_SEQUENCE) {
-                messageID(sessionKey.toMessageID(lastSequence))
+            if (checkpointTimestamp != null && !Timestamp.getDefaultInstance().equals(checkpointTimestamp) && lastSequence != DEFAULT_SEQUENCE) {
+                messageID(sessionKey.toMessageID(checkpointTimestamp, lastSequence))
             }
             bodyData(createMessageBean("The rule starts working from " +
                     (if (lastSequence == DEFAULT_SEQUENCE) "start of cache" else "sequence $lastSequence") +
-                    (checkpointTimestamp?.let {
+                    (if (checkpointTimestamp != null && !Timestamp.getDefaultInstance().equals(checkpointTimestamp)) {
                         val instant = checkpointTimestamp.toInstant()
                         " and expects messages between $instant and ${instant.plusMillis(taskTimeout.messageTimeout)}"
-                    } ?: "")))
+                    } else "")))
             bodyData(createMessageBean("Rule timeout is set to ${taskTimeout.timeout} mls"))
         }
     }
@@ -903,7 +902,7 @@ abstract class AbstractCheckTask(
         }
 
     private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long): Timestamp? =
-        if (timestamp != null && messageTimeout > 0) {
+        if (timestamp != null && !Timestamp.getDefaultInstance().equals(timestamp) && messageTimeout > 0) {
             Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
         } else {
             null

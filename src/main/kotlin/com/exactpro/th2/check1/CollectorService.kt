@@ -30,6 +30,7 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
@@ -39,12 +40,11 @@ import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMess
 import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
+import com.exactpro.th2.common.utils.shutdownGracefully
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
-import org.slf4j.LoggerFactory
 import mu.KotlinLogging
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -54,9 +54,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
-import com.exactpro.th2.check1.utils.toMessageID
-import com.exactpro.th2.common.message.toJson
-import com.exactpro.th2.common.schema.message.MessageListener
 
 class CollectorService(
     protoMessageRouter: MessageRouter<MessageBatch>,
@@ -96,7 +93,7 @@ class CollectorService(
                 }
             }))
         }.onFailure {
-            logger.warn("Can not subscribe for listening protobuf messages", it)
+            logger.warn(it) {"Can not subscribe for listening protobuf messages" }
         }.getOrNull()
         transportSubscriberMonitor = runCatching {
             checkNotNull(transportMessageRouter.subscribeAll({ _: DeliveryMetadata, batch: GroupBatch ->
@@ -112,7 +109,7 @@ class CollectorService(
                     }
             }))
         }.onFailure {
-            logger.warn("Can not subscribe for listening transport messages", it)
+            logger.warn(it) {"Can not subscribe for listening transport messages" }
         }.getOrNull()
 
         if (protoSubscriberMonitor == null && transportSubscriberMonitor == null) {
@@ -222,8 +219,8 @@ class CollectorService(
                 else -> {
                     !task.hasNextRule().also { canBeRemoved ->
                         when {
-                            canBeRemoved -> logger.info("Removed task ${task.description} ($endTime) from tasks map")
-                            else -> logger.warn("Task ${task.description} can't be removed because it has a continuation")
+                            canBeRemoved -> logger.info { "Removed task ${task.description} ($endTime) from tasks map" }
+                            else -> logger.warn { "Task ${task.description} can't be removed because it has a continuation" }
                         }
                     }
                 }
@@ -236,18 +233,16 @@ class CollectorService(
 
     @Throws(JsonProcessingException::class)
     private fun sendEvents(parentEventID: EventID, event: Event) {
-        logger.debug("Sending event thee id '{}' parent id '{}'", event.id, parentEventID)
+        logger.debug { "Sending event thee id '${event.id}' parent id '${parentEventID.toJson()}'" }
 
         val batch = event.toBatchProto(parentEventID)
 
         ForkJoinPool.commonPool().execute {
             try {
                 eventBatchRouter.send(batch, "publish", "event")
-                if (logger.isDebugEnabled) {
-                    logger.debug("Sent event batch '{}'", shortDebugString(batch))
-                }
+                logger.debug { "Sent event batch '${batch.toJson()}'" }
             } catch (e: Exception) {
-                logger.error("Can not send event batch '{}'", shortDebugString(batch), e)
+                logger.error(e) { "Can not send event batch '${batch.toJson()}'" }
             }
         }
     }
@@ -262,33 +257,20 @@ class CollectorService(
     fun close() {
         protoSubscriberMonitor?.let {
             runCatching(protoSubscriberMonitor::unsubscribe)
-                .onFailure { logger.error("Close protobuf subscriber failure", it) }
+                .onFailure { logger.error(it) { "Close protobuf subscriber failure" } }
         }
         transportSubscriberMonitor?.let {
             runCatching(transportSubscriberMonitor::unsubscribe)
-                .onFailure { logger.error("Close transport subscriber failure", it) }
+                .onFailure { logger.error(it) { "Close transport subscriber failure" } }
             mqSubject.onComplete()
         }
         mqSubject.onComplete()
-        runCatching {
-            commonRuleExecutor.shutdown()
-            val timeout: Long = 10
-            val unit = TimeUnit.SECONDS
-            if (!commonRuleExecutor.awaitTermination(timeout, unit)) {
-                logger.warn { "Cannot shutdown executor during ${unit.toMillis(timeout)} ms. Force shutdown" }
-                val remainingTasks = commonRuleExecutor.shutdownNow()
-                logger.warn { "Tasks left: ${remainingTasks.size}" }
-            }
-        }.onFailure {
-            logger.error(it) { "Cannot shutdown common task executor" }
-        }
+        commonRuleExecutor.shutdownGracefully(10, TimeUnit.SECONDS)
     }
 
     private fun publishCheckpoint(request: CheckpointRequestOrBuilder, checkpoint: Checkpoint, event: Event) {
         if (!request.hasParentEventId()) {
-            if (logger.isWarnEnabled) {
-                logger.warn("Parent id missed in request {}", request.toJson())
-            }
+            logger.warn { "Parent id missed in request ${request.toJson()}" }
             return
         }
         val rootEvent: Event = event
@@ -316,13 +298,12 @@ class CollectorService(
                 if (request.hasParentEventId()) {
                     sendEvents(request.parentEventId, rootEvent)
                 } else {
-                    logger.warn("Parent id missed in request")
+                    logger.warn {"Parent id missed in request" }
                 }
             } catch (e: Exception) {
-                logger.error(
-                    "Sending events '{}' with a parent '{}' failed ",
-                    rootEvent, request.parentEventId, e
-                )
+                logger.error(e) {
+                    "Sending events '$rootEvent' with a parent '${request.parentEventId.toJson()}' failed "
+                }
             }
         }
     }

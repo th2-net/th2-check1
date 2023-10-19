@@ -22,6 +22,7 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
+import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
@@ -72,17 +73,17 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             assertTrue(eventsList.all { it.status == EventStatus.SUCCESS }, "Has messages outside the prefilter")
         }, {
             val rootEvent = eventsList.first()
-            assertTrue(rootEvent.attachedMessageIdsCount == 5)
+            assertEquals(5, rootEvent.attachedMessageIdsCount, "Message sequences: ${rootEvent.attachedMessageIdsList.map(MessageID::getSequence)}")
             assertEquals((2..6L).toList(), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val prefilteredEvent = eventsList.findEventByType("preFiltering")
             assertNotNull(prefilteredEvent, "Missed pre filtering event")
-            assertTrue(prefilteredEvent.attachedMessageIdsCount == 0)
+            assertEquals(0, prefilteredEvent.attachedMessageIdsCount)
             assertEquals(emptyList(), prefilteredEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val unexpectedMessagesEvent = eventsList.findEventByType("noMessagesCheckResult")
             assertNotNull(unexpectedMessagesEvent, "Missed resulting event")
-            assertTrue(unexpectedMessagesEvent.attachedMessageIdsCount == 0)
+            assertEquals(0, unexpectedMessagesEvent.attachedMessageIdsCount)
             assertEquals(emptyList(), unexpectedMessagesEvent.attachedMessageIdsList.map { it.sequence })
         })
     }
@@ -120,12 +121,12 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         assertAll({
             val rootEvent = eventsList.first()
             assertEquals(rootEvent.status, EventStatus.FAILED, "Event status should be failed")
-            assertTrue(rootEvent.attachedMessageIdsCount == 4)
+            assertEquals(4, rootEvent.attachedMessageIdsCount)
             assertEquals((2..5L).toList(), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val prefilteredEvent = eventsList.findEventByType("preFiltering")
             assertNotNull(prefilteredEvent, "Missed pre filtering event")
-            assertTrue(prefilteredEvent.attachedMessageIdsCount == 1)
+            assertEquals(1, prefilteredEvent.attachedMessageIdsCount)
             val verificationEvents = eventsList.filter { it.type == "Verification" }
             assertEquals(1, verificationEvents.size)
             assertTrue(verificationEvents.all { it.parentId == prefilteredEvent.id })
@@ -133,7 +134,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         }, {
             val unexpectedMessagesEvent = eventsList.findEventByType("noMessagesCheckResult")
             assertNotNull(unexpectedMessagesEvent, "Missed resulting event")
-            assertTrue(unexpectedMessagesEvent.attachedMessageIdsCount == 1)
+            assertEquals(1, unexpectedMessagesEvent.attachedMessageIdsCount)
             assertEquals(listOf(2L), unexpectedMessagesEvent.attachedMessageIdsList.map { it.sequence })
         })
     }
@@ -160,7 +161,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
             createPreFilter("B", "2"),
             TaskTimeout(2000)
         )
-        task.begin(createCheckpoint(checkpointTimestamp))
+        task.begin(createCheckpoint())
 
         val eventBatch = awaitEventBatchRequest(1000L, 4)
         val eventsList = eventBatch.flatMap(EventBatch::getEventsList)
@@ -168,17 +169,17 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         assertAll({
             val rootEvent = eventsList.first()
             assertEquals(rootEvent.status, EventStatus.FAILED, "Root event should be failed due to timeout")
-            assertTrue(rootEvent.attachedMessageIdsCount == 5)
+            assertEquals(5, rootEvent.attachedMessageIdsCount)
             assertEquals((1..5L).toList(), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val prefilteredEvent = eventsList.findEventByType("preFiltering")
             assertNotNull(prefilteredEvent, "Missed pre filtering event")
-            assertTrue(prefilteredEvent.attachedMessageIdsCount == 0)
+            assertEquals(0, prefilteredEvent.attachedMessageIdsCount)
             assertEquals(emptyList(), prefilteredEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val unexpectedMessagesEvent = eventsList.findEventByType("noMessagesCheckResult")
             assertNotNull(unexpectedMessagesEvent, "Missed resulting event")
-            assertTrue(unexpectedMessagesEvent.attachedMessageIdsCount == 0)
+            assertEquals(0, unexpectedMessagesEvent.attachedMessageIdsCount)
             assertEquals(emptyList(), unexpectedMessagesEvent.attachedMessageIdsList.map { it.sequence })
             assertTrue(
                 unexpectedMessagesEvent.name == "Check passed",

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2022-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,12 +15,15 @@ package com.exactpro.th2.check1.utils
 import com.exactpro.th2.check1.SessionKey
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.MessageID
+import com.google.protobuf.Timestamp
 
-fun SessionKey.toMessageID(sequence: Long): MessageID = MessageID.newBuilder()
+fun SessionKey.toMessageID(timestamp: Timestamp, sequence: Long): MessageID = MessageID.newBuilder()
     .setConnectionId(
         ConnectionID.newBuilder()
         .setSessionAlias(sessionAlias)
         .build())
+    .setBookName(bookName)
+    .setTimestamp(timestamp)
     .setSequence(sequence)
     .setDirection(direction)
     .build()

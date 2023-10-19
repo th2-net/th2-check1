@@ -151,7 +151,7 @@ class TestChain : AbstractCheckTaskTest() {
     @Test
     fun `sequence rules - untrusted execution`() {
         val checkpointTimestamp = Instant.now()
-        val streams = createStreams(messages = (1..5L).map {
+        val streams = createStreams(messages = (2..6L).map {
             ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
@@ -164,11 +164,11 @@ class TestChain : AbstractCheckTaskTest() {
         })
 
         val task = sequenceCheckRuleTask(
-            listOf(1, 2),
+            listOf(2, 3),
             eventID,
             streams,
             taskTimeout = TaskTimeout(2000L, 500)
-        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 1)) }
         var eventsList = awaitEventBatchAndGetEvents(4, 4)
         assertAll({
             val rootEvent = eventsList.first()
@@ -177,7 +177,7 @@ class TestChain : AbstractCheckTaskTest() {
         })
 
         sequenceCheckRuleTask(
-            listOf(3, 4),
+            listOf(4, 5),
             eventID,
             streams,
             taskTimeout = TaskTimeout(2000L, 1500L)
@@ -189,7 +189,7 @@ class TestChain : AbstractCheckTaskTest() {
     @Test
     fun `no messages sequence rules - untrusted execution`() {
         val checkpointTimestamp = Instant.now()
-        val streams = createStreams(messages = (1..5L).map {
+        val streams = createStreams(messages = (2..6L).map {
             ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
@@ -206,7 +206,7 @@ class TestChain : AbstractCheckTaskTest() {
             streams,
             taskTimeout = TaskTimeout(2000L, 500),
             preFilterParam = createPreFilter("E", "5")
-        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 1)) }
         var eventsList = awaitEventBatchAndGetEvents(2, 2)
         assertAll({
             val rootEvent = eventsList.first()
@@ -227,7 +227,7 @@ class TestChain : AbstractCheckTaskTest() {
     @Test
     fun `simple rules - ignored untrusted execution`() {
         val checkpointTimestamp = Instant.now()
-        val streams = createStreams(messages = (1..5L).map {
+        val streams = createStreams(messages = (2..6L).map {
             ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
@@ -241,7 +241,7 @@ class TestChain : AbstractCheckTaskTest() {
 
         val task = checkRuleTask(
             1, eventID, streams, taskTimeout = TaskTimeout(2000L, 500)
-        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 1)) }
         var eventsList = awaitEventBatchAndGetEvents(2, 2)
         assertAll({
             val rootEvent = eventsList.first()
@@ -249,7 +249,7 @@ class TestChain : AbstractCheckTaskTest() {
             assertTrue(rootEvent.attachedMessageIdsCount == 1)
         })
 
-        checkRuleTask(3, eventID, streams).also { task.subscribeNextTask(it) }
+        checkRuleTask(4, eventID, streams).also { task.subscribeNextTask(it) }
         eventsList = awaitEventBatchAndGetEvents(4, 2)
         assertAll({
             val rootEvent = eventsList.first()

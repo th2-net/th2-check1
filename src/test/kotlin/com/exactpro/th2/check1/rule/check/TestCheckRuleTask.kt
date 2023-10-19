@@ -41,7 +41,6 @@ import com.exactpro.th2.common.grpc.MetadataFilter
 import com.exactpro.th2.common.grpc.RootComparisonSettings
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.ValueFilter
-import com.exactpro.th2.common.message.message
 import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.message.rootMessageFilter
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
@@ -98,7 +97,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             )
         ))
 
-        val eventID = EventID.newBuilder().setId("root").build()
+        val eventID = createRootEventId()
         val filter = RootMessageFilter.newBuilder()
             .setMessageType(MESSAGE_TYPE)
             .setMetadataFilter(MetadataFilter.newBuilder()
@@ -190,12 +189,13 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
-        assertEquals(4, eventList.size, "Incorrect number of events $eventList")
-        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(5, eventList.size, "Incorrect number of events $eventList")
+        assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
         assertEquals("Check rule - test_session", eventList[0].name)
-        assertEquals("Message filter", eventList[1].name)
-        assertEquals("Verification '$MESSAGE_TYPE' message", eventList[2].name)
-        assertEquals("Verification '$MESSAGE_TYPE' metadata", eventList[3].name)
+        assertEquals("Rule works from the beginning of the cache", eventList[1].name)
+        assertEquals("Message filter", eventList[2].name)
+        assertEquals("Verification '$MESSAGE_TYPE' message", eventList[3].name)
+        assertEquals("Verification '$MESSAGE_TYPE' metadata", eventList[4].name)
     }
 
     @Test
@@ -521,7 +521,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         val config = Check1Configuration(isDefaultCheckSimpleCollectionsOrder = defaultValue)
         val ruleFactory = RuleFactory(config, streams, clientStub)
         val request = CheckRuleRequest.newBuilder()
-            .setParentEventId(createEventId("root"))
+            .setParentEventId(createRootEventId())
+            .setBookName(BOOK_NAME)
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(SESSION_ALIAS))
             .setRootFilter(messageFilterForCheckOrderBuilder)
             .setMessageTimeout(5)
