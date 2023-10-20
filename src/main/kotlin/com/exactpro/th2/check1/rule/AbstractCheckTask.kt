@@ -69,6 +69,8 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 /**
  * Implements common logic for check task.
@@ -377,7 +379,7 @@ abstract class AbstractCheckTask(
             )
             status(PASSED)
             type("ruleStartPoint")
-            if (checkpointTimestamp != null && !Timestamp.getDefaultInstance().equals(checkpointTimestamp) && lastSequence != DEFAULT_SEQUENCE) {
+            if (isValid(checkpointTimestamp) && lastSequence != DEFAULT_SEQUENCE) {
                 messageID(sessionKey.toMessageID(checkpointTimestamp, lastSequence))
             }
             bodyData(createMessageBean("The rule starts working from " +
@@ -418,7 +420,7 @@ abstract class AbstractCheckTask(
                             .type("Exception")
                             .status(FAILED)
                             .bodyData(createMessageBean(message))
-                            .bodyData(createMessageBean(ex.message))
+                            .exception(ex, true)
                             .toProto(parentEventID)
                     ).build()
             )
@@ -547,7 +549,7 @@ abstract class AbstractCheckTask(
                 .name("Check result event cannot build completely")
                 .type("eventNotComplete")
                 .bodyData(createMessageBean("An unexpected exception has been thrown during result check build"))
-                .bodyData(createMessageBean(e.message))
+                .exception(e, true)
                 .status(FAILED)
             true
         }
@@ -695,6 +697,7 @@ abstract class AbstractCheckTask(
     companion object {
         const val DEFAULT_SEQUENCE = Long.MIN_VALUE
         private val RESPONSE_EXECUTOR = ForkJoinPool.commonPool()
+        private val TIMEOUT_STATES: Set<State> = setOf(State.TIMEOUT, State.MESSAGE_TIMEOUT)
 
         @JvmField
         val TRANSPORT_CONVERTER = TransportToIMessageConverter(
@@ -708,7 +711,14 @@ abstract class AbstractCheckTask(
             null,
             createParameters().setUseMarkerForNullsInMessage(true)
         )
-        private val TIMEOUT_STATES: Set<State> = setOf(State.TIMEOUT, State.MESSAGE_TIMEOUT)
+
+        @OptIn(ExperimentalContracts::class)
+        private fun isValid(timestamp: Timestamp?): Boolean {
+            contract {
+                returns(true) implies (timestamp != null)
+            }
+            return timestamp != null && !Timestamp.getDefaultInstance().equals(timestamp)
+        }
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
@@ -737,7 +747,7 @@ abstract class AbstractCheckTask(
             it.metaContainer = VerificationUtil.toMetaContainer(this)
         }
 
-    protected fun Event.appendEventWithVerification(
+    private fun Event.appendEventWithVerification(
         messageHolder: MessageHolder,
         protoFilter: RootMessageFilter,
         comparisonResult: ComparisonResult
@@ -760,7 +770,7 @@ abstract class AbstractCheckTask(
         return this
     }
 
-    protected fun Event.appendEventWithVerification(
+    private fun Event.appendEventWithVerification(
         messageHolder: MessageHolder,
         metadataFilter: MetadataFilter,
         comparisonResult: ComparisonResult
@@ -793,7 +803,7 @@ abstract class AbstractCheckTask(
         return this
     }
 
-    protected fun Event.appendEventsWithFilter(rootMessageFilter: RootMessageFilter): Event = this.apply {
+    private fun Event.appendEventsWithFilter(rootMessageFilter: RootMessageFilter): Event = this.apply {
         addSubEventWithSamePeriod()
             .name("Message filter")
             .type("Filter")
@@ -902,7 +912,7 @@ abstract class AbstractCheckTask(
         }
 
     private fun calculateCheckpointTimeout(timestamp: Timestamp?, messageTimeout: Long): Timestamp? =
-        if (timestamp != null && !Timestamp.getDefaultInstance().equals(timestamp) && messageTimeout > 0) {
+        if (isValid(timestamp) && messageTimeout > 0) {
             Timestamps.add(timestamp, Durations.fromMillis(messageTimeout))
         } else {
             null
