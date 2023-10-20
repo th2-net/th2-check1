@@ -260,7 +260,7 @@ class CollectorService(
             mqSubject.onComplete()
         }
         mqSubject.onComplete()
-        ruleExecutorPool.close()
+        ruleExecutorPool.dispose()
     }
 
     private fun publishCheckpoint(request: CheckpointRequestOrBuilder, checkpoint: Checkpoint, event: Event) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -21,8 +21,8 @@ import java.util.concurrent.TimeUnit
 
 class ExecutorPool(
     threadName: String,
-    nExecutors: Int = 1
-): AutoCloseable {
+    private val nExecutors: Int = 1
+) {
     init {
         require(threadName.isNotBlank()) {
             "'threadName' can't be blank, actual '$threadName'"
@@ -45,13 +45,12 @@ class ExecutorPool(
 
     private val firstExecutor: ExecutorService = executors.first()
 
-    private val executorSupplier: () -> ExecutorService = when (nExecutors) {
-        1 -> { { firstExecutor } }
-        else -> { { executors.minBy { it.taskCount } } }
+    fun get(): ExecutorService = when (nExecutors) {
+        1 -> firstExecutor
+        else -> executors.minBy { it.taskCount }
     }
-    fun get(): ExecutorService = executorSupplier.invoke()
 
-    override fun close() {
+    fun dispose() {
         executors.forEach {
             it.shutdownGracefully(10, TimeUnit.SECONDS)
         }
