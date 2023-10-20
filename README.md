@@ -1,4 +1,4 @@
-# th2 check1 (4.2.1)
+# th2 check1 (4.3.0)
 
 ## Overview
 
@@ -96,6 +96,7 @@ spec:
     time-precision: 'PT0.000000001S'
     decimal-precision: '0.00001'
     enable-checkpoint-events-publication: true
+    rules-execution-threads: 1
   type: th2-check1
   pins:
     - name: server
@@ -138,7 +139,8 @@ This block describes the configuration for check1.
   "time-precision": "PT0.000000001S",
   "decimal-precision": 0.00001,
   "check-null-value-as-empty": false,
-  "enable-checkpoint-events-publication": true
+  "enable-checkpoint-events-publication": true,
+  "rules-execution-threads": 1
 }
 ```
 
@@ -196,6 +198,13 @@ Enables event publication for each stream that was added into checkpoint.
 Otherwise, only top events with attached messages will be published.
 _Enabled by default._
 
+#### rules-execution-threads
+
+Configures number of threads for rules execution. 
+This option can help to increase performance when you are going to calculate heavy rules, and you haven't got strict CPU limitation,
+otherwise use `1` thread for rule execution.
+The default value is `1`
+
 ## Required pins
 
 The Check1 component has two types of pin:
@@ -241,6 +250,14 @@ The `th2_check1_actual_cache_number` metric separate messages with three labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 4.3.0
+
+#### Added:
++ Configure number of threads for rules execution. Parameter `rules-execution-threads` 
+
+#### Merged:
++ Changes from 3.10.0 version
 
 ### 4.2.1
 

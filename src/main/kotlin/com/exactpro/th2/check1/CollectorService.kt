@@ -23,6 +23,7 @@ import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
 import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.RuleFactory
+import com.exactpro.th2.check1.utils.ExecutorPool
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.ConnectionID
@@ -40,24 +41,20 @@ import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMess
 import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
-import com.exactpro.th2.common.utils.shutdownGracefully
 import com.fasterxml.jackson.core.JsonProcessingException
-import com.google.common.util.concurrent.ThreadFactoryBuilder
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
 import mu.KotlinLogging
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import java.util.concurrent.ForkJoinPool
-import java.util.concurrent.TimeUnit
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 
 class CollectorService(
     protoMessageRouter: MessageRouter<MessageBatch>,
-   transportMessageRouter: MessageRouter<GroupBatch>, private val eventBatchRouter: MessageRouter<EventBatch>,
+    transportMessageRouter: MessageRouter<GroupBatch>,
+    private val eventBatchRouter: MessageRouter<EventBatch>,
     private val configuration: Check1Configuration,
 ) {
 
@@ -76,9 +73,7 @@ class CollectorService(
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
     private val defaultAutoSilenceCheck: Boolean = configuration.isAutoSilenceCheckAfterSequenceRule
-    private val commonRuleExecutor: ExecutorService = Executors.newSingleThreadExecutor(
-        ThreadFactoryBuilder().setNameFormat("rule-executor-%d").build()
-    )
+    private val ruleExecutorPool = ExecutorPool("rule-executor", configuration.rulesExecutionThreads)
     private var ruleFactory: RuleFactory
 
     init {
@@ -181,7 +176,7 @@ class CollectorService(
         } else {
             checkpoint
         }
-        value?.subscribeNextTask(this) ?: begin(realCheckpoint, commonRuleExecutor)
+        value?.subscribeNextTask(this) ?: begin(realCheckpoint, ruleExecutorPool.get())
     }
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
@@ -265,7 +260,7 @@ class CollectorService(
             mqSubject.onComplete()
         }
         mqSubject.onComplete()
-        commonRuleExecutor.shutdownGracefully(10, TimeUnit.SECONDS)
+        ruleExecutorPool.close()
     }
 
     private fun publishCheckpoint(request: CheckpointRequestOrBuilder, checkpoint: Checkpoint, event: Event) {
