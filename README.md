@@ -256,6 +256,11 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 #### Added:
 + Configure number of threads for rules execution. Parameter `rules-execution-threads` 
 
+#### Updated:
++ common: `5.6.0-dev`
++ grpc-check1: `4.3.0-dev`
++ rxjava: `2.2.21`
+
 #### Merged:
 + Changes from 3.10.0 version
 
