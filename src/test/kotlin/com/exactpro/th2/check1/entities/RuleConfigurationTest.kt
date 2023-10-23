@@ -27,6 +27,7 @@ class RuleConfigurationTest {
                     TaskTimeout(0, 0), null, Duration.ofSeconds(-1),
                     0.005,
                     1,
+                    true,
                     true
             )
         }
@@ -40,6 +41,7 @@ class RuleConfigurationTest {
                     TaskTimeout(0, 0), null, Duration.ofSeconds(1),
                     -0.005,
                     1,
+                    true,
                     true
             )
         }
@@ -57,6 +59,7 @@ class RuleConfigurationTest {
                     Duration.ofSeconds(1),
                     0.005,
                     maxEventBatchContentSize,
+                    true,
                     true
             )
         }
@@ -74,6 +77,7 @@ class RuleConfigurationTest {
                     Duration.ofSeconds(1),
                     0.005,
                     1,
+                    true,
                     true
             )
         }

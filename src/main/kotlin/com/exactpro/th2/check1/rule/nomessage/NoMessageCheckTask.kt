@@ -43,53 +43,71 @@ class NoMessageCheckTask(
     eventBatchRouter: MessageRouter<EventBatch>
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
-    private val messagePreFilter = SailfishFilter(
-        PROTO_CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
-        protoPreMessageFilter.toCompareSettings()
-    )
-
-    private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
-        SailfishFilter(
-            PROTO_CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
-            it.toComparisonSettings()
-        )
+    protected class Refs(
+        rootEvent: Event,
+        val protoPreMessageFilter: RootMessageFilter,
+        val messagePreFilter: SailfishFilter,
+        val metadataPreFilter: SailfishFilter?,
+    ) : AbstractCheckTask.Refs(rootEvent) {
+        val preFilterEvent: Event by lazy {
+            Event.start()
+                .type("preFiltering")
+                .bodyData(protoPreMessageFilter.toTreeTable())
+        }
+        val resultEvent: Event by lazy {
+            Event.start()
+                .type("noMessagesCheckResult")
+        }
     }
 
-    private lateinit var preFilterEvent: Event
-    private lateinit var resultEvent: Event
+    override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
+        Refs(
+            rootEvent = createRootEvent(),
+            protoPreMessageFilter = protoPreFilter.toRootMessageFilter(),
+            messagePreFilter = SailfishFilter(
+                PROTO_CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+                protoPreMessageFilter.toCompareSettings()
+            ),
+            metadataPreFilter = protoPreMessageFilter.metadataFilterOrNull()?.let {
+                SailfishFilter(
+                    PROTO_CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                    it.toComparisonSettings()
+                )
+            }
+        )
+    })
+
+    private val refs get() = refsKeeper.refs
 
     private var extraMessagesCounter: Int = 0
 
-
-    override fun onStart() {
-        super.onStart()
-        preFilterEvent = Event.start()
-            .type("preFiltering")
-            .bodyData(protoPreMessageFilter.toTreeTable())
-        rootEvent.addSubEvent(preFilterEvent)
-        resultEvent = Event.start()
-            .type("noMessagesCheckResult")
-        rootEvent.addSubEvent(resultEvent)
+    override fun onStartInit() {
+        with(refs) {
+            rootEvent.addSubEvent(preFilterEvent)
+            rootEvent.addSubEvent(resultEvent)
+        }
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
         preFilterBy(
             this,
-            protoPreMessageFilter,
-            messagePreFilter,
-            metadataPreFilter,
+            refs.protoPreMessageFilter,
+            refs.messagePreFilter,
+            refs.metadataPreFilter,
             LOGGER
         ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
-                preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(holderActual.id)
+                refs.preFilterEvent.appendEventsWithVerification(preFilterContainer)
+                refs.preFilterEvent.messageID(holderActual.id)
             }
         }
 
     override fun name(): String = "No message check"
 
     override fun type(): String = "noMessageCheck"
+
+    override val errorEventOnTimeout: Boolean
+        get() = false
 
     override fun setup(rootEvent: Event) {
         rootEvent.bodyData(EventUtils.createMessageBean("No message check rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)" }}"))
@@ -98,17 +116,17 @@ class NoMessageCheckTask(
     override fun onNext(messageContainer: MessageContainer) {
         messageContainer.messageHolder.apply {
             extraMessagesCounter++
-            resultEvent.messageID(id)
+            refs.resultEvent.messageID(id)
         }
     }
 
     override fun completeEvent(taskState: State) {
-        preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
+        refs.preFilterEvent.name("Prefilter: $extraMessagesCounter messages were filtered.")
 
         if (extraMessagesCounter == 0) {
-            resultEvent.status(Event.Status.PASSED).name("Check passed")
+            refs.resultEvent.status(Event.Status.PASSED).name("Check passed")
         } else {
-            resultEvent.status(Event.Status.FAILED)
+            refs.resultEvent.status(Event.Status.FAILED)
                 .name("Check failed: $extraMessagesCounter extra messages were found.")
         }
 
@@ -119,7 +137,7 @@ class NoMessageCheckTask(
             if (taskState != State.TIMEOUT || !isCheckpointLastReceivedMessage()) {
                 executionStopEvent.status(Event.Status.FAILED)
             }
-            resultEvent.addSubEvent(executionStopEvent)
+            refs.resultEvent.addSubEvent(executionStopEvent)
         }
     }
 }

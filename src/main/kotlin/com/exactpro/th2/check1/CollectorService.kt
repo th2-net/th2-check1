@@ -23,6 +23,7 @@ import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
 import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.RuleFactory
+import com.exactpro.th2.check1.utils.ExecutorPool
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.ConnectionID
@@ -30,6 +31,7 @@ import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
@@ -40,10 +42,9 @@ import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.fasterxml.jackson.core.JsonProcessingException
-import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
-import org.slf4j.LoggerFactory
+import mu.KotlinLogging
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
@@ -54,10 +55,10 @@ class CollectorService(
     protoMessageRouter: MessageRouter<MessageBatch>,
     transportMessageRouter: MessageRouter<GroupBatch>,
     private val eventBatchRouter: MessageRouter<EventBatch>,
-    configuration: Check1Configuration
+    private val configuration: Check1Configuration,
 ) {
 
-    private val logger = LoggerFactory.getLogger(javaClass.name + '@' + hashCode())
+    private val logger = KotlinLogging.logger(javaClass.name + '@' + hashCode())
 
     /**
      * Queue name to subscriber. Messages with different connectivity can be transferred with one queue.
@@ -72,7 +73,7 @@ class CollectorService(
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
     private val defaultAutoSilenceCheck: Boolean = configuration.isAutoSilenceCheckAfterSequenceRule
-
+    private val ruleExecutorPool = ExecutorPool("rule-executor", configuration.rulesExecutionThreads)
     private var ruleFactory: RuleFactory
 
     init {
@@ -87,7 +88,7 @@ class CollectorService(
                 }
             }))
         }.onFailure {
-            logger.warn("Can not subscribe for listening protobuf messages", it)
+            logger.warn(it) {"Can not subscribe for listening protobuf messages" }
         }.getOrNull()
         transportSubscriberMonitor = runCatching {
             checkNotNull(transportMessageRouter.subscribeAll({ _: DeliveryMetadata, batch: GroupBatch ->
@@ -103,7 +104,7 @@ class CollectorService(
                     }
             }))
         }.onFailure {
-            logger.warn("Can not subscribe for listening transport messages", it)
+            logger.warn(it) {"Can not subscribe for listening transport messages" }
         }.getOrNull()
 
         if (protoSubscriberMonitor == null && transportSubscriberMonitor == null) {
@@ -175,7 +176,7 @@ class CollectorService(
         } else {
             checkpoint
         }
-        value?.subscribeNextTask(this) ?: begin(realCheckpoint)
+        value?.subscribeNextTask(this) ?: begin(realCheckpoint, ruleExecutorPool.get())
     }
 
     private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
@@ -210,14 +211,13 @@ class CollectorService(
             val endTime = task.endTime
             when {
                 !olderThan(now, delta, unit, endTime) -> false
-                task.tryShutdownExecutor() -> {
-                    logger.info("Removed task ${task.description} ($endTime) from tasks map")
-                    true
-                }
-
                 else -> {
-                    logger.warn("Task ${task.description} can't be removed because it has a continuation")
-                    false
+                    !task.hasNextRule().also { canBeRemoved ->
+                        when {
+                            canBeRemoved -> logger.info { "Removed task ${task.description} ($endTime) from tasks map" }
+                                else -> logger.debug { "Task ${task.description} can't be removed because it has a continuation" }
+                        }
+                    }
                 }
             }
         }
@@ -228,68 +228,78 @@ class CollectorService(
 
     @Throws(JsonProcessingException::class)
     private fun sendEvents(parentEventID: EventID, event: Event) {
-        logger.debug("Sending event thee id '{}' parent id '{}'", event.id, parentEventID)
+        logger.debug { "Sending event thee id '${event.id}' parent id '${parentEventID.toJson()}'" }
 
-        val batch = EventBatch.newBuilder()
-            .setParentEventId(parentEventID)
-            .addAllEvents(event.toListProto(parentEventID))
-            .build()
+        val batch = event.toBatchProto(parentEventID)
 
         ForkJoinPool.commonPool().execute {
             try {
                 eventBatchRouter.send(batch, "publish", "event")
-                if (logger.isDebugEnabled) {
-                    logger.debug("Sent event batch '{}'", shortDebugString(batch))
-                }
+                logger.debug { "Sent event batch '${batch.toJson()}'" }
             } catch (e: Exception) {
-                logger.error("Can not send event batch '{}'", shortDebugString(batch), e)
+                logger.error(e) { "Can not send event batch '${batch.toJson()}'" }
             }
         }
     }
 
     fun createCheckpoint(request: CheckpointRequestOrBuilder): Checkpoint {
-        val rootEvent = Event.start()
-            .name("Checkpoint")
-            .type("Checkpoint")
-            .description(request.description)
-        return try {
-            val checkpoint = checkpointSubscriber.createCheckpoint()
-            rootEvent.endTimestamp()
-                .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
-            checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
-                val messageID = sessionKey.toMessageID(checkpointData)
-                rootEvent.messageID(messageID)
-                    .addSubEventWithSamePeriod()
-                    .name("Checkpoint for book name '${sessionKey.bookName}', session alias '${sessionKey.sessionAlias}', direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
-                    .type("Checkpoint for session")
-                    .messageID(messageID)
-            }
-            checkpoint
-        } finally {
-            try {
-                if (request.hasParentEventId()) {
-                    sendEvents(request.parentEventId, rootEvent)
-                } else {
-                    logger.warn("Parent id missed in request")
-                }
-            } catch (e: Exception) {
-                logger.error(
-                    "Sending events '{}' with a parent '{}' failed ",
-                    rootEvent, request.parentEventId, e
-                )
-            }
-        }
+        val event: Event = Event.start()
+        val checkpoint = checkpointSubscriber.createCheckpoint()
+        publishCheckpoint(request, checkpoint, event)
+        return checkpoint
     }
 
     fun close() {
         protoSubscriberMonitor?.let {
             runCatching(protoSubscriberMonitor::unsubscribe)
-                .onFailure { logger.error("Close protobuf subscriber failure", it) }
+                .onFailure { logger.error(it) { "Close protobuf subscriber failure" } }
         }
         transportSubscriberMonitor?.let {
             runCatching(transportSubscriberMonitor::unsubscribe)
-                .onFailure { logger.error("Close transport subscriber failure", it) }
+                .onFailure { logger.error(it) { "Close transport subscriber failure" } }
             mqSubject.onComplete()
+        }
+        mqSubject.onComplete()
+        ruleExecutorPool.dispose()
+    }
+
+    private fun publishCheckpoint(request: CheckpointRequestOrBuilder, checkpoint: Checkpoint, event: Event) {
+        if (!request.hasParentEventId()) {
+            logger.warn { "Parent id missed in request ${request.toJson()}" }
+            return
+        }
+        val rootEvent: Event = event
+            .name("Checkpoint")
+            .type("Checkpoint")
+            .description(request.description)
+            .endTimestamp()
+            .bodyData(EventUtils.createMessageBean("Checkpoint id '${checkpoint.id}'"))
+        try {
+            if (!configuration.enableCheckpointEventsPublication) {
+                rootEvent.bodyData(EventUtils.createMessageBean("Checkpoints publication is disabled. Check the component configuration to enable it"))
+            }
+            checkpoint.sessionKeyToCheckpointData.forEach { (sessionKey: SessionKey, checkpointData: CheckpointData) ->
+                val messageID = sessionKey.toMessageID(checkpointData)
+                rootEvent.messageID(messageID)
+                if (configuration.enableCheckpointEventsPublication) {
+                    rootEvent.addSubEventWithSamePeriod()
+                        .name("Checkpoint for book name '${sessionKey.bookName}', session alias '${sessionKey.sessionAlias}', direction '${sessionKey.direction}' sequence '$checkpointData.sequence'")
+                        .type("Checkpoint for session")
+                        .messageID(messageID)
+                }
+            }
+        } finally {
+            try {
+                if (request.hasParentEventId()) {
+                    sendEvents(request.parentEventId, rootEvent)
+                } else {
+                    logger.warn {"Parent id missed in request" }
+                }
+            } catch (e: Exception) {
+                logger.error(e) {
+                    "Sending events '$rootEvent' with a parent '${request.parentEventId.toJson()}' failed "
+                }
+            }
         }
     }
 

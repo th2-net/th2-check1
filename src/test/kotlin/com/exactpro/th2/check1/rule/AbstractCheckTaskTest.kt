@@ -211,7 +211,8 @@ abstract class AbstractCheckTaskTest {
             configuration.timePrecision,
             configuration.decimalPrecision,
             maxEventBatchContentSize,
-            true
+            true,
+                true
         )
     }
 

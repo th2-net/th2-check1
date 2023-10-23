@@ -98,8 +98,8 @@ class TestChain : AbstractCheckTaskTest() {
 
         val task = sequenceCheckRuleTask(listOf(3, 4), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
-        assertEquals(8, eventList.size)
-        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(9, eventList.size)
+        assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(4, eventList.filter { it.status == FAILED }.size)
 
         sequenceCheckRuleTask(listOf(1, 2), eventID, streams).also { task.subscribeNextTask(it) }
@@ -114,8 +114,8 @@ class TestChain : AbstractCheckTaskTest() {
 
         val task = sequenceCheckRuleTask(listOf(1, 4), eventID, streams).also { it.begin() }
         var eventList = awaitEventBatchAndGetEvents(6, 6)
-        assertEquals(9, eventList.size)
-        assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(10, eventList.size)
+        assertEquals(6, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(4, eventList.filter { it.status == FAILED }.size)
 
         sequenceCheckRuleTask(listOf(2, 3), eventID, streams).also { task.subscribeNextTask(it) }
@@ -139,8 +139,8 @@ class TestChain : AbstractCheckTaskTest() {
         task.begin()
 
         val eventList = awaitEventBatchRequest(1000L, 4 * 2).flatMap(EventBatch::getEventsList)
-        assertEquals(4 * 3, eventList.size)
-        assertEquals(4 * 3, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(4 * 4, eventList.size)
+        assertEquals(4 * 4, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(
             listOf(1L, 2L, 3L, 4L),
             eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList)
@@ -151,7 +151,7 @@ class TestChain : AbstractCheckTaskTest() {
     @Test
     fun `sequence rules - untrusted execution`() {
         val checkpointTimestamp = Instant.now()
-        val streams = createStreams(messages = (1..5L).map {
+        val streams = createStreams(messages = (2..6L).map {
             ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
@@ -164,11 +164,11 @@ class TestChain : AbstractCheckTaskTest() {
         })
 
         val task = sequenceCheckRuleTask(
-            listOf(1, 2),
+            listOf(2, 3),
             eventID,
             streams,
             taskTimeout = TaskTimeout(2000L, 500)
-        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 1)) }
         var eventsList = awaitEventBatchAndGetEvents(4, 4)
         assertAll({
             val rootEvent = eventsList.first()
@@ -177,7 +177,7 @@ class TestChain : AbstractCheckTaskTest() {
         })
 
         sequenceCheckRuleTask(
-            listOf(3, 4),
+            listOf(4, 5),
             eventID,
             streams,
             taskTimeout = TaskTimeout(2000L, 1500L)
@@ -189,7 +189,7 @@ class TestChain : AbstractCheckTaskTest() {
     @Test
     fun `no messages sequence rules - untrusted execution`() {
         val checkpointTimestamp = Instant.now()
-        val streams = createStreams(messages = (1..5L).map {
+        val streams = createStreams(messages = (2..6L).map {
             ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
@@ -206,7 +206,7 @@ class TestChain : AbstractCheckTaskTest() {
             streams,
             taskTimeout = TaskTimeout(2000L, 500),
             preFilterParam = createPreFilter("E", "5")
-        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 1)) }
         var eventsList = awaitEventBatchAndGetEvents(2, 2)
         assertAll({
             val rootEvent = eventsList.first()
@@ -227,7 +227,7 @@ class TestChain : AbstractCheckTaskTest() {
     @Test
     fun `simple rules - ignored untrusted execution`() {
         val checkpointTimestamp = Instant.now()
-        val streams = createStreams(messages = (1..5L).map {
+        val streams = createStreams(messages = (2..6L).map {
             ProtoMessageHolder(
                 constructProtoMessage(it, timestamp = getProtoTimestamp(checkpointTimestamp, it * 1000))
                     .putAllFields(
@@ -241,7 +241,7 @@ class TestChain : AbstractCheckTaskTest() {
 
         val task = checkRuleTask(
             1, eventID, streams, taskTimeout = TaskTimeout(2000L, 500)
-        ).also { it.begin(createCheckpoint(checkpointTimestamp, 0)) }
+        ).also { it.begin(createCheckpoint(checkpointTimestamp, 1)) }
         var eventsList = awaitEventBatchAndGetEvents(2, 2)
         assertAll({
             val rootEvent = eventsList.first()
@@ -249,13 +249,13 @@ class TestChain : AbstractCheckTaskTest() {
             assertTrue(rootEvent.attachedMessageIdsCount == 1)
         })
 
-        checkRuleTask(3, eventID, streams).also { task.subscribeNextTask(it) }
+        checkRuleTask(4, eventID, streams).also { task.subscribeNextTask(it) }
         eventsList = awaitEventBatchAndGetEvents(4, 2)
         assertAll({
             val rootEvent = eventsList.first()
             assertEquals(FAILED, rootEvent.status)
             assertEquals(3, rootEvent.attachedMessageIdsCount)
-            assertEquals(1, eventsList[2].attachedMessageIdsCount)
+            assertEquals(1, eventsList.single { it.type == "Verification" }.attachedMessageIdsCount)
             assertEquals(FAILED, eventsList.last().status)
         })
     }
@@ -265,8 +265,8 @@ class TestChain : AbstractCheckTaskTest() {
         awaitEventBatchRequest(1000L, times).drop(times - last).flatMap(EventBatch::getEventsList)
 
     private fun checkSimpleVerifySuccess(eventList: List<Event>, sequence: Long) {
-        assertEquals(3, eventList.size)
-        assertEquals(3, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(4, eventList.size)
+        assertEquals(4, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(
             listOf(sequence),
             eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList)
@@ -275,14 +275,14 @@ class TestChain : AbstractCheckTaskTest() {
     }
 
     private fun checkSimpleVerifyFailure(eventList: List<Event>) {
-        assertEquals(3, eventList.size)
-        assertEquals(1, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(4, eventList.size)
+        assertEquals(2, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(2, eventList.filter { it.status == FAILED }.size)
     }
 
     private fun checkSequenceVerifySuccess(eventList: List<Event>, sequences: List<Long>) {
-        assertEquals(8, eventList.size)
-        assertEquals(8, eventList.filter { it.status == SUCCESS }.size)
+        assertEquals(9, eventList.size)
+        assertEquals(9, eventList.filter { it.status == SUCCESS }.size)
         assertEquals(sequences, eventList
             .dropWhile { it.type != CHECK_MESSAGES_TYPE } // Skip prefilter
             .filter { it.type == VERIFICATION_TYPE }
@@ -389,6 +389,6 @@ class TestChain : AbstractCheckTaskTest() {
         private const val KEY_FIELD = "key"
         private const val NOT_KEY_FIELD = "not_key"
         private const val UNTRUSTED_EXECUTION_EVENT_NAME: String =
-            "The current check is untrusted because the start point of the check interval has been selected approximately"
+            "The current check is untrusted because previous rule in the chain started from approximate start point"
     }
 }

@@ -84,7 +84,7 @@ public class VerificationUtil {
     ) {
         if (value.hasMessageFilter()) {
             parent.add(fieldName, toMetaContainer(value.getMessageFilter(), listItemAsSeparate));
-        } else if (value.hasListFilter() && value.getListFilter().getValues(0).hasMessageFilter()) {
+        } else if (value.hasListFilter() && containsMessageFilter(value.getListFilter())) {
             if (listItemAsSeparate) {
                 convertListAsSeparateContainers(parent, fieldName, value.getListFilter());
             } else {
@@ -116,5 +116,9 @@ public class VerificationUtil {
             }
         }
         parent.add(fieldName, result);
+    }
+
+    private static boolean containsMessageFilter(ListValueFilter listFilter) {
+        return listFilter.getValuesCount() > 0 && listFilter.getValues(0).hasMessageFilter();
     }
 }

@@ -196,8 +196,8 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:4.5.0')
-    implementation 'com.exactpro.th2:grpc-check1:4.2.0-dev'
-    implementation 'com.exactpro.th2:common:5.4.0-dev'
+    implementation 'com.exactpro.th2:grpc-check1:4.3.0-sync-+'
+    implementation 'com.exactpro.th2:common:5.6.0-dev'
     implementation 'com.exactpro.th2:common-utils:2.2.0-dev'
     implementation('com.exactpro.th2:sailfish-utils:4.1.1-dev') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
@@ -212,7 +212,7 @@ dependencies {
         exclude group: 'com.exactpro.mina', module: 'apache-mina-core' // because of the vulnerability
     }
 
-    implementation "io.reactivex.rxjava2:rxjava:2.2.19" // https://github.com/salesforce/reactive-grpc/issues/202
+    implementation "io.reactivex.rxjava2:rxjava:2.2.21" // https://github.com/salesforce/reactive-grpc/issues/202
 
     implementation('io.prometheus:simpleclient') {
         because('metrics from messages and rules')
@@ -229,13 +229,13 @@ test {
 }
 
 application {
-    mainClassName 'com.exactpro.th2.check1.Check1Main'
+    mainClass.set('com.exactpro.th2.check1.Check1Main')
 }
 
 applicationName = 'service'
 
 distTar {
-    archiveName "${applicationName}.tar"
+    archiveFileName.set("${applicationName}.tar")
 }
 
 dockerPrepare {

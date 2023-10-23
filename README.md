@@ -1,4 +1,4 @@
-# th2 check1 (4.2.1)
+# th2 check1 (4.3.0)
 
 ## Overview
 
@@ -95,6 +95,8 @@ spec:
     auto-silence-check-after-sequence-rule: false
     time-precision: 'PT0.000000001S'
     decimal-precision: '0.00001'
+    enable-checkpoint-events-publication: true
+    rules-execution-threads: 1
   type: th2-check1
   pins:
     - name: server
@@ -136,7 +138,9 @@ This block describes the configuration for check1.
   "auto-silence-check-after-sequence-rule": false,
   "time-precision": "PT0.000000001S",
   "decimal-precision": 0.00001,
-  "check-null-value-as-empty": false
+  "check-null-value-as-empty": false,
+  "enable-checkpoint-events-publication": true,
+  "rules-execution-threads": 1
 }
 ```
 
@@ -188,6 +192,19 @@ default, this parameter is set to `false`. For example, if the `checkNullValueAs
 
 + `true`, then `NULL_VALUE` is equal to `EMPTY`, otherwise `NULL_VALUE` is equal to `NOT_EMPTY`
 
+#### enable-checkpoint-events-publication
+
+Enables event publication for each stream that was added into checkpoint.
+Otherwise, only top events with attached messages will be published.
+_Enabled by default._
+
+#### rules-execution-threads
+
+Configures number of threads for rules execution. 
+This option can help to increase performance when you are going to calculate heavy rules, and you haven't got strict CPU limitation,
+otherwise use `1` thread for rule execution.
+The default value is `1`
+
 ## Required pins
 
 The Check1 component has two types of pin:
@@ -233,6 +250,14 @@ The `th2_check1_actual_cache_number` metric separate messages with three labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 4.3.0
+
+#### Added:
++ Configure number of threads for rules execution. Parameter `rules-execution-threads` 
+
+#### Merged:
++ Changes from 3.10.0 version
 
 ### 4.2.1
 
@@ -325,13 +350,19 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Migrated `sailfish-utils` version from `3.12.2` to `3.14.0`
     + sailfish updated to 3.3.54
 
-### 3.9.1
+### 3.10.0
+
+#### Added:
++ Support for disabling of order verification for simple collection
++ Switch for events publication in checkpoint request. Parameter `enable-checkpoint-events-publication` should be used for that.
 
 #### Changed:
 
 + Migrated `sailfish-utils` version from `3.12.2` to `3.12.3`
     + Improved condition output format for `EQ_PRECISION`, `WILDCARD`, `LIKE`, `IN`, `MORE`, `LESS` operations and their
       negative versions
++ Changed the way the check1 works with threads internally.
+  Now it uses a common executor for running check rules instead of creating an executor per each rule
 
 ### 3.9.0
 

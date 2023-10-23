@@ -53,6 +53,8 @@ import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import com.exactpro.th2.common.message.toJson
+import org.junit.jupiter.api.Assertions
 
 class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
@@ -147,6 +149,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
         /*
             checkSequenceRule
+              ruleStartPoint
               preFiltering
                 Verification x 3
               checkMessages
@@ -175,8 +178,13 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 assertTrue(getEventsList().all { VERIFICATION_TYPE == it.type })
             }
             with(batchRequest[5]) {
-                assertEquals(1, eventsCount)
-                assertEquals("checkSequence", getEvents(0).type)
+                assertEquals(2, eventsCount)
+                Assertions.assertEquals(1, eventsList.count { it.type == "checkSequence" }) {
+                    "unexpected count of \"checkSequence\" events: ${eventsList.joinToString { it.toJson() }}"
+                }
+                Assertions.assertEquals(1, eventsList.count { it.type == "ruleStartPoint" }) {
+                    "unexpected count of \"ruleStartPoint\" events: ${eventsList.joinToString { it.toJson() }}"
+                }
             }
         }, {
             val checkedMessages =
@@ -385,21 +393,6 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messagesWithKeyFields: List<MessageHolder> = listOf(
             ProtoMessageHolder(
                 constructProtoMessage(
-                    0,
-                    SESSION_ALIAS,
-                    MESSAGE_TYPE,
-                    timestamp = getProtoTimestamp(checkpointTimestamp, 100)
-                )
-                    .putAllFields(
-                        mapOf(
-                            "A" to Value.newBuilder().setSimpleValue("42").build(),
-                            "B" to Value.newBuilder().setSimpleValue("AAA").build()
-                        )
-                    )
-                    .build()
-            ),
-            ProtoMessageHolder(
-                constructProtoMessage(
                     1,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
@@ -418,7 +411,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     2,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
-                    timestamp = getProtoTimestamp(checkpointTimestamp, 200)
+                    timestamp = getProtoTimestamp(checkpointTimestamp, 100)
                 )
                     .putAllFields(
                         mapOf(
@@ -431,6 +424,21 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             ProtoMessageHolder(
                 constructProtoMessage(
                     3,
+                    SESSION_ALIAS,
+                    MESSAGE_TYPE,
+                    timestamp = getProtoTimestamp(checkpointTimestamp, 200)
+                )
+                    .putAllFields(
+                        mapOf(
+                            "A" to Value.newBuilder().setSimpleValue("42").build(),
+                            "B" to Value.newBuilder().setSimpleValue("AAA").build()
+                        )
+                    )
+                    .build()
+            ),
+            ProtoMessageHolder(
+                constructProtoMessage(
+                    4,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 300)
@@ -474,7 +482,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             true,
             filtersParam = messageFilters,
             taskTimeout = TaskTimeout(5000L, 500L)
-        ).begin(createCheckpoint(checkpointTimestamp, 0))
+        ).begin(createCheckpoint(checkpointTimestamp, 1))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -482,7 +490,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         assertAll({
             val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
             assertEquals(3, rootEvent.attachedMessageIdsCount)
-            assertEquals(listOf(1L, 2L, 3L), rootEvent.attachedMessageIdsList.map { it.sequence })
+            assertEquals(listOf(2L, 3L, 4L), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val checkedMessages =
                 assertNotNull(eventsList.find { it.type == CHECK_MESSAGES_TYPE }, "Cannot find checkMessages event")
@@ -490,7 +498,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             assertEquals(3, verifications.size, "Unexpected verifications count: $verifications")
             assertTrue("Some verifications are not success: $verifications") { verifications.all { it.status == EventStatus.SUCCESS } }
             assertEquals(
-                listOf(1L, 2L, 3L),
+                listOf(2L, 3L, 4L),
                 verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
         }, {
             assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
@@ -503,7 +511,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messagesWithKeyFields: List<MessageHolder> = listOf(
             ProtoMessageHolder(
                 constructProtoMessage(
-                    0,
+                    1,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 100)
@@ -518,7 +526,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             ),
             ProtoMessageHolder(
                 constructProtoMessage(
-                    1,
+                    2,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 500)
@@ -533,7 +541,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             ),
             ProtoMessageHolder(
                 constructProtoMessage(
-                    2,
+                    3,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 600)
@@ -548,7 +556,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             ),
             ProtoMessageHolder(
                 constructProtoMessage(
-                    3,
+                    4,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 700)
@@ -587,7 +595,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             true,
             filtersParam = messageFilters,
             taskTimeout = TaskTimeout(5000L, 500L)
-        ).begin(createCheckpoint(checkpointTimestamp, 0))
+        ).begin(createCheckpoint(checkpointTimestamp, 1))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -595,7 +603,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         assertAll({
             val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
             assertEquals(1, rootEvent.attachedMessageIdsCount)
-            assertEquals(listOf(1L), rootEvent.attachedMessageIdsList.map { it.sequence })
+            assertEquals(listOf(2L), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val checkedMessages =
                 assertNotNull(eventsList.find { it.type == CHECK_MESSAGES_TYPE }, "Cannot find checkMessages event")
@@ -603,7 +611,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             assertEquals(1, verifications.size, "Unexpected verifications count: $verifications")
             assertTrue("Some verifications are not success: $verifications") { verifications.all { it.status == EventStatus.SUCCESS } }
             assertEquals(
-                listOf(1L),
+                listOf(2L),
                 verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
         }, {
             assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
@@ -704,7 +712,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val messagesWithKeyFields: List<MessageHolder> = listOf(
             ProtoMessageHolder(
                 constructProtoMessage(
-                    1,
+                    2,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 500)
@@ -719,7 +727,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             ),
             ProtoMessageHolder(
                 constructProtoMessage(
-                    2,
+                    3,
                     SESSION_ALIAS,
                     MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 600)
@@ -758,7 +766,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             true,
             filtersParam = messageFilters,
             taskTimeout = TaskTimeout(5000L, 500L)
-        ).begin(createCheckpoint(checkpointTimestamp, 0))
+        ).begin(createCheckpoint(checkpointTimestamp, 1))
 
         val batchRequest = awaitEventBatchRequest(1000L, 6)
         val eventsList: List<Event> = batchRequest.flatMap(EventBatch::getEventsList)
@@ -766,7 +774,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         assertAll({
             val rootEvent = assertNotNull(eventsList.find { it.parentId == parentEventID })
             assertEquals(1, rootEvent.attachedMessageIdsCount)
-            assertEquals(listOf(1L), rootEvent.attachedMessageIdsList.map { it.sequence })
+            assertEquals(listOf(2L), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
             val checkedMessages =
                 assertNotNull(eventsList.find { it.type == CHECK_MESSAGES_TYPE }, "Cannot find checkMessages event")
@@ -774,7 +782,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             assertEquals(1, verifications.size, "Unexpected verifications count: $verifications")
             assertTrue("Some verifications are not success: $verifications") { verifications.all { it.status == EventStatus.SUCCESS } }
             assertEquals(
-                listOf(1L),
+                listOf(2L),
                 verifications.flatMap { verification -> verification.attachedMessageIdsList.map { it.sequence } })
         }, {
             assertCheckSequenceStatus(EventStatus.SUCCESS, eventsList) // because all key fields are in a correct order
@@ -1012,7 +1020,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertAll({
-            assertEquals(3, eventList.size)
+            assertEquals(4, eventList.size)
             assertEquals(1, eventList.filter { it.type == "internalError" }.size)
         })
     }
