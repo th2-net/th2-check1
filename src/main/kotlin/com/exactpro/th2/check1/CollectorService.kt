@@ -215,7 +215,7 @@ class CollectorService(
                     !task.hasNextRule().also { canBeRemoved ->
                         when {
                             canBeRemoved -> logger.info { "Removed task ${task.description} ($endTime) from tasks map" }
-                            else -> logger.warn { "Task ${task.description} can't be removed because it has a continuation" }
+                                else -> logger.debug { "Task ${task.description} can't be removed because it has a continuation" }
                         }
                     }
                 }
