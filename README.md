@@ -17,7 +17,7 @@ verification.
 # Verification requests
 
 Available requests are described
-in [this repository](https://gitlab.exactpro.com/vivarium/th2/th2-core-open-source/th2-grpc-check1)
+in [this repository](https://github.com/th2-net/th2-grpc-check1/blob/dev-version-4/src/main/proto/th2_grpc_check1/check1.proto)
 
 - CheckSequenceRuleRequest - prefilters the messages and verify all of them by filter. Order checking configured from
   request. Depending on the request and check1 configuration **SilenceCheckRule** can be added after the
