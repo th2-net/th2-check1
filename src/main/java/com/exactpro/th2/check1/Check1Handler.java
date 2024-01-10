@@ -31,6 +31,8 @@ import com.exactpro.th2.check1.grpc.CheckpointRequest;
 import com.exactpro.th2.check1.grpc.NoMessageCheckResponse;
 import com.exactpro.th2.check1.grpc.NoMessageCheckRequest;
 import com.exactpro.th2.common.grpc.RequestStatus;
+import com.exactpro.th2.check1.grpc.MultiSubmitRulesRequest;
+import com.exactpro.th2.check1.grpc.MultiSubmitRulesResponse;
 
 import io.grpc.stub.StreamObserver;
 
@@ -173,5 +175,30 @@ public class Check1Handler extends Check1ImplBase {
         } finally {
             responseObserver.onCompleted();
         }
+    }
+
+    @Override
+    public void multiSubmitRules(MultiSubmitRulesRequest request, StreamObserver<MultiSubmitRulesResponse> responseObserver) {
+        final var observer = new StreamObserver<CheckSequenceRuleResponse>() {
+            final MultiSubmitRulesResponse.Builder responseBuilder = MultiSubmitRulesResponse.newBuilder();
+
+            @Override
+            public void onNext(CheckSequenceRuleResponse checkSequenceRuleResponse) {
+                responseBuilder.addResponses(checkSequenceRuleResponse);
+            }
+
+            @Override
+            public void onError(Throwable throwable) {}
+
+            @Override
+            public void onCompleted() {}
+        };
+
+        for (var ruleReq: request.getRulesList()) {
+            submitCheckSequenceRule(ruleReq, observer);
+        }
+
+        responseObserver.onNext(observer.responseBuilder.build());
+        responseObserver.onCompleted();
     }
 }

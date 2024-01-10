@@ -196,9 +196,9 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:4.5.0')
-    implementation 'com.exactpro.th2:grpc-check1:4.3.0-dev'
-    implementation 'com.exactpro.th2:common:5.6.0-dev'
-    implementation 'com.exactpro.th2:common-utils:2.2.0-dev'
+    implementation 'com.exactpro.th2:grpc-check1:4.3.0-multisubmit-dv4-7466822347-050e99f-SNAPSHOT'
+    implementation 'com.exactpro.th2:common:5.7.2-dev'
+    implementation 'com.exactpro.th2:common-utils:2.2.2-dev'
     implementation('com.exactpro.th2:sailfish-utils:4.1.1-dev') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
         // because of the vulnerability
@@ -219,7 +219,7 @@ dependencies {
     }
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'
     testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
 }
