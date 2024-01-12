@@ -111,7 +111,11 @@ public class Check1Handler extends Check1ImplBase {
                 if (logger.isInfoEnabled()) {
                     logger.info("Submitting sequence rule for request '" + MessageUtils.toJson(request) + "' started");
                 }
+
+                var start = System.currentTimeMillis();
                 ChainID chainID = collectorService.verifyCheckSequenceRule(request);
+                logger.info("verifyCheckSequenceRule completed in " + (System.currentTimeMillis() - start) + "ms");
+
                 if (logger.isInfoEnabled()) {
                     logger.info("Submitting sequence rule for request '" + request.getDescription() + "' finished");
                 }
@@ -179,26 +183,21 @@ public class Check1Handler extends Check1ImplBase {
 
     @Override
     public void multiSubmitRules(MultiSubmitRulesRequest request, StreamObserver<MultiSubmitRulesResponse> responseObserver) {
-        final var observer = new StreamObserver<CheckSequenceRuleResponse>() {
-            final MultiSubmitRulesResponse.Builder responseBuilder = MultiSubmitRulesResponse.newBuilder();
+        var start = System.currentTimeMillis();
 
-            @Override
-            public void onNext(CheckSequenceRuleResponse checkSequenceRuleResponse) {
-                responseBuilder.addResponses(checkSequenceRuleResponse);
+        final MultiSubmitRulesResponse.Builder responseBuilder = MultiSubmitRulesResponse.newBuilder();
+        try {
+            for (var ruleReq : request.getRulesList()) {
+                collectorService.verifyCheckSequenceRule(ruleReq);
             }
+        } catch (Exception e) {}
 
-            @Override
-            public void onError(Throwable throwable) {}
+        responseBuilder.build();
 
-            @Override
-            public void onCompleted() {}
-        };
-
-        for (var ruleReq: request.getRulesList()) {
-            submitCheckSequenceRule(ruleReq, observer);
-        }
-
-        responseObserver.onNext(observer.responseBuilder.build());
+        logger.info("multiSubmitRules completed in " + (System.currentTimeMillis() - start) + "ms");
+        var resp_start = System.currentTimeMillis();
+        responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();
+        logger.info("multiSubmitRules response completed in: " + (System.currentTimeMillis() - resp_start) + "ms");
     }
 }
