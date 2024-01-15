@@ -220,8 +220,8 @@ dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
-    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit'
-    testImplementation "com.nhaarman.mockitokotlin2:mockito-kotlin:2.2.0"
+    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
+    testImplementation 'org.mockito.kotlin:mockito-kotlin:4.1.0'
 }
 
 test {
