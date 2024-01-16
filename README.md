@@ -1,4 +1,4 @@
-# th2 check1 (4.3.0)
+# th2 check1 (4.4.0)
 
 ## Overview
 
@@ -27,6 +27,7 @@ in [this repository](https://github.com/th2-net/th2-grpc-check1/blob/dev-version
 - CheckRuleRequest - get message filter from request and check it with messages in the cache or await specified time in
   case of empty cache or message absence.
 - NoMessageCheckRequest - prefilters messages and verifies that no other messages have been received.
+- WaitForResult - synchronous request waiting for the result of specified rule during specified timeout
 
 ## Request parameters
 
@@ -45,7 +46,8 @@ in [this repository](https://github.com/th2-net/th2-grpc-check1/blob/dev-version
 * **description** - the description that will be added to the root event produced by the rule
 * **timeout** - defines the allowed timeout for messages matching by real time. If not set the default value from check1
   settings will be taken
-* **message_timeout** - defines the allowed timeout for messages matching by the time they were received.
+* **store_result** - `true` indicates that the rule result should be stored for later request using `WaitForResult` method
+* **message_timeout** - defines the allowed timeout for messages matching by the time they were received
 * **checkpoint** (must be set if `message_timeout` is used and no valid `chain_id` has been provided)
 
 ### CheckRuleRequest
@@ -73,6 +75,13 @@ in [this repository](https://github.com/th2-net/th2-grpc-check1/blob/dev-version
 #### Optional
 
 * **pre_filter** pre-filtering for messages that should not be received.
+
+### WaitForResult
+
+#### Required
+
+* **rule_id** - the id of rule
+* **timeout** - timeout for waiting for result
 
 ## Quick start
 
@@ -251,6 +260,13 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ## Release Notes
 
+### 4.4.0
+
+#### Added:
++ Support for disabling of order verification for simple collection
++ Switch for events publication in checkpoint request. Parameter `enable-checkpoint-events-publication` should be used for that
++ `WaitForResult` method added
+
 ### 4.3.0
 
 #### Added:
@@ -354,12 +370,6 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Migrated `common` version from `3.31.3` to `3.44.0`
 + Migrated `sailfish-utils` version from `3.12.2` to `3.14.0`
     + sailfish updated to 3.3.54
-
-### 3.10.0
-
-#### Added:
-+ Support for disabling of order verification for simple collection
-+ Switch for events publication in checkpoint request. Parameter `enable-checkpoint-events-publication` should be used for that.
 
 #### Changed:
 

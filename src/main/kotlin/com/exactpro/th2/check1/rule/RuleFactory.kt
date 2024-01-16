@@ -1,9 +1,12 @@
 /*
  * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,6 +35,7 @@ import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.schema.message.MessageRouter
@@ -53,7 +57,11 @@ class RuleFactory(
     private val isCheckNullValueAsEmpty = configuration.isCheckNullValueAsEmpty
     private val defaultCheckSimpleCollectionsOrder = configuration.isDefaultCheckSimpleCollectionsOrder
 
-    fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean): CheckRuleTask =
+    fun createCheckRule(
+        request: CheckRuleRequest,
+        isChainIdExist: Boolean,
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
+    ): CheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -82,6 +90,7 @@ class RuleFactory(
                             request.parentEventId,
                             streamObservable,
                             eventBatchRouter,
+                            onTaskFinished
                     )
                 }
                 onErrorEvent {
@@ -91,7 +100,11 @@ class RuleFactory(
                 }
             }
 
-    fun createSequenceCheckRule(request: CheckSequenceRuleRequest, isChainIdExist: Boolean): SequenceCheckRuleTask =
+    fun createSequenceCheckRule(
+        request: CheckSequenceRuleRequest,
+        isChainIdExist: Boolean,
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
+    ): SequenceCheckRuleTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -121,7 +134,8 @@ class RuleFactory(
                             request.checkOrder,
                             request.parentEventId,
                             streamObservable,
-                            eventBatchRouter
+                            eventBatchRouter,
+                            onTaskFinished
                     )
                 }
                 onErrorEvent {
@@ -131,7 +145,11 @@ class RuleFactory(
                 }
             }
 
-    fun createNoMessageCheckRule(request: NoMessageCheckRequest, isChainIdExist: Boolean): NoMessageCheckTask =
+    fun createNoMessageCheckRule(
+        request: NoMessageCheckRequest,
+        isChainIdExist: Boolean,
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
+    ): NoMessageCheckTask =
             ruleCreation(request.parentEventId) {
                 checkAndCreateRule {
                     check(request.hasParentEventId()) { "Parent event id can't be null" }
@@ -158,7 +176,8 @@ class RuleFactory(
                             request.preFilter,
                             parentEventID,
                             streamObservable,
-                            eventBatchRouter
+                            eventBatchRouter,
+                            onTaskFinished
                     )
                 }
                 onErrorEvent {
@@ -170,7 +189,8 @@ class RuleFactory(
 
     fun createSilenceCheck(
         request: CheckSequenceRuleRequest,
-        timeout: Long
+        timeout: Long,
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): SilenceCheckTask {
         return ruleCreation(request.parentEventId) {
             checkAndCreateRule {
@@ -195,7 +215,8 @@ class RuleFactory(
                     sessionKey,
                     request.parentEventId,
                     streamObservable,
-                    eventBatchRouter
+                    eventBatchRouter,
+                    onTaskFinished
                 )
             }
             onErrorEvent {
