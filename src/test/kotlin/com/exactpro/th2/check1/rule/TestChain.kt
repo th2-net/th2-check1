@@ -38,6 +38,7 @@ import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.exactpro.th2.common.value.toValue
+import com.google.protobuf.util.Timestamps
 import io.reactivex.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
@@ -145,10 +146,16 @@ class TestChain : AbstractCheckTaskTest() {
         val eventList = awaitEventBatchRequest(1000L, 4 * 2).flatMap(EventBatch::getEventsList)
         assertEquals(4 * 4, eventList.size)
         assertEquals(4 * 4, eventList.filter { it.status == SUCCESS }.size)
+        // Event publication is done in a separate thread,
+        // so, there is no guarantee that flatted event list will be in the right order.
+        // But we can sort events by timestamp and it should be enough
         assertEquals(
             listOf(1L, 2L, 3L, 4L),
-            eventList.filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList)
+            eventList.asSequence()
+                .sortedWith(compareBy(Timestamps.comparator()) { it.id.startTimestamp })
+                .filter { it.type == VERIFICATION_TYPE }.flatMap(Event::getAttachedMessageIdsList)
                 .map(MessageID::getSequence)
+                .toList()
         )
     }
 
