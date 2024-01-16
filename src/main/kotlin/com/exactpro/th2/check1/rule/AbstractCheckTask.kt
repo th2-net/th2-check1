@@ -91,7 +91,7 @@ abstract class AbstractCheckTask(
 
     protected open class Refs(
         val rootEvent: Event,
-        val onTaskFinished: ((EventStatus) -> Unit)
+        val onTaskFinished: (EventStatus) -> Unit
     )
 
     protected class RefsKeeper<T : Refs>(refs: T) {
@@ -396,7 +396,11 @@ abstract class AbstractCheckTask(
                     (if (lastSequence == DEFAULT_SEQUENCE) "start of cache" else "sequence $lastSequence") +
                     (if (checkpointTimestamp != null && !Timestamp.getDefaultInstance().equals(checkpointTimestamp)) {
                         val instant = checkpointTimestamp.toInstant()
-                        " and expects messages between $instant and ${instant.plusMillis(taskTimeout.messageTimeout)}"
+                        if (taskTimeout.messageTimeout > 0) {
+                            " and expects messages between $instant and ${instant.plusMillis(taskTimeout.messageTimeout)}"
+                        } else {
+                            " and expects messages from $instant until rule is stopped by the timeout"
+                        }
                     } else "")))
             bodyData(createMessageBean("Rule timeout is set to ${taskTimeout.timeout} mls"))
         }
