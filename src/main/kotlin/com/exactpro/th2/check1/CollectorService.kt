@@ -39,7 +39,6 @@ import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.grpc.RequestStatus
-import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
@@ -58,7 +57,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
-import com.exactpro.th2.common.message.toJson
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicLong
@@ -138,13 +136,19 @@ class CollectorService(
         ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter)
     }
 
-    private fun prepareStoringResults(storeResult: Boolean): Triple<Long, CompletableFuture<Pair<EventStatus, Instant>>?, ((EventStatus) -> Unit)> {
+    private data class StoringResult(
+        val id: Long,
+        val resultFuture: CompletableFuture<Pair<EventStatus, Instant>>?,
+        val onTaskFinished: (EventStatus) -> Unit,
+    )
+
+    private fun prepareStoringResults(storeResult: Boolean): StoringResult {
         return if (storeResult) {
             val future = CompletableFuture<Pair<EventStatus, Instant>>()
             val ruleId = ruleIdCounter.incrementAndGet()
-            Triple(ruleId, future) { future.complete(it to Instant.now()) }
+            StoringResult(ruleId, future) { future.complete(it to Instant.now()) }
         } else {
-            Triple(0L, null, AbstractCheckTask.EMPTY_STATUS_CONSUMER)
+            EMPTY_STORING_RESULT
         }
     }
 
@@ -410,4 +414,8 @@ class CollectorService(
         .setSequence(data.sequence)
         .setDirection(direction)
         .build()
+
+    companion object {
+        private val EMPTY_STORING_RESULT = StoringResult(0L, null, AbstractCheckTask.EMPTY_STATUS_CONSUMER)
+    }
 }
