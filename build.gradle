@@ -196,7 +196,7 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:4.5.0')
-    implementation 'com.exactpro.th2:grpc-check1:4.3.0-multisubmit-dv4-7466822347-050e99f-SNAPSHOT'
+    implementation 'com.exactpro.th2:grpc-check1:4.4.0-multisubmit-dv4-7561711435-dd5cc0c-SNAPSHOT'
     implementation 'com.exactpro.th2:common:5.6.0-dev'
     implementation 'com.exactpro.th2:common-utils:2.2.2-dev'
     implementation('com.exactpro.th2:sailfish-utils:4.1.1-dev') {

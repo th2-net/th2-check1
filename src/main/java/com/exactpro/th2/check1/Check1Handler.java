@@ -1,15 +1,19 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1;
 
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
@@ -23,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import com.exactpro.th2.check1.grpc.ChainID;
 import com.exactpro.th2.check1.grpc.CheckpointResponse;
 import com.exactpro.th2.check1.grpc.Check1Grpc.Check1ImplBase;
+import com.exactpro.th2.check1.grpc.RuleResponse;
 import com.exactpro.th2.check1.grpc.CheckRuleRequest;
 import com.exactpro.th2.check1.grpc.CheckRuleResponse;
 import com.exactpro.th2.check1.grpc.CheckSequenceRuleRequest;
@@ -185,19 +190,66 @@ public class Check1Handler extends Check1ImplBase {
     public void multiSubmitRules(MultiSubmitRulesRequest request, StreamObserver<MultiSubmitRulesResponse> responseObserver) {
         var start = System.currentTimeMillis();
 
-        final MultiSubmitRulesResponse.Builder responseBuilder = MultiSubmitRulesResponse.newBuilder();
-        try {
-            for (var ruleReq : request.getRulesList()) {
-                collectorService.verifyCheckSequenceRule(ruleReq);
-            }
-        } catch (Exception e) {}
+        if (logger.isInfoEnabled()) {
+            logger.info("Rules list for request '{}' started", MessageUtils.toJson(request));
+        }
 
-        responseBuilder.build();
+        final boolean isResponseNeeded = !request.getOmitResponse();
+        final MultiSubmitRulesResponse.Builder responseBuilder = MultiSubmitRulesResponse.newBuilder();
+
+        if (!isResponseNeeded) {
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+        }
+
+        for (var ruleReq : request.getRulesList()) {
+            try {
+                final ChainID chainId;
+                if (ruleReq.hasCheckRuleRequest()) {
+                    chainId = collectorService.verifyCheckRule(ruleReq.getCheckRuleRequest());
+                } else if (ruleReq.hasSequenceRule()) {
+                    chainId = collectorService.verifyCheckSequenceRule(ruleReq.getSequenceRule());
+                } else if (ruleReq.hasNoMessageRule()) {
+                    chainId = collectorService.verifyNoMessageCheck(ruleReq.getNoMessageRule());
+                } else {
+                    if (logger.isErrorEnabled()) {
+                        logger.error("Illegal request in MultiSubmitRulesRequest. Request " + MessageUtils.toJson(ruleReq));
+                    }
+
+                    if (isResponseNeeded) {
+                        responseBuilder.addResponses(RuleResponse.newBuilder().setStatus(RequestStatus.newBuilder().setStatus(ERROR)));
+                    }
+                    continue;
+                }
+
+                if (isResponseNeeded) {
+                    responseBuilder.addResponses(RuleResponse.newBuilder().setChainId(chainId).setStatus(RequestStatus.newBuilder().setStatus(SUCCESS)));
+                }
+            } catch (Exception e) {
+                if (logger.isErrorEnabled()) {
+                    logger.error("No message check rule task for request '{}' isn't submitted", MessageUtils.toJson(ruleReq), e);
+                }
+
+                if (isResponseNeeded) {
+                    responseBuilder.addResponses(
+                            RuleResponse.newBuilder().setStatus(
+                                    RequestStatus.newBuilder()
+                                            .setStatus(ERROR)
+                                            .setMessage("Rule rejected by internal process: " + e.getMessage())
+                            )
+                    );
+                }
+            }
+        }
 
         logger.info("multiSubmitRules completed in " + (System.currentTimeMillis() - start) + "ms");
         var resp_start = System.currentTimeMillis();
-        responseObserver.onNext(responseBuilder.build());
-        responseObserver.onCompleted();
+
+        if (isResponseNeeded) {
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+        }
+
         logger.info("multiSubmitRules response completed in: " + (System.currentTimeMillis() - resp_start) + "ms");
     }
 }

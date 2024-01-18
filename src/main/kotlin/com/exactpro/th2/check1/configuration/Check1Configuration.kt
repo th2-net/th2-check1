@@ -1,9 +1,12 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,11 +30,11 @@ class Check1Configuration(
     @field:JsonProperty(value = "cleanup-older-than", defaultValue = "60")
     val cleanupOlderThan: Long = 60L,
 
-    @field:JsonProperty(value = "max-event-batch-content-size", defaultValue = "1048576")
-    val maxEventBatchContentSize: Int = 1048576,
-
     @field:JsonProperty(value = "cleanup-time-unit", defaultValue = "SECONDS")
     val cleanupTimeUnit: ChronoUnit = ChronoUnit.SECONDS,
+
+    @field:JsonProperty(value = "cleanup-interval-millis", defaultValue = "1000")
+    val cleanupIntervalMillis: Long = 1000L,
 
     @field:JsonProperty(value = "rule-execution-timeout", defaultValue = "5000")
     val ruleExecutionTimeout: Long = 5000L,
@@ -61,4 +64,7 @@ class Check1Configuration(
     @field:JsonProperty(value = "rules-execution-threads", defaultValue = "1")
     @field:JsonPropertyDescription("Number of threads for rules execution")
     val rulesExecutionThreads: Int = 1,
+
+    @field:JsonProperty(value = "max-event-batch-content-size", defaultValue = "1048576")
+    val maxEventBatchContentSize: Int = 1048576
 )

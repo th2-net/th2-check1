@@ -1,4 +1,4 @@
-# th2 check1 (4.3.0)
+# th2 check1 (4.4.0)
 
 ## Overview
 
@@ -73,6 +73,11 @@ in [this repository](https://github.com/th2-net/th2-grpc-check1/blob/dev-version
 #### Optional
 
 * **pre_filter** pre-filtering for messages that should not be received.
+
+### MultiSubmitRules
+
+* **rules** - list of rules to submit
+* **omitResponse** - if `true` sends empty response instead of list of individual response for every submitted rule
 
 ## Quick start
 
@@ -251,10 +256,16 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ## Release Notes
 
+### 4.4.0
+
+#### Added:
++ `multiSubmitRules` grpc method (grpc-check1: `4.4.0-dev`)
++ `cleanupIntervalMillis` configuration parameter to specify minimal interval between rules cleanup
+
 ### 4.3.0
 
 #### Added:
-+ Configure number of threads for rules execution. Parameter `rules-execution-threads` 
++ Configure number of threads for rules execution. Parameter `rules-execution-threads`
 
 #### Updated:
 + common: `5.6.0-dev`
