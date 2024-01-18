@@ -196,8 +196,8 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:4.5.0')
-    implementation 'com.exactpro.th2:grpc-check1:4.4.0-multisubmit-dv4-7561711435-dd5cc0c-SNAPSHOT'
-    implementation 'com.exactpro.th2:common:5.6.0-dev'
+    implementation 'com.exactpro.th2:grpc-check1:4.4.0-multisubmit-dv4-7567351808-82885f6-SNAPSHOT'
+    implementation 'com.exactpro.th2:common:5.7.1-dev'
     implementation 'com.exactpro.th2:common-utils:2.2.2-dev'
     implementation('com.exactpro.th2:sailfish-utils:4.1.1-dev') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'

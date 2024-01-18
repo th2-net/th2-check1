@@ -36,8 +36,8 @@ import com.exactpro.th2.check1.grpc.CheckpointRequest;
 import com.exactpro.th2.check1.grpc.NoMessageCheckResponse;
 import com.exactpro.th2.check1.grpc.NoMessageCheckRequest;
 import com.exactpro.th2.common.grpc.RequestStatus;
-import com.exactpro.th2.check1.grpc.MultiSubmitRulesRequest;
-import com.exactpro.th2.check1.grpc.MultiSubmitRulesResponse;
+import com.exactpro.th2.check1.grpc.MultiRulesRequest;
+import com.exactpro.th2.check1.grpc.MultiRulesResponse;
 
 import io.grpc.stub.StreamObserver;
 
@@ -187,15 +187,13 @@ public class Check1Handler extends Check1ImplBase {
     }
 
     @Override
-    public void multiSubmitRules(MultiSubmitRulesRequest request, StreamObserver<MultiSubmitRulesResponse> responseObserver) {
-        var start = System.currentTimeMillis();
-
+    public void submitMultipleRules(MultiRulesRequest request, StreamObserver<MultiRulesResponse> responseObserver) {
         if (logger.isInfoEnabled()) {
             logger.info("Rules list for request '{}' started", MessageUtils.toJson(request));
         }
 
         final boolean isResponseNeeded = !request.getOmitResponse();
-        final MultiSubmitRulesResponse.Builder responseBuilder = MultiSubmitRulesResponse.newBuilder();
+        final MultiRulesResponse.Builder responseBuilder = MultiRulesResponse.newBuilder();
 
         if (!isResponseNeeded) {
             responseObserver.onNext(responseBuilder.build());
@@ -242,14 +240,9 @@ public class Check1Handler extends Check1ImplBase {
             }
         }
 
-        logger.info("multiSubmitRules completed in " + (System.currentTimeMillis() - start) + "ms");
-        var resp_start = System.currentTimeMillis();
-
         if (isResponseNeeded) {
             responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
         }
-
-        logger.info("multiSubmitRules response completed in: " + (System.currentTimeMillis() - resp_start) + "ms");
     }
 }
