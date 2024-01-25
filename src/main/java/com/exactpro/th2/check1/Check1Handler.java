@@ -16,11 +16,13 @@
 
 package com.exactpro.th2.check1;
 
+import static com.exactpro.th2.check1.utils.ProtoMessageUtilsKt.generateChainID;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
 
 import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 import com.exactpro.th2.common.message.MessageUtils;
+import com.google.protobuf.Empty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,9 +119,7 @@ public class Check1Handler extends Check1ImplBase {
                     logger.info("Submitting sequence rule for request '" + MessageUtils.toJson(request) + "' started");
                 }
 
-                var start = System.currentTimeMillis();
                 ChainID chainID = collectorService.verifyCheckSequenceRule(request);
-                logger.info("verifyCheckSequenceRule completed in " + (System.currentTimeMillis() - start) + "ms");
 
                 if (logger.isInfoEnabled()) {
                     logger.info("Submitting sequence rule for request '" + request.getDescription() + "' finished");
@@ -188,47 +188,39 @@ public class Check1Handler extends Check1ImplBase {
 
     @Override
     public void submitMultipleRules(MultiRulesRequest request, StreamObserver<MultiRulesResponse> responseObserver) {
-        if (logger.isInfoEnabled()) {
-            logger.info("Rules list for request '{}' started", MessageUtils.toJson(request));
-        }
+        try {
+            if (logger.isDebugEnabled()) {
+                logger.debug("Rules list for request '{}' started", MessageUtils.toJson(request));
+            }
 
-        final boolean isResponseNeeded = !request.getOmitResponse();
-        final MultiRulesResponse.Builder responseBuilder = MultiRulesResponse.newBuilder();
+            MultiRulesResponse.Builder responseBuilder = MultiRulesResponse.newBuilder();
+            ChainID defaultChainId = request.hasDefaultChain() ? request.getDefaultChain() : generateChainID();
 
-        if (!isResponseNeeded) {
-            responseObserver.onNext(responseBuilder.build());
-            responseObserver.onCompleted();
-        }
+            for (var ruleReq : request.getRulesList()) {
+                try {
+                    final ChainID chainId;
+                    if (ruleReq.hasCheckRuleRequest()) {
+                        chainId = collectorService.verifyCheckRule(ruleReq.getCheckRuleRequest(), defaultChainId);
+                    } else if (ruleReq.hasSequenceRule()) {
+                        chainId = collectorService.verifyCheckSequenceRule(ruleReq.getSequenceRule(), defaultChainId);
+                    } else if (ruleReq.hasNoMessageRule()) {
+                        chainId = collectorService.verifyNoMessageCheck(ruleReq.getNoMessageRule(), defaultChainId);
+                    } else {
+                        if (logger.isErrorEnabled()) {
+                            logger.error("Illegal request in MultiSubmitRulesRequest. Request " + MessageUtils.toJson(ruleReq));
+                        }
 
-        for (var ruleReq : request.getRulesList()) {
-            try {
-                final ChainID chainId;
-                if (ruleReq.hasCheckRuleRequest()) {
-                    chainId = collectorService.verifyCheckRule(ruleReq.getCheckRuleRequest());
-                } else if (ruleReq.hasSequenceRule()) {
-                    chainId = collectorService.verifyCheckSequenceRule(ruleReq.getSequenceRule());
-                } else if (ruleReq.hasNoMessageRule()) {
-                    chainId = collectorService.verifyNoMessageCheck(ruleReq.getNoMessageRule());
-                } else {
-                    if (logger.isErrorEnabled()) {
-                        logger.error("Illegal request in MultiSubmitRulesRequest. Request " + MessageUtils.toJson(ruleReq));
-                    }
-
-                    if (isResponseNeeded) {
                         responseBuilder.addResponses(RuleResponse.newBuilder().setStatus(RequestStatus.newBuilder().setStatus(ERROR)));
+                        continue;
                     }
-                    continue;
-                }
 
-                if (isResponseNeeded) {
                     responseBuilder.addResponses(RuleResponse.newBuilder().setChainId(chainId).setStatus(RequestStatus.newBuilder().setStatus(SUCCESS)));
-                }
-            } catch (Exception e) {
-                if (logger.isErrorEnabled()) {
-                    logger.error("No message check rule task for request '{}' isn't submitted", MessageUtils.toJson(ruleReq), e);
-                }
 
-                if (isResponseNeeded) {
+                } catch (Exception e) {
+                    if (logger.isErrorEnabled()) {
+                        logger.error("No message check rule task for request '{}' isn't submitted", MessageUtils.toJson(ruleReq), e);
+                    }
+
                     responseBuilder.addResponses(
                             RuleResponse.newBuilder().setStatus(
                                     RequestStatus.newBuilder()
@@ -238,11 +230,40 @@ public class Check1Handler extends Check1ImplBase {
                     );
                 }
             }
+
+            responseObserver.onNext(responseBuilder.build());
+        } finally {
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void postMultipleRules(MultiRulesRequest request, StreamObserver<Empty> responseObserver) {
+        responseObserver.onNext(Empty.getDefaultInstance());
+        responseObserver.onCompleted();
+
+        if (logger.isDebugEnabled()) {
+            logger.debug("Rules list for request '{}' started", MessageUtils.toJson(request));
         }
 
-        if (isResponseNeeded) {
-            responseObserver.onNext(responseBuilder.build());
-            responseObserver.onCompleted();
+        ChainID defaultChainId = request.hasDefaultChain() ? request.getDefaultChain() : generateChainID();
+
+        for (var ruleReq: request.getRulesList()) {
+            try {
+                if (ruleReq.hasCheckRuleRequest()) {
+                    collectorService.verifyCheckRule(ruleReq.getCheckRuleRequest(), defaultChainId);
+                } else if (ruleReq.hasSequenceRule()) {
+                    collectorService.verifyCheckSequenceRule(ruleReq.getSequenceRule(), defaultChainId);
+                } else if (ruleReq.hasNoMessageRule()) {
+                    collectorService.verifyNoMessageCheck(ruleReq.getNoMessageRule(), defaultChainId);
+                } else if (logger.isErrorEnabled()) {
+                    logger.error("Illegal request in MultiSubmitRulesRequest. Request " + MessageUtils.toJson(ruleReq));
+                }
+            } catch (Exception e) {
+                if (logger.isErrorEnabled()) {
+                    logger.error("No message check rule task for request '{}' isn't submitted", MessageUtils.toJson(ruleReq), e);
+                }
+            }
         }
     }
 }

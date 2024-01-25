@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -10,6 +10,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.SessionKey
@@ -233,6 +234,7 @@ abstract class AbstractCheckTaskTest {
         const val MESSAGE_TYPE = "TestMsg"
         const val BOOK_NAME = "test_book"
         const val SESSION_ALIAS = "test_session"
+        const val SCOPE = "test_scope"
         const val VERIFICATION_TYPE = "Verification"
         const val ROOT_ID = "root"
     }

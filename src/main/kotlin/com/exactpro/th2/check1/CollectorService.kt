@@ -28,6 +28,7 @@ import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.check1.utils.ExecutorPool
+import com.exactpro.th2.check1.utils.generateChainID
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.ConnectionID
@@ -130,10 +131,11 @@ class CollectorService(
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckRule(request: CheckRuleRequest): ChainID {
-        val chainID = request.getChainIdOrGenerate()
-
+    @JvmOverloads
+    fun verifyCheckRule(request: CheckRuleRequest, defaultChainID: ChainID? = null): ChainID {
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+
+        val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
             val task = ruleFactory.createCheckRule(request, value != null)
@@ -143,12 +145,12 @@ class CollectorService(
     }
 
     @Throws(InterruptedException::class)
-    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest): ChainID {
-        val chainID = request.getChainIdOrGenerate()
-
+    @JvmOverloads
+    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, defaultChainID: ChainID? = null): ChainID {
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
-        val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
 
+        val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
+        val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
         val silenceCheckTask: AbstractCheckTask? = if (silenceCheck) {
             ruleFactory.createSilenceCheck(request, olderThanTimeUnit.duration.toMillis() * olderThanDelta)
         } else {
@@ -163,10 +165,11 @@ class CollectorService(
         return chainID
     }
 
-    fun verifyNoMessageCheck(request: NoMessageCheckRequest): ChainID {
-        val chainID = request.getChainIdOrGenerate()
-
+    @JvmOverloads
+    fun verifyNoMessageCheck(request: NoMessageCheckRequest, defaultChainID: ChainID? = null): ChainID {
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+
+        val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
             val task = ruleFactory.createNoMessageCheckRule(request, value != null)
@@ -183,32 +186,6 @@ class CollectorService(
         }
         value?.subscribeNextTask(this) ?: begin(realCheckpoint, ruleExecutorPool.get())
     }
-
-    private fun CheckRuleRequest.getChainIdOrGenerate(): ChainID {
-        return if (hasChainId()) {
-            chainId
-        } else {
-            generateChainID()
-        }
-    }
-
-    private fun CheckSequenceRuleRequest.getChainIdOrGenerate(): ChainID {
-        return if (hasChainId()) {
-            chainId
-        } else {
-            generateChainID()
-        }
-    }
-
-    private fun NoMessageCheckRequest.getChainIdOrGenerate(): ChainID {
-        return if (hasChainId()) {
-            chainId
-        } else {
-            generateChainID()
-        }
-    }
-
-    private fun generateChainID() = ChainID.newBuilder().setId(EventUtils.generateUUID()).build()
 
     private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
         val now = Instant.now()

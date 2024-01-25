@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2024 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -22,6 +22,7 @@ import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.BOOK_NAME
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.MESSAGE_TYPE
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.ROOT_ID
+import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.SCOPE
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.SESSION_ALIAS
 import com.exactpro.th2.check1.util.assertThrowsWithMessages
 import com.exactpro.th2.check1.util.createDefaultMessage
@@ -74,7 +75,7 @@ class RuleFactoryTest {
     @Test
     fun `failed rule creation because session alias is empty`() {
         val request = CheckRuleRequest.newBuilder()
-            .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).build())
+            .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).setScope(SCOPE).build())
             .setCheckpoint(Checkpoint.newBuilder().setId(EventUtils.generateUUID()).build()).build()
 
         assertThrowsWithMessages<RuleCreationException>(
@@ -88,7 +89,7 @@ class RuleFactoryTest {
     @Test
     fun `success rule creation with missed checkpoint`() {
         val request = CheckRuleRequest.newBuilder()
-            .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).build())
+            .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).setScope(SCOPE).build())
             .setConnectivityId(
                 ConnectionID.newBuilder()
                     .setSessionAlias("test_alias")
@@ -110,7 +111,7 @@ class RuleFactoryTest {
     @Test
     fun `failed rule creation with missed checkpoint and invalid chain id`() {
         val request = CheckRuleRequest.newBuilder()
-            .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).build())
+            .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).setScope(SCOPE).build())
             .setConnectivityId(
                 ConnectionID.newBuilder()
                     .setSessionAlias("test_alias")
@@ -172,7 +173,7 @@ class RuleFactoryTest {
     @Test
     fun `failed rule creation because checkpoint is missed`() {
         val request = CheckRuleRequest.newBuilder()
-            .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).build())
+            .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId(ROOT_ID).setScope(SCOPE).build())
             .setConnectivityId(
                 ConnectionID.newBuilder()
                     .setSessionAlias("test_alias")
@@ -282,7 +283,7 @@ class RuleFactoryTest {
         }
         return CheckRuleRequest
             .newBuilder()
-            .setParentEventId(EventID.newBuilder().setBookName(parentBookName).setId(ROOT_ID).build())
+            .setParentEventId(EventID.newBuilder().setBookName(parentBookName).setId(ROOT_ID).setScope(SCOPE).build())
             .setConnectivityId(ConnectionID.newBuilder().setSessionAlias(connectivitySessionAlias))
             .setRootFilter(RootMessageFilter.newBuilder().setMessageType(MESSAGE_TYPE))
             .setMessageTimeout(5)
