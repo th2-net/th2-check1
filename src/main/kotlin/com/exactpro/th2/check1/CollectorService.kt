@@ -130,29 +130,27 @@ class CollectorService(
         ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter)
     }
 
-    @Throws(InterruptedException::class)
     @JvmOverloads
-    fun verifyCheckRule(request: CheckRuleRequest, defaultChainID: ChainID? = null): ChainID {
+    fun verifyCheckRule(request: CheckRuleRequest, eventId: EventID? = null, defaultChainID: ChainID? = null): ChainID {
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createCheckRule(request, value != null)
+            val task = ruleFactory.createCheckRule(request, value != null, eventId)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
     }
 
-    @Throws(InterruptedException::class)
     @JvmOverloads
-    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, defaultChainID: ChainID? = null): ChainID {
+    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, eventId: EventID? = null,  defaultChainID: ChainID? = null): ChainID {
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
         val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
         val silenceCheckTask: AbstractCheckTask? = if (silenceCheck) {
-            ruleFactory.createSilenceCheck(request, olderThanTimeUnit.duration.toMillis() * olderThanDelta)
+            ruleFactory.createSilenceCheck(request, olderThanTimeUnit.duration.toMillis() * olderThanDelta, eventId)
         } else {
             null
         }
@@ -166,13 +164,13 @@ class CollectorService(
     }
 
     @JvmOverloads
-    fun verifyNoMessageCheck(request: NoMessageCheckRequest, defaultChainID: ChainID? = null): ChainID {
+    fun verifyNoMessageCheck(request: NoMessageCheckRequest,  eventId: EventID? = null, defaultChainID: ChainID? = null): ChainID {
         cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
 
         val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createNoMessageCheckRule(request, value != null)
+            val task = ruleFactory.createNoMessageCheckRule(request, value != null, eventId)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
         return chainID
