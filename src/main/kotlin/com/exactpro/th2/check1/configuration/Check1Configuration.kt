@@ -33,8 +33,8 @@ class Check1Configuration(
     @field:JsonProperty(value = "cleanup-time-unit", defaultValue = "SECONDS")
     val cleanupTimeUnit: ChronoUnit = ChronoUnit.SECONDS,
 
-    @field:JsonProperty(value = "cleanup-interval-millis", defaultValue = "1000")
-    val cleanupIntervalMillis: Long = 1000L,
+    @field:JsonProperty(value = "min-cleanup-interval-ms", defaultValue = "1000")
+    val minCleanupIntervalMs: Long = 1000L,
 
     @field:JsonProperty(value = "rule-execution-timeout", defaultValue = "5000")
     val ruleExecutionTimeout: Long = 5000L,

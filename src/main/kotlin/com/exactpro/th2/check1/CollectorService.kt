@@ -204,7 +204,7 @@ class CollectorService(
             }
         }
 
-        nextCleanupTime = now.plusMillis(configuration.cleanupIntervalMillis)
+        nextCleanupTime = now.plusMillis(configuration.minCleanupIntervalMs)
     }
 
     private fun olderThan(now: Instant?, delta: Long, unit: ChronoUnit, endTime: Instant?) =

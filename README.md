@@ -1,4 +1,4 @@
-# th2 check1 (4.4.0)
+# th2 check1 (4.5.0)
 
 ## Overview
 
@@ -74,10 +74,20 @@ in [this repository](https://github.com/th2-net/th2-grpc-check1/blob/dev-version
 
 * **pre_filter** pre-filtering for messages that should not be received.
 
-### MultiSubmitRules
+### SubmitMultipleRules
+
+#### Required
 
 * **rules** - list of rules to submit
-* **omitResponse** - if `true` sends empty response instead of list of individual response for every submitted rule
+
+#### Optional
+
+* **default_parent_event_id** - default value for `parent_event_id` of submitted rules.
+* **default_chain** - default value for `parent_event_id` of submitted rules.
+
+### PostMultipleRules
+
+the same as `SubmitMultipleRules` but returns immediately with `Empty` response
 
 ## Quick start
 
@@ -164,6 +174,10 @@ time unit defined in _cleanup-time-unit_ setting. _The default value is set to 6
 
 The time unit for _cleanup-older-than_ setting. The available values are MILLIS, SECONDS, MINUTES, HOURS. _The default
 value is set to SECONDS_
+
+#### min-cleanup-interval-ms
+
+Minimum interval between cleanups in milliseconds. Default value is 1000 milliseconds.
 
 #### max-event-batch-content-size
 
@@ -256,11 +270,11 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ## Release Notes
 
-### 4.4.0
+### 4.5.0
 
 #### Added:
 + `multiSubmitRules` grpc method (grpc-check1: `4.4.0-dev`)
-+ `cleanupIntervalMillis` configuration parameter to specify minimal interval between rules cleanup
++ `min-cleanup-interval-ms` configuration parameter to specify minimal interval between rules cleanup
 
 ### 4.3.0
 
