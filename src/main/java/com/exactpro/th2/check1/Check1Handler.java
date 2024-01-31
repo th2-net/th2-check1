@@ -20,16 +20,15 @@ import static com.exactpro.th2.check1.utils.ProtoMessageUtilsKt.generateChainID;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.ERROR;
 import static com.exactpro.th2.common.grpc.RequestStatus.Status.SUCCESS;
 
-import com.exactpro.th2.check1.grpc.WaitForResultRequest;
-import com.exactpro.th2.check1.grpc.WaitForResultResponse;
-import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 import com.exactpro.th2.common.grpc.EventID;
 import com.exactpro.th2.common.message.MessageUtils;
-import kotlin.Pair;
 import com.google.protobuf.Empty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.exactpro.th2.check1.grpc.WaitForResultRequest;
+import com.exactpro.th2.check1.grpc.WaitForResultResponse;
+import com.exactpro.th2.check1.grpc.CheckpointResponse;
 import com.exactpro.th2.check1.grpc.Check1Grpc.Check1ImplBase;
 import com.exactpro.th2.check1.grpc.CheckRuleRequest;
 import com.exactpro.th2.check1.grpc.CheckRuleResponse;
@@ -38,7 +37,13 @@ import com.exactpro.th2.check1.grpc.CheckSequenceRuleResponse;
 import com.exactpro.th2.check1.grpc.CheckpointRequest;
 import com.exactpro.th2.check1.grpc.NoMessageCheckResponse;
 import com.exactpro.th2.check1.grpc.NoMessageCheckRequest;
+import com.exactpro.th2.check1.grpc.ChainID;
+import com.exactpro.th2.check1.grpc.MultiRulesRequest;
+import com.exactpro.th2.check1.grpc.MultiRulesResponse;
+import com.exactpro.th2.check1.grpc.Rule;
+import com.exactpro.th2.check1.grpc.RuleResponse;
 import com.exactpro.th2.common.grpc.RequestStatus;
+import com.exactpro.th2.check1.utils.ProtoMessageUtilsKt;
 
 import io.grpc.stub.StreamObserver;
 
@@ -83,9 +88,9 @@ public class Check1Handler extends Check1ImplBase {
 
             CheckRuleResponse.Builder response = CheckRuleResponse.newBuilder();
             try {
-                Pair<Long, ChainID> ids = collectorService.verifyCheckRule(request);
-                response.setRuleId(ids.getFirst())
-                        .setChainId(ids.getSecond())
+                CollectorService.RuleAndChainIds ids = collectorService.verifyCheckRule(request);
+                response.setRuleId(ids.getRuleId())
+                        .setChainId(ids.getChainID())
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
@@ -119,13 +124,13 @@ public class Check1Handler extends Check1ImplBase {
                     logger.info("Submitting sequence rule for request '" + MessageUtils.toJson(request) + "' started");
                 }
 
-                Pair<Long, ChainID> ids = collectorService.verifyCheckSequenceRule(request);
+                CollectorService.RuleAndChainIds ids = collectorService.verifyCheckSequenceRule(request);
 
                 if (logger.isInfoEnabled()) {
                     logger.info("Submitting sequence rule for request '" + request.getDescription() + "' finished");
                 }
-                response.setRuleId(ids.getFirst())
-                        .setChainId(ids.getSecond())
+                response.setRuleId(ids.getRuleId())
+                        .setChainId(ids.getChainID())
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
@@ -161,9 +166,9 @@ public class Check1Handler extends Check1ImplBase {
 
             NoMessageCheckResponse.Builder response = NoMessageCheckResponse.newBuilder();
             try {
-                Pair<Long, ChainID> ids = collectorService.verifyNoMessageCheck(request);
-                response.setRuleId(ids.getFirst())
-                        .setChainId(ids.getSecond())
+                CollectorService.RuleAndChainIds ids = collectorService.verifyNoMessageCheck(request);
+                response.setRuleId(ids.getRuleId())
+                        .setChainId(ids.getChainID())
                         .setStatus(RequestStatus.newBuilder().setStatus(SUCCESS));
             } catch (Exception e) {
                 if (logger.isErrorEnabled()) {
@@ -219,13 +224,14 @@ public class Check1Handler extends Check1ImplBase {
 
             for (var ruleReq : request.getRulesList()) {
                 try {
-                    ChainID chainId = checkRule(ruleReq, defaultEventId, defaultChainId);
+                    CollectorService.RuleAndChainIds ids = checkRule(ruleReq, defaultEventId, defaultChainId);
 
                     RuleResponse.Builder ruleResponse = RuleResponse.newBuilder();
                     RequestStatus.Status status;
 
-                    if (chainId != null) {
-                        ruleResponse.setChainId(chainId);
+                    if (ids != null) {
+                        ruleResponse.setRuleId(ids.getRuleId());
+                        ruleResponse.setChainId(ids.getChainID());
                         status = SUCCESS;
                     } else {
                         status = ERROR;
@@ -276,27 +282,27 @@ public class Check1Handler extends Check1ImplBase {
         }
     }
 
-    private ChainID checkRule(Rule ruleReq, EventID defaultEventId, ChainID defaultChainId) {
-        ChainID chainId;
+    private CollectorService.RuleAndChainIds checkRule(Rule ruleReq, EventID defaultEventId, ChainID defaultChainId) {
+        CollectorService.RuleAndChainIds ids;
         if (ruleReq.hasCheckRuleRequest()) {
             var rule = ruleReq.getCheckRuleRequest();
             var eventId = rule.hasParentEventId() ? rule.getParentEventId() : defaultEventId;
-            chainId = collectorService.verifyCheckRule(ruleReq.getCheckRuleRequest(), eventId, defaultChainId);
+            ids = collectorService.verifyCheckRule(ruleReq.getCheckRuleRequest(), eventId, defaultChainId);
         } else if (ruleReq.hasSequenceRule()) {
             var rule = ruleReq.getCheckRuleRequest();
             var eventId = rule.hasParentEventId() ? rule.getParentEventId() : defaultEventId;
-            chainId = collectorService.verifyCheckSequenceRule(ruleReq.getSequenceRule(), eventId, defaultChainId);
+            ids = collectorService.verifyCheckSequenceRule(ruleReq.getSequenceRule(), eventId, defaultChainId);
         } else if (ruleReq.hasNoMessageRule()) {
             var rule = ruleReq.getCheckRuleRequest();
             var eventId = rule.hasParentEventId() ? rule.getParentEventId() : defaultEventId;
-            chainId = collectorService.verifyNoMessageCheck(ruleReq.getNoMessageRule(), eventId, defaultChainId);
+            ids = collectorService.verifyNoMessageCheck(ruleReq.getNoMessageRule(), eventId, defaultChainId);
         } else {
             if (logger.isErrorEnabled()) {
                 logger.error("Illegal request in MultiSubmitRulesRequest. Request " + MessageUtils.toJson(ruleReq));
             }
-            chainId = null;
+            ids = null;
         }
 
-        return chainId;
+        return ids;
     }
 }

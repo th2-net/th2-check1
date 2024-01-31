@@ -32,7 +32,10 @@ import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SilenceCheckTask
 import com.exactpro.th2.common.event.Event
-import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.schema.message.MessageRouter
@@ -60,7 +63,8 @@ class RuleFactory(
         defaultEventId: EventID? = null,
         onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): CheckRuleTask {
-        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId ?: error { "Parent event id can't be null" }
+        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId
+            ?: error { "Parent event id can't be null" }
         return ruleCreation(eventId) {
             checkAndCreateRule {
                 val sessionAlias: String = request.connectivityId.sessionAlias
@@ -106,7 +110,8 @@ class RuleFactory(
         defaultEventId: EventID? = null,
         onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): SequenceCheckRuleTask {
-        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId ?: error { "Parent event id can't be null" }
+        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId
+            ?: error { "Parent event id can't be null" }
         return ruleCreation(eventId) {
             checkAndCreateRule {
                 val sessionAlias: String = request.connectivityId.sessionAlias
@@ -155,7 +160,8 @@ class RuleFactory(
         defaultEventId: EventID? = null,
         onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): NoMessageCheckTask {
-        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId ?: error { "Parent event id can't be null" }
+        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId
+            ?: error { "Parent event id can't be null" }
         return ruleCreation(eventId) {
             checkAndCreateRule {
                 val sessionAlias: String = request.connectivityId.sessionAlias

@@ -155,7 +155,7 @@ class CollectorService(
     }
 
     @JvmOverloads
-    fun verifyCheckRule(request: CheckRuleRequest, eventId: EventID? = null, defaultChainID: ChainID? = null): Pair<Long, ChainID> {
+    fun verifyCheckRule(request: CheckRuleRequest, eventId: EventID? = null, defaultChainID: ChainID? = null): RuleAndChainIds {
         cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
 
         val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
@@ -170,11 +170,11 @@ class CollectorService(
             ruleIdToResult[ruleId] = resultFuture
         }
 
-        return ruleId to chainID
+        return RuleAndChainIds(ruleId, chainID)
     }
 
     @JvmOverloads
-    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, eventId: EventID? = null,  defaultChainID: ChainID? = null): Pair<Long, ChainID> {
+    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, eventId: EventID? = null,  defaultChainID: ChainID? = null): RuleAndChainIds {
         cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
 
         val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
@@ -205,11 +205,11 @@ class CollectorService(
             else
                 resultFuture.thenCompose { if (it.first == EventStatus.SUCCESS) silenceFuture else resultFuture }
         }
-        return ruleId to chainID
+        return RuleAndChainIds(ruleId, chainID)
     }
 
     @JvmOverloads
-    fun verifyNoMessageCheck(request: NoMessageCheckRequest,  eventId: EventID? = null, defaultChainID: ChainID? = null): Pair<Long, ChainID> {
+    fun verifyNoMessageCheck(request: NoMessageCheckRequest,  eventId: EventID? = null, defaultChainID: ChainID? = null): RuleAndChainIds {
         cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
 
         val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
@@ -224,7 +224,7 @@ class CollectorService(
             ruleIdToResult[ruleId] = resultFuture
         }
 
-        return ruleId to chainID
+        return RuleAndChainIds(ruleId, chainID)
     }
 
     enum class RuleResult(
@@ -398,4 +398,6 @@ class CollectorService(
     companion object {
         private val EMPTY_STORING_RESULT = StoringResult(0L, null, AbstractCheckTask.EMPTY_STATUS_CONSUMER)
     }
+
+    data class RuleAndChainIds(val ruleId: Long, val chainID: ChainID)
 }
