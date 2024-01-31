@@ -48,7 +48,9 @@ fun createVerificationEntry(
     status: VerificationStatus? = null,
 ): VerificationEntry =
     VerificationEntry().apply {
-        fields = linkedMapOf(*verificationEntries)
+        if (verificationEntries.isNotEmpty()) {
+            fields = linkedMapOf(*verificationEntries)
+        }
         this.status = status
     }
 

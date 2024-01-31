@@ -34,10 +34,12 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.schema.message.DeliveryMetadata
+import com.exactpro.th2.common.grpc.RequestStatus
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
@@ -53,14 +55,18 @@ import mu.KotlinLogging
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicLong
 
 class CollectorService(
     protoMessageRouter: MessageRouter<MessageBatch>,
     transportMessageRouter: MessageRouter<GroupBatch>,
     private val eventBatchRouter: MessageRouter<EventBatch>,
-    private val configuration: Check1Configuration,
+    private val configuration: Check1Configuration
 ) {
 
     private val logger = KotlinLogging.logger(javaClass.name + '@' + hashCode())
@@ -74,6 +80,8 @@ class CollectorService(
     private val checkpointSubscriber: CheckpointSubscriber
     private val mqSubject: PublishSubject<MessageHolder>
     private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, AbstractCheckTask> = ConcurrentHashMap()
+    private val ruleIdToResult: MutableMap<Long, CompletableFuture<Pair<EventStatus, Instant>>> = ConcurrentHashMap()
+    private val ruleIdCounter = AtomicLong()
 
     private val olderThanDelta = configuration.cleanupOlderThan
     private val olderThanTimeUnit = configuration.cleanupTimeUnit
@@ -130,50 +138,132 @@ class CollectorService(
         ruleFactory = RuleFactory(configuration, streamObservable, eventBatchRouter)
     }
 
-    @JvmOverloads
-    fun verifyCheckRule(request: CheckRuleRequest, eventId: EventID? = null, defaultChainID: ChainID? = null): ChainID {
-        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+    private data class StoringResult(
+        val id: Long,
+        val resultFuture: CompletableFuture<Pair<EventStatus, Instant>>?,
+        val onTaskFinished: (EventStatus) -> Unit,
+    )
 
-        val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
-
-        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createCheckRule(request, value != null, eventId)
-            task.apply { addToChainOrBegin(value, request.checkpoint) }
+    private fun prepareStoringResults(storeResult: Boolean): StoringResult {
+        return if (storeResult) {
+            val future = CompletableFuture<Pair<EventStatus, Instant>>()
+            val ruleId = ruleIdCounter.incrementAndGet()
+            StoringResult(ruleId, future) { future.complete(it to Instant.now()) }
+        } else {
+            EMPTY_STORING_RESULT
         }
-        return chainID
     }
 
     @JvmOverloads
-    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, eventId: EventID? = null,  defaultChainID: ChainID? = null): ChainID {
-        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+    fun verifyCheckRule(request: CheckRuleRequest, eventId: EventID? = null, defaultChainID: ChainID? = null): Pair<Long, ChainID> {
+        cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
 
         val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
-        val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
-        val silenceCheckTask: AbstractCheckTask? = if (silenceCheck) {
-            ruleFactory.createSilenceCheck(request, olderThanTimeUnit.duration.toMillis() * olderThanDelta, eventId)
-        } else {
-            null
-        }
+        val (ruleId, resultFuture, onTaskFinished) = prepareStoringResults(request.storeResult)
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createSequenceCheckRule(request, value != null)
+            val task = ruleFactory.createCheckRule(request, value != null, eventId, onTaskFinished)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
+        }
+
+        if (resultFuture != null) {
+            ruleIdToResult[ruleId] = resultFuture
+        }
+
+        return ruleId to chainID
+    }
+
+    @JvmOverloads
+    fun verifyCheckSequenceRule(request: CheckSequenceRuleRequest, eventId: EventID? = null,  defaultChainID: ChainID? = null): Pair<Long, ChainID> {
+        cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
+
+        val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
+        val (ruleId, resultFuture, onTaskFinished) = prepareStoringResults(request.storeResult)
+        val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
+
+        val (silenceCheckTask, silenceFuture) = if (silenceCheck) {
+            val (_, resultFutureSilence, onTaskFinishedSilence) = prepareStoringResults(request.storeResult)
+            ruleFactory.createSilenceCheck(
+                request,
+                olderThanTimeUnit.duration.toMillis() * olderThanDelta,
+                eventId,
+                onTaskFinished
+            ) to resultFutureSilence
+        } else {
+            null to null
+        }
+
+        eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, prevTask ->
+            ruleFactory.createSequenceCheckRule(request, prevTask != null, eventId, onTaskFinished)
+                .apply { addToChainOrBegin(prevTask, request.checkpoint) }
                 .run { silenceCheckTask?.also { subscribeNextTask(it) } ?: this }
         }
-        return chainID
+
+        if (resultFuture != null) {
+            ruleIdToResult[ruleId] = if (silenceFuture == null)
+                resultFuture
+            else
+                resultFuture.thenCompose { if (it.first == EventStatus.SUCCESS) silenceFuture else resultFuture }
+        }
+        return ruleId to chainID
     }
 
     @JvmOverloads
-    fun verifyNoMessageCheck(request: NoMessageCheckRequest,  eventId: EventID? = null, defaultChainID: ChainID? = null): ChainID {
-        cleanupTasksOlderThan(olderThanDelta, olderThanTimeUnit)
+    fun verifyNoMessageCheck(request: NoMessageCheckRequest,  eventId: EventID? = null, defaultChainID: ChainID? = null): Pair<Long, ChainID> {
+        cleanupTasksAndResults(olderThanDelta, olderThanTimeUnit)
 
         val chainID = if (request.hasChainId()) request.chainId else defaultChainID ?: generateChainID()
+        val (ruleId, resultFuture, onTaskFinished) = prepareStoringResults(request.storeResult)
 
         eventIdToLastCheckTask.compute(CheckTaskKey(chainID, request.connectivityId)) { _, value ->
-            val task = ruleFactory.createNoMessageCheckRule(request, value != null, eventId)
+            val task = ruleFactory.createNoMessageCheckRule(request, value != null, eventId, onTaskFinished)
             task.apply { addToChainOrBegin(value, request.checkpoint) }
         }
-        return chainID
+
+        if (resultFuture != null) {
+            ruleIdToResult[ruleId] = resultFuture
+        }
+
+        return ruleId to chainID
+    }
+
+    enum class RuleResult(
+        val requestStatus: RequestStatus.Status = RequestStatus.Status.ERROR,
+        val message: String? = null,
+        val status: EventStatus? = null
+    ) {
+        PASSED(RequestStatus.Status.SUCCESS, status = EventStatus.SUCCESS),
+        FAILED(RequestStatus.Status.SUCCESS, status = EventStatus.FAILED),
+        TIMEOUT(message = "Timeout expired"),
+        NOT_FOUND(message = "No rule with specified id found"),
+        ERROR(message = "Failed to retrieve rule result due to internal error. See logs for more details.");
+    }
+
+    fun getRuleResult(id: Long, timeoutNano: Long): RuleResult {
+        val statusFuture = ruleIdToResult[id]
+
+        if (statusFuture == null) {
+            logger.debug("No rule with specified id found")
+            return RuleResult.NOT_FOUND
+        }
+
+        return try {
+            val (status, _) = statusFuture.get(timeoutNano, TimeUnit.NANOSECONDS)
+            when (status) {
+                EventStatus.SUCCESS -> RuleResult.PASSED
+                EventStatus.FAILED -> RuleResult.FAILED
+                else -> {
+                    logger.error("Invalid rule status: $status")
+                    RuleResult.ERROR
+                }
+            }
+        } catch (e: TimeoutException) {
+            logger.debug("Timeout expired")
+            RuleResult.TIMEOUT
+        } catch (e: Exception) {
+            logger.error("Failed to retrieve rule result: ", e)
+            RuleResult.ERROR
+        }
     }
 
     private fun AbstractCheckTask.addToChainOrBegin(value: AbstractCheckTask?, checkpoint: GrpcCheckpoint) {
@@ -185,7 +275,7 @@ class CollectorService(
         value?.subscribeNextTask(this) ?: begin(realCheckpoint, ruleExecutorPool.get())
     }
 
-    private fun cleanupTasksOlderThan(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
+    private fun cleanupTasksAndResults(delta: Long, unit: ChronoUnit = ChronoUnit.SECONDS) {
         val now = Instant.now()
         if (now.isBefore(nextCleanupTime)) return
 
@@ -202,6 +292,11 @@ class CollectorService(
                     }
                 }
             }
+        }
+
+        ruleIdToResult.values.removeIf { future ->
+            val (_, endTime) = future.getNow(null) ?: return@removeIf false
+            return@removeIf olderThan(now, delta, unit, endTime)
         }
 
         nextCleanupTime = now.plusMillis(configuration.minCleanupIntervalMs)
@@ -299,4 +394,8 @@ class CollectorService(
         .setSequence(data.sequence)
         .setDirection(direction)
         .build()
+
+    companion object {
+        private val EMPTY_STORING_RESULT = StoringResult(0L, null, AbstractCheckTask.EMPTY_STATUS_CONSUMER)
+    }
 }

@@ -1,9 +1,12 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2024 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,11 +32,9 @@ import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SilenceCheckTask
 import com.exactpro.th2.common.event.Event
-import com.exactpro.th2.common.grpc.Direction
-import com.exactpro.th2.common.grpc.EventBatch
-import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.RootMessageFilter
+import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.message.toJson
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.schema.message.MessageRouter
 import io.reactivex.Observable
 import mu.KotlinLogging
@@ -53,7 +54,12 @@ class RuleFactory(
     private val isCheckNullValueAsEmpty = configuration.isCheckNullValueAsEmpty
     private val defaultCheckSimpleCollectionsOrder = configuration.isDefaultCheckSimpleCollectionsOrder
 
-    fun createCheckRule(request: CheckRuleRequest, isChainIdExist: Boolean, defaultEventId: EventID? = null): CheckRuleTask {
+    fun createCheckRule(
+        request: CheckRuleRequest,
+        isChainIdExist: Boolean,
+        defaultEventId: EventID? = null,
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
+    ): CheckRuleTask {
         val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId ?: error { "Parent event id can't be null" }
         return ruleCreation(eventId) {
             checkAndCreateRule {
@@ -61,11 +67,7 @@ class RuleFactory(
                 check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                 val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
                 checkMessageTimeout(request.messageTimeout) {
-                    checkCheckpoint(
-                        RequestAdaptor.from(request),
-                        sessionKey,
-                        isChainIdExist
-                    )
+                    checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist)
                 }
 
                 val filter = request.rootFilter.also { it.validateRootMessageFilter() }
@@ -87,6 +89,7 @@ class RuleFactory(
                     eventId,
                     streamObservable,
                     eventBatchRouter,
+                    onTaskFinished
                 )
             }
             onErrorEvent {
@@ -97,7 +100,12 @@ class RuleFactory(
         }
     }
 
-    fun createSequenceCheckRule(request: CheckSequenceRuleRequest, isChainIdExist: Boolean, defaultEventId: EventID? = null): SequenceCheckRuleTask {
+    fun createSequenceCheckRule(
+        request: CheckSequenceRuleRequest,
+        isChainIdExist: Boolean,
+        defaultEventId: EventID? = null,
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
+    ): SequenceCheckRuleTask {
         val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId ?: error { "Parent event id can't be null" }
         return ruleCreation(eventId) {
             checkAndCreateRule {
@@ -105,11 +113,7 @@ class RuleFactory(
                 check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                 val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
                 checkMessageTimeout(request.messageTimeout) {
-                    checkCheckpoint(
-                        RequestAdaptor.from(request),
-                        sessionKey,
-                        isChainIdExist
-                    )
+                    checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist)
                 }
 
                 val protoMessageFilters = request.rootMessageFiltersList.onEach { it.validateRootMessageFilter() }
@@ -133,7 +137,8 @@ class RuleFactory(
                     request.checkOrder,
                     eventId,
                     streamObservable,
-                    eventBatchRouter
+                    eventBatchRouter,
+                    onTaskFinished
                 )
             }
             onErrorEvent {
@@ -144,7 +149,12 @@ class RuleFactory(
         }
     }
 
-    fun createNoMessageCheckRule(request: NoMessageCheckRequest, isChainIdExist: Boolean, defaultEventId: EventID? = null): NoMessageCheckTask {
+    fun createNoMessageCheckRule(
+        request: NoMessageCheckRequest,
+        isChainIdExist: Boolean,
+        defaultEventId: EventID? = null,
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
+    ): NoMessageCheckTask {
         val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId ?: error { "Parent event id can't be null" }
         return ruleCreation(eventId) {
             checkAndCreateRule {
@@ -152,11 +162,7 @@ class RuleFactory(
                 check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
                 val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
                 checkMessageTimeout(request.messageTimeout) {
-                    checkCheckpoint(
-                        RequestAdaptor.from(request),
-                        sessionKey,
-                        isChainIdExist
-                    )
+                    checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist)
                 }
 
                 val ruleConfiguration = RuleConfiguration(
@@ -176,7 +182,8 @@ class RuleFactory(
                     request.preFilter,
                     eventId,
                     streamObservable,
-                    eventBatchRouter
+                    eventBatchRouter,
+                    onTaskFinished
                 )
             }
             onErrorEvent {
@@ -187,7 +194,12 @@ class RuleFactory(
         }
     }
 
-    fun createSilenceCheck(request: CheckSequenceRuleRequest, timeout: Long, defaultEventId: EventID? = null): SilenceCheckTask {
+    fun createSilenceCheck(
+        request: CheckSequenceRuleRequest,
+        timeout: Long,
+        defaultEventId: EventID? = null,
+        onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
+    ): SilenceCheckTask {
         val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId ?: error { "Parent event id can't be null" }
         return ruleCreation(eventId) {
             checkAndCreateRule {
@@ -212,7 +224,8 @@ class RuleFactory(
                     sessionKey,
                     eventId,
                     streamObservable,
-                    eventBatchRouter
+                    eventBatchRouter,
+                    onTaskFinished
                 )
             }
             onErrorEvent {

@@ -1,9 +1,12 @@
 /*
  * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,6 +22,7 @@ import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
+import com.exactpro.th2.check1.rule.AbstractCheckTask.Companion.EMPTY_STATUS_CONSUMER
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.util.createDefaultMessage
 import com.exactpro.th2.check1.rule.RuleFactory
@@ -30,6 +34,7 @@ import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.EventStatus.FAILED
 import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.FilterOperation
@@ -61,6 +66,10 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.timeout
+import java.lang.IllegalArgumentException
 import java.time.Instant
 import java.util.stream.Stream
 import java.util.concurrent.Executors
@@ -73,7 +82,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         parentEventID: EventID,
         messageStream: Observable<StreamContainer>,
         maxEventBatchContentSize: Int = 1024 * 1024,
-        taskTimeout: TaskTimeout = TaskTimeout(1000L)
+        taskTimeout: TaskTimeout = TaskTimeout(1000L),
+        onTaskFinished: (EventStatus) -> Unit = EMPTY_STATUS_CONSUMER
     ) = CheckRuleTask(
         createRuleConfiguration(taskTimeout, SESSION_ALIAS, maxEventBatchContentSize),
         Instant.now(),
@@ -81,7 +91,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         messageFilter,
         parentEventID,
         messageStream,
-        clientStub
+        clientStub,
+        onTaskFinished
     )
 
     @Test
@@ -140,13 +151,17 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                     .putPropertyFilters("keyProp", "42".toPropertyFilter(FilterOperation.EQUAL, true))
             )
             .build()
-        val task = checkTask(filter, eventID, streams)
+
+        val onTaskFinishedMock: (EventStatus) -> Unit = mock()
+        val task = checkTask(filter, eventID, streams, onTaskFinished = onTaskFinishedMock)
+
         task.begin()
 
         val eventBatches = awaitEventBatchRequest(1000L, 2)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertEquals(5, eventList.size)
         assertEquals(5, eventList.filter { it.status == SUCCESS }.size)
+        verify(onTaskFinishedMock, timeout(1000).only()).invoke(SUCCESS)
     }
 
     @Test
@@ -223,13 +238,16 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
                     .putPropertyFilters("keyProp", "42".toPropertyFilter(FilterOperation.EQUAL))
             )
             .build()
-        val task = checkTask(filter, eventID, streams, 1)
+        val onTaskFinishedMock: (EventStatus) -> Unit = mock()
+        val task = checkTask(filter, eventID, streams, 1, onTaskFinished = onTaskFinishedMock)
         task.begin()
 
         val eventBatches = awaitEventBatchRequest(1000L, 1)
         val eventList = eventBatches.flatMap(EventBatch::getEventsList)
         assertEquals(1, eventList.size)
         assertEquals(FAILED, eventList[0].status)
+
+        verify(onTaskFinishedMock, timeout(1000).only()).invoke(FAILED)
     }
 
     @Test
@@ -540,7 +558,8 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
             assertNotNull(verificationEvent) { "Missed verification event" }
             val verification = assertVerification(verificationEvent)
 
-            val verificationEntry = createVerificationEntry(if (expectedComparisonResult) VerificationStatus.PASSED else VerificationStatus.FAILED)
+            val expectedStatus = if (expectedComparisonResult) VerificationStatus.PASSED else VerificationStatus.FAILED
+            val verificationEntry = createVerificationEntry(expectedStatus)
 
             val expected = mapOf("simple_list" to createVerificationEntry(
                 "0" to verificationEntry,
