@@ -196,9 +196,9 @@ signing {
 
 dependencies {
     api platform('com.exactpro.th2:bom:4.5.0')
-    implementation 'com.exactpro.th2:grpc-check1:4.3.1-dev'
-    implementation 'com.exactpro.th2:common:5.6.0-dev'
-    implementation 'com.exactpro.th2:common-utils:2.2.0-dev'
+    implementation 'com.exactpro.th2:grpc-check1:4.4.0-dev'
+    implementation 'com.exactpro.th2:common:5.8.0-dev'
+    implementation 'com.exactpro.th2:common-utils:2.2.2-dev'
     implementation('com.exactpro.th2:sailfish-utils:4.1.1-dev') {
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
         // because of the vulnerability
@@ -217,11 +217,10 @@ dependencies {
     implementation('io.prometheus:simpleclient') {
         because('metrics from messages and rules')
     }
-    implementation 'org.jetbrains.kotlin:kotlin-reflect'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
-    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
-    testImplementation 'org.mockito.kotlin:mockito-kotlin:4.1.0'
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.1"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5"
+    testImplementation "org.mockito.kotlin:mockito-kotlin:5.2.1"
 }
 
 test {

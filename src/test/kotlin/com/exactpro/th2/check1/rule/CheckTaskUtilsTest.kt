@@ -1,18 +1,23 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2024 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1.rule
 
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.BOOK_NAME
+import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.SCOPE
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.event.EventUtils.createMessageBean
@@ -28,7 +33,7 @@ import java.time.Instant
 import kotlin.test.assertEquals
 
 class CheckTaskUtilsTest {
-    private val parentEventId: EventID = EventUtils.toEventID(Instant.now(), BOOK_NAME, "parentEventId")
+    private val parentEventId: EventID = EventUtils.toEventID(Instant.now(), BOOK_NAME, SCOPE, "parentEventId")
     private val data = createMessageBean("0123456789".repeat(20))
     private val dataSize = OBJECT_MAPPER.writeValueAsBytes(listOf(data)).size
     private val bigData = createMessageBean("0123456789".repeat(30))

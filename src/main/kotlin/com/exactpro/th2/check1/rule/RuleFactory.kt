@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2024 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,12 +32,12 @@ import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SilenceCheckTask
 import com.exactpro.th2.common.event.Event
-import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.EventStatus
+import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toJson
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.schema.message.MessageRouter
 import io.reactivex.Observable
 import mu.KotlinLogging
@@ -60,139 +60,154 @@ class RuleFactory(
     fun createCheckRule(
         request: CheckRuleRequest,
         isChainIdExist: Boolean,
+        defaultEventId: EventID? = null,
         onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
-    ): CheckRuleTask =
-            ruleCreation(request.parentEventId) {
-                checkAndCreateRule {
-                    check(request.hasParentEventId()) { "Parent event id can't be null" }
-                    val sessionAlias: String = request.connectivityId.sessionAlias
-                    check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
-                    val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
-
-                    val filter = request.rootFilter.also { it.validateRootMessageFilter() }
-
-                    val ruleConfiguration = RuleConfiguration(
-                            createTaskTimeout(request.timeout, request.messageTimeout),
-                            request.description,
-                            timePrecision,
-                            decimalPrecision,
-                            maxEventBatchContentSize,
-                            isCheckNullValueAsEmpty,
-                            defaultCheckSimpleCollectionsOrder
-                    )
-
-                    CheckRuleTask(
-                            ruleConfiguration,
-                            Instant.now(),
-                            sessionKey,
-                            filter,
-                            request.parentEventId,
-                            streamObservable,
-                            eventBatchRouter,
-                            onTaskFinished
-                    )
+    ): CheckRuleTask {
+        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId
+            ?: error { "Parent event id can't be null" }
+        return ruleCreation(eventId) {
+            checkAndCreateRule {
+                val sessionAlias: String = request.connectivityId.sessionAlias
+                check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
+                val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
+                checkMessageTimeout(request.messageTimeout) {
+                    checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist)
                 }
-                onErrorEvent {
-                    Event.start()
-                            .name("Check rule cannot be created")
-                            .type("checkRuleCreation")
-                }
+
+                val filter = request.rootFilter.also { it.validateRootMessageFilter() }
+
+                val ruleConfiguration = RuleConfiguration(
+                    createTaskTimeout(request.timeout, request.messageTimeout),
+                    request.description,
+                    timePrecision,
+                    decimalPrecision, maxEventBatchContentSize,
+                    isCheckNullValueAsEmpty,
+                    defaultCheckSimpleCollectionsOrder
+                )
+
+                CheckRuleTask(
+                    ruleConfiguration,
+                    Instant.now(),
+                    sessionKey,
+                    filter,
+                    eventId,
+                    streamObservable,
+                    eventBatchRouter,
+                    onTaskFinished
+                )
             }
+            onErrorEvent {
+                Event.start()
+                    .name("Check rule cannot be created")
+                    .type("checkRuleCreation")
+            }
+        }
+    }
 
     fun createSequenceCheckRule(
         request: CheckSequenceRuleRequest,
         isChainIdExist: Boolean,
+        defaultEventId: EventID? = null,
         onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
-    ): SequenceCheckRuleTask =
-            ruleCreation(request.parentEventId) {
-                checkAndCreateRule {
-                    check(request.hasParentEventId()) { "Parent event id can't be null" }
-                    val sessionAlias: String = request.connectivityId.sessionAlias
-                    check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
-                    val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
-
-                    val protoMessageFilters = request.rootMessageFiltersList.onEach { it.validateRootMessageFilter() }
-
-                    val ruleConfiguration = RuleConfiguration(
-                            createTaskTimeout(request.timeout, request.messageTimeout),
-                            request.description,
-                            timePrecision,
-                            decimalPrecision,
-                            maxEventBatchContentSize,
-                            isCheckNullValueAsEmpty,
-                            defaultCheckSimpleCollectionsOrder
-                    )
-
-                    SequenceCheckRuleTask(
-                            ruleConfiguration,
-                            Instant.now(),
-                            sessionKey,
-                            request.preFilter,
-                            protoMessageFilters,
-                            request.checkOrder,
-                            request.parentEventId,
-                            streamObservable,
-                            eventBatchRouter,
-                            onTaskFinished
-                    )
+    ): SequenceCheckRuleTask {
+        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId
+            ?: error { "Parent event id can't be null" }
+        return ruleCreation(eventId) {
+            checkAndCreateRule {
+                val sessionAlias: String = request.connectivityId.sessionAlias
+                check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
+                val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
+                checkMessageTimeout(request.messageTimeout) {
+                    checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist)
                 }
-                onErrorEvent {
-                    Event.start()
-                            .name("Sequence check rule cannot be created")
-                            .type("sequenceCheckRuleCreation")
-                }
+
+                val protoMessageFilters = request.rootMessageFiltersList.onEach { it.validateRootMessageFilter() }
+
+                val ruleConfiguration = RuleConfiguration(
+                    createTaskTimeout(request.timeout, request.messageTimeout),
+                    request.description,
+                    timePrecision,
+                    decimalPrecision,
+                    maxEventBatchContentSize,
+                    isCheckNullValueAsEmpty,
+                    defaultCheckSimpleCollectionsOrder
+                )
+
+                SequenceCheckRuleTask(
+                    ruleConfiguration,
+                    Instant.now(),
+                    sessionKey,
+                    request.preFilter,
+                    protoMessageFilters,
+                    request.checkOrder,
+                    eventId,
+                    streamObservable,
+                    eventBatchRouter,
+                    onTaskFinished
+                )
             }
+            onErrorEvent {
+                Event.start()
+                    .name("Sequence check rule cannot be created")
+                    .type("sequenceCheckRuleCreation")
+            }
+        }
+    }
 
     fun createNoMessageCheckRule(
         request: NoMessageCheckRequest,
         isChainIdExist: Boolean,
+        defaultEventId: EventID? = null,
         onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
-    ): NoMessageCheckTask =
-            ruleCreation(request.parentEventId) {
-                checkAndCreateRule {
-                    check(request.hasParentEventId()) { "Parent event id can't be null" }
-                    val parentEventID: EventID = request.parentEventId
-                    val sessionAlias: String = request.connectivityId.sessionAlias
-                    check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
-                    val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
-                    checkMessageTimeout(request.messageTimeout) { checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist) }
-
-                    val ruleConfiguration = RuleConfiguration(
-                            createTaskTimeout(request.timeout, request.messageTimeout),
-                            request.description,
-                            timePrecision,
-                            decimalPrecision,
-                            maxEventBatchContentSize,
-                            isCheckNullValueAsEmpty,
-                            defaultCheckSimpleCollectionsOrder
-                    )
-
-                    NoMessageCheckTask(
-                            ruleConfiguration,
-                            Instant.now(),
-                            sessionKey,
-                            request.preFilter,
-                            parentEventID,
-                            streamObservable,
-                            eventBatchRouter,
-                            onTaskFinished
-                    )
+    ): NoMessageCheckTask {
+        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId
+            ?: error { "Parent event id can't be null" }
+        return ruleCreation(eventId) {
+            checkAndCreateRule {
+                val sessionAlias: String = request.connectivityId.sessionAlias
+                check(sessionAlias.isNotEmpty()) { "Session alias cannot be empty" }
+                val sessionKey = SessionKey(request.bookName, sessionAlias, directionOrDefault(request.direction))
+                checkMessageTimeout(request.messageTimeout) {
+                    checkCheckpoint(RequestAdaptor.from(request), sessionKey, isChainIdExist)
                 }
-                onErrorEvent {
-                    Event.start()
-                            .name("Check rule cannot be created")
-                            .type("checkRuleCreation")
-                }
+
+                val ruleConfiguration = RuleConfiguration(
+                    createTaskTimeout(request.timeout, request.messageTimeout),
+                    request.description,
+                    timePrecision,
+                    decimalPrecision,
+                    maxEventBatchContentSize,
+                    isCheckNullValueAsEmpty,
+                    defaultCheckSimpleCollectionsOrder
+                )
+
+                NoMessageCheckTask(
+                    ruleConfiguration,
+                    Instant.now(),
+                    sessionKey,
+                    request.preFilter,
+                    eventId,
+                    streamObservable,
+                    eventBatchRouter,
+                    onTaskFinished
+                )
             }
+            onErrorEvent {
+                Event.start()
+                    .name("Check rule cannot be created")
+                    .type("checkRuleCreation")
+            }
+        }
+    }
 
     fun createSilenceCheck(
         request: CheckSequenceRuleRequest,
         timeout: Long,
+        defaultEventId: EventID? = null,
         onTaskFinished: ((EventStatus) -> Unit) = AbstractCheckTask.EMPTY_STATUS_CONSUMER
     ): SilenceCheckTask {
-        return ruleCreation(request.parentEventId) {
+        val eventId = if (request.hasParentEventId()) request.parentEventId else defaultEventId ?: error { "Parent event id can't be null" }
+        return ruleCreation(eventId) {
             checkAndCreateRule {
                 check(timeout > 0) { "timeout must be greater that zero" }
                 val sessionAlias: String = request.connectivityId.sessionAlias
@@ -213,7 +228,7 @@ class RuleFactory(
                     request.preFilter,
                     Instant.now(),
                     sessionKey,
-                    request.parentEventId,
+                    eventId,
                     streamObservable,
                     eventBatchRouter,
                     onTaskFinished

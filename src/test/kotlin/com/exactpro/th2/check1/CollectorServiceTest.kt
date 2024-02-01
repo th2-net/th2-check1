@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2023-2024 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package com.exactpro.th2.check1
 
 import com.exactpro.th2.check1.configuration.Check1Configuration
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
-import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.BOOK_NAME
+import com.exactpro.th2.check1.rule.AbstractCheckTaskTest.Companion.SCOPE
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.MessageBatch
@@ -55,13 +55,14 @@ class CollectorServiceTest {
         eventRouterStub,
         Check1Configuration(
             cleanupOlderThan = CLEANUP_OLDER_THAN_MILLIS,
-            cleanupTimeUnit = ChronoUnit.MILLIS
+            cleanupTimeUnit = ChronoUnit.MILLIS,
+            minCleanupIntervalMs = 0
         )
     )
 
     private fun createCheckRuleRequest(timeout: Long)  = CheckRuleRequest.newBuilder()
         .setBookName(BOOK_NAME)
-        .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setId("root").build())
+        .setParentEventId(EventID.newBuilder().setBookName(BOOK_NAME).setScope(SCOPE).setId("root").build())
         .setConnectivityId(ConnectionID.newBuilder()
             .setSessionAlias("test_alias")
             .setSessionGroup("test_alias")

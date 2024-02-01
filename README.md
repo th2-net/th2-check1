@@ -1,4 +1,4 @@
-# th2 check1 (4.4.0)
+# th2 check1 (4.5.0)
 
 ## Overview
 
@@ -82,6 +82,21 @@ in [this repository](https://github.com/th2-net/th2-grpc-check1/blob/dev-version
 
 * **rule_id** - the id of rule
 * **timeout** - timeout for waiting for result
+
+### SubmitMultipleRules
+
+#### Required
+
+* **rules** - list of rules to submit
+
+#### Optional
+
+* **default_parent_event_id** - default value for `parent_event_id` of submitted rules.
+* **default_chain** - default value for `parent_event_id` of submitted rules.
+
+### PostMultipleRules
+
+the same as `SubmitMultipleRules` but returns immediately with `Empty` response
 
 ## Quick start
 
@@ -168,6 +183,10 @@ time unit defined in _cleanup-time-unit_ setting. _The default value is set to 6
 
 The time unit for _cleanup-older-than_ setting. The available values are MILLIS, SECONDS, MINUTES, HOURS. _The default
 value is set to SECONDS_
+
+#### min-cleanup-interval-ms
+
+Minimum interval between cleanups in milliseconds. Default value is 1000 milliseconds.
 
 #### max-event-batch-content-size
 
@@ -260,6 +279,12 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ## Release Notes
 
+### 4.5.0
+
+#### Added:
++ `multiSubmitRules` grpc method (grpc-check1: `4.4.0-dev`)
++ `min-cleanup-interval-ms` configuration parameter to specify minimal interval between rules cleanup
+
 ### 4.4.0
 
 #### Added:
@@ -270,7 +295,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 ### 4.3.0
 
 #### Added:
-+ Configure number of threads for rules execution. Parameter `rules-execution-threads` 
++ Configure number of threads for rules execution. Parameter `rules-execution-threads`
 
 #### Updated:
 + common: `5.6.0-dev`
@@ -365,15 +390,16 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ### 3.10.0
 
+#### Added:
+
++ Support for disabling of order verification for simple collection
++ Switch for events publication in checkpoint request. Parameter `enable-checkpoint-events-publication` should be used for that.
+
 #### Changed:
 
 + Migrated `common` version from `3.31.3` to `3.44.0`
 + Migrated `sailfish-utils` version from `3.12.2` to `3.14.0`
-    + sailfish updated to 3.3.54
-
-#### Changed:
-
-+ Migrated `sailfish-utils` version from `3.12.2` to `3.12.3`
+    + sailfish updated to 3.3.54 
     + Improved condition output format for `EQ_PRECISION`, `WILDCARD`, `LIKE`, `IN`, `MORE`, `LESS` operations and their
       negative versions
 + Changed the way the check1 works with threads internally.
