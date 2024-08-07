@@ -1,4 +1,4 @@
-# th2 check1 (4.5.0)
+# th2 check1 (4.6.0)
 
 ## Overview
 
@@ -278,6 +278,12 @@ The `th2_check1_actual_cache_number` metric separate messages with three labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 4.6.0
++ Migrated to th2 gradle plugin `0.1.1` (bom: `4.6.1`)
++ Updated grpc-check1: `4.4.1-dev`
++ Updated common: `5.14.0-dev`
++ Updated common-utils `2.2.3-dev`
 
 ### 4.5.0
 
