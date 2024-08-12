@@ -1,38 +1,23 @@
-import com.github.jk1.license.filter.LicenseBundleNormalizer
-import com.github.jk1.license.render.JsonReportRenderer
-
 plugins {
-    id 'com.palantir.docker' version '0.25.0'
-    id 'org.jetbrains.kotlin.jvm' version '1.8.22'
-    id "io.github.gradle-nexus.publish-plugin" version "1.0.0"
-    id 'signing'
-    id 'java-library'
-    id 'application'
-    id 'maven-publish'
-    id "org.owasp.dependencycheck" version "8.3.1"
-    id 'com.github.jk1.dependency-license-report' version '2.5'
-    id "de.undercouch.download" version "5.4.0"
+    id "org.jetbrains.kotlin.jvm" version "$kotlin_version"
+    id "application"
+    id "com.exactpro.th2.gradle.component" version "0.1.1"
 }
 
 group = 'com.exactpro.th2'
 version = release_version
 
-compileKotlin {
-    kotlinOptions.jvmTarget = "11"
-}
+kotlin.jvmToolchain(11)
 
-compileTestKotlin {
-    kotlinOptions.jvmTarget = "11"
-}
-
-sourceCompatibility = 11
-targetCompatibility = 11
-
-ext.excludeSailfish = { rcd ->
-    rcd.excludeModule("com.exactpro.sf", "sailfish-core")
-    rcd.excludeModule("com.exactpro.sf", "sailfish-common")
-    rcd.excludeModule("com.exactpro.sf", "sailfish-rest-api-client")
-    rcd.excludeModule("com.exactpro.sf", "service-http")
+ext {
+    commonVersion = '5.14.0-dev'
+    sailfishVersion = '3.3.241'
+    excludeSailfish = { rcd ->
+        rcd.excludeModule("com.exactpro.sf", "sailfish-core")
+        rcd.excludeModule("com.exactpro.sf", "sailfish-common")
+        rcd.excludeModule("com.exactpro.sf", "sailfish-rest-api-client")
+        rcd.excludeModule("com.exactpro.sf", "service-http")
+    }
 }
 
 repositories {
@@ -57,6 +42,7 @@ repositories {
             ignoreGradleMetadataRedirection()
         }
     }
+
     maven {
         name 'Sonatype_releases'
         url 'https://s01.oss.sonatype.org/content/repositories/releases/'
@@ -64,6 +50,7 @@ repositories {
             excludeSailfish(it)
         }
     }
+
     maven {
         name 'Sonatype_releases'
         url 'https://s01.oss.sonatype.org/content/repositories/releases/'
@@ -73,209 +60,46 @@ repositories {
             ignoreGradleMetadataRedirection()
         }
     }
+
     mavenCentral()
     mavenLocal()
 
     configurations.configureEach {
-        resolutionStrategy {
-            cacheChangingModulesFor 0, 'seconds'
-            cacheDynamicVersionsFor 0, 'seconds'
-        }
+        resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+        resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
     }
-}
-
-java {
-    withJavadocJar()
-    withSourcesJar()
-}
-
-javadoc {
-    options.addStringOption('Xdoclint:none', '-quiet')
-}
-
-jar {
-    manifest {
-        attributes(
-                'Created-By': "${System.getProperty('java.version')} (${System.getProperty('java.vendor')})",
-                'Specification-Title': '',
-                'Specification-Vendor': 'Exactpro Systems LLC',
-                'Implementation-Title': project.archivesBaseName,
-                'Implementation-Vendor': 'Exactpro Systems LLC',
-                'Implementation-Vendor-Id': 'com.exactpro',
-                'Implementation-Version': project.version
-        )
-    }
-}
-
-// conditionals for publications
-tasks.withType(PublishToMavenRepository).configureEach {
-    onlyIf {
-        (repository == publishing.repositories.nexus &&
-                project.hasProperty('nexus_user') &&
-                project.hasProperty('nexus_password') &&
-                project.hasProperty('nexus_url')) ||
-                (repository == publishing.repositories.sonatype &&
-                        project.hasProperty('sonatypeUsername') &&
-                        project.hasProperty('sonatypePassword'))
-    }
-}
-tasks.withType(Sign).configureEach {
-    onlyIf {
-        project.hasProperty('signingKey') &&
-                project.hasProperty('signingPassword')
-    }
-}
-// disable running task 'initializeSonatypeStagingRepository' on a gitlab
-tasks.configureEach { task ->
-    if (task.name.equals('initializeSonatypeStagingRepository') &&
-            !(project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword'))
-    ) {
-        task.enabled = false
-    }
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from(components.java)
-            pom {
-                name = rootProject.name
-                packaging = 'jar'
-                description = rootProject.description
-                url = vcs_url
-                scm {
-                    url = vcs_url
-                }
-                licenses {
-                    license {
-                        name = 'The Apache License, Version 2.0'
-                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                    }
-                }
-                developers {
-                    developer {
-                        id = 'developer'
-                        name = 'developer'
-                        email = 'developer@exactpro.com'
-                    }
-                }
-                scm {
-                    url = vcs_url
-                }
-            }
-        }
-    }
-    repositories {
-        //Nexus repo to publish from gitlab
-        maven {
-            name = 'nexus'
-            credentials {
-                username = project.findProperty('nexus_user')
-                password = project.findProperty('nexus_password')
-            }
-            url = project.findProperty('nexus_url')
-        }
-    }
-}
-
-nexusPublishing {
-    repositories {
-        sonatype {
-            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-        }
-    }
-}
-
-signing {
-    String signingKey = findProperty("signingKey")
-    String signingPassword = findProperty("signingPassword")
-    useInMemoryPgpKeys(signingKey, signingPassword)
-    sign publishing.publications.mavenJava
 }
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.5.0')
-    implementation 'com.exactpro.th2:grpc-check1:4.4.0-dev'
-    implementation 'com.exactpro.th2:common:5.8.0-dev'
-    implementation 'com.exactpro.th2:common-utils:2.2.2-dev'
-    implementation('com.exactpro.th2:sailfish-utils:4.1.1-dev') {
-        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml'
-        // because of the vulnerability
+    implementation "com.exactpro.th2:common:$commonVersion"
+    implementation "com.exactpro.th2:grpc-check1:4.4.1-dev"
+    implementation "com.exactpro.th2:common-utils:2.2.3-dev"
+    implementation("com.exactpro.th2:sailfish-utils:4.1.1-dev") {
+        exclude group: "commons-configuration", module: "commons-configuration" // because of the vulnerability
+        exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
         exclude group: 'com.exactpro.mina', module: 'apache-mina-core' // because of the vulnerability
     }
 
     implementation "org.slf4j:slf4j-api"
 
-    implementation("com.exactpro.sf:sailfish-common") {
-        exclude group: 'com.exactpro.mina', module: 'apache-mina-core' // because of the vulnerability
+    implementation ("com.exactpro.sf:sailfish-common:$sailfishVersion") {
+        exclude group: "commons-configuration", module: "commons-configuration" // because of the vulnerability
+        exclude group: "com.fasterxml.jackson.dataformat", module: "jackson-dataformat-yaml" // because of the vulnerability
+        exclude group: "com.exactpro.mina", module: "apache-mina-core" // because of the vulnerability
+        exclude group: "javax.activation", module: "javax.activation-api" // because of the license
     }
 
     implementation "io.reactivex.rxjava2:rxjava:2.2.21" // https://github.com/salesforce/reactive-grpc/issues/202
 
-    implementation('io.prometheus:simpleclient') {
+    implementation("io.prometheus:simpleclient") {
         because('metrics from messages and rules')
     }
 
-    testImplementation "org.junit.jupiter:junit-jupiter:5.10.1"
+    testImplementation "org.junit.jupiter:junit-jupiter"
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit5"
-    testImplementation "org.mockito.kotlin:mockito-kotlin:5.2.1"
+    testImplementation "org.mockito.kotlin:mockito-kotlin:5.4.0"
 }
 
-test {
-    useJUnitPlatform()
-}
-
-application {
-    mainClass.set('com.exactpro.th2.check1.Check1Main')
-}
-
-applicationName = 'service'
-
-distTar {
-    archiveFileName.set("${applicationName}.tar")
-}
-
-dockerPrepare {
-    dependsOn distTar
-}
-
-docker {
-    copySpec.from(tarTree("$buildDir/distributions/${applicationName}.tar"))
-}
-
-dependencyLocking {
-    lockAllConfigurations()
-}
-dependencyCheck {
-    formats = ['SARIF', 'JSON', 'HTML']
-    failBuildOnCVSS = 5
-    suppressionFile = file('suppressions.xml')
-    analyzers {
-        assemblyEnabled = false
-        nugetconfEnabled = false
-        nodeEnabled = false
-    }
-}
-
-licenseReport {
-    def licenseNormalizerBundlePath = "$buildDir/license-normalizer-bundle.json"
-
-    if (!file(licenseNormalizerBundlePath).exists()) {
-        download.run {
-            src 'https://raw.githubusercontent.com/th2-net/.github/main/license-compliance/gradle-license-report/license-normalizer-bundle.json'
-            dest "$buildDir/license-normalizer-bundle.json"
-            overwrite false
-        }
-    }
-
-    filters = [
-            new LicenseBundleNormalizer(licenseNormalizerBundlePath, false)
-    ]
-    renderers = [
-            new JsonReportRenderer('licenses.json', false),
-    ]
-    excludeOwnGroup = false
-    allowedLicensesFile = new URL("https://raw.githubusercontent.com/th2-net/.github/main/license-compliance/gradle-license-report/allowed-licenses.json")
-}
+test.useJUnitPlatform()
+application.mainClass = "com.exactpro.th2.check1.Check1Main"
