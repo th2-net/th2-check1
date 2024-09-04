@@ -1,9 +1,12 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,6 +29,7 @@ import com.exactpro.th2.common.event.Event.Status.FAILED
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
@@ -35,53 +39,69 @@ import java.time.Instant
 /**
  * This rule checks for the presence of a single message in the messages stream.
  */
+
 class CheckRuleTask(
     ruleConfiguration: RuleConfiguration,
     startTime: Instant,
     sessionKey: SessionKey,
-    private val protoMessageFilter: RootMessageFilter,
+    protoMessageFilter: RootMessageFilter,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
-    eventBatchRouter: MessageRouter<EventBatch>
+    eventBatchRouter: MessageRouter<EventBatch>,
+    onTaskFinished: ((EventStatus) -> Unit) = EMPTY_STATUS_CONSUMER
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private val messageFilter: SailfishFilter = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoMessageFilter),
-        protoMessageFilter.toCompareSettings()
-    )
-    private val metadataFilter: SailfishFilter? = protoMessageFilter.metadataFilterOrNull()?.let {
-        SailfishFilter(
-            CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
-            it.toComparisonSettings()
+    protected class Refs(
+        rootEvent: Event,
+        onTaskFinished: ((EventStatus) -> Unit),
+        val protoMessageFilter: RootMessageFilter,
+        val messageFilter: SailfishFilter,
+        val metadataFilter: SailfishFilter?
+    ) : AbstractCheckTask.Refs(rootEvent, onTaskFinished)
+
+    override val refsKeeper = RefsKeeper(
+        Refs(
+            rootEvent = createRootEvent(),
+            onTaskFinished = onTaskFinished,
+            protoMessageFilter = protoMessageFilter,
+            messageFilter = SailfishFilter(
+                PROTO_CONVERTER.fromProtoPreFilter(protoMessageFilter),
+                protoMessageFilter.toCompareSettings()
+            ),
+            metadataFilter = protoMessageFilter.metadataFilterOrNull()?.let {
+                SailfishFilter(
+                    PROTO_CONVERTER.fromMetadataFilter(it, METADATA_MESSAGE_NAME),
+                    it.toComparisonSettings()
+                )
+            }
         )
-    }
+    )
 
-    override fun onStart() {
-        super.onStart()
+    private val refs get() = refsKeeper.refs
 
+    override fun onStartInit() {
         val subEvent = Event.start()
             .endTimestamp()
             .name("Message filter")
             .type("Filter")
-            .bodyData(protoMessageFilter.toReadableBodyCollection())
+            .bodyData(refs.protoMessageFilter.toReadableBodyCollection())
 
-        rootEvent.addSubEvent(subEvent)
-
+        refs.rootEvent.addSubEvent(subEvent)
     }
 
     override fun onNext(messageContainer: MessageContainer) {
-        val aggregatedResult = matchFilter(messageContainer, messageFilter, metadataFilter)
+        val aggregatedResult = matchFilter(messageContainer, refs.messageFilter, refs.metadataFilter)
 
-        val container = ComparisonContainer(messageContainer, protoMessageFilter, aggregatedResult)
+        val container = ComparisonContainer(messageContainer, refs.protoMessageFilter, aggregatedResult)
 
         if (container.matchesByKeys) {
-            rootEvent.appendEventsWithVerification(container)
+            refs.rootEvent.appendEventsWithVerification(container)
             checkComplete()
         }
     }
 
     override fun onTimeout() {
-        rootEvent.addSubEventWithSamePeriod()
+        refs.rootEvent.addSubEventWithSamePeriod()
             .name("No message found by target keys")
             .type("Check failed")
             .status(FAILED)
@@ -92,6 +112,6 @@ class CheckRuleTask(
     override fun type(): String = "Check rule"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(EventUtils.createMessageBean("Check rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
+        rootEvent.bodyData(EventUtils.createMessageBean("Check rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)" }}"))
     }
 }

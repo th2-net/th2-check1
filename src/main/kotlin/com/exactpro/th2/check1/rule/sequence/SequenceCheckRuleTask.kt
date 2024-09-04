@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1.rule.sequence
 
 import com.exactpro.th2.check1.SessionKey
@@ -36,6 +37,7 @@ import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.event.bean.builder.TableBuilder
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -44,7 +46,7 @@ import com.exactpro.th2.common.schema.message.MessageRouter
 import com.google.protobuf.TextFormat.shortDebugString
 import io.reactivex.Observable
 import java.time.Instant
-import java.util.LinkedHashMap
+import kotlin.collections.HashSet
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
@@ -57,83 +59,102 @@ import kotlin.collections.set
  * If **checkOrder** parameter is set to `true` the messages must be received in the exact same order as filters were specified.
  * If this parameter is set to `false`, the order won't be checked.
  */
+
 class SequenceCheckRuleTask(
     ruleConfiguration: RuleConfiguration,
     startTime: Instant,
     sessionKey: SessionKey,
     protoPreFilter: PreFilter,
-    private val protoMessageFilters: List<RootMessageFilter>,
+    protoMessageFilters: List<RootMessageFilter>,
     private val checkOrder: Boolean,
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
-    eventBatchRouter: MessageRouter<EventBatch>
+    eventBatchRouter: MessageRouter<EventBatch>,
+    onTaskFinished: ((EventStatus) -> Unit) = EMPTY_STATUS_CONSUMER
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private val protoPreMessageFilter: RootMessageFilter = protoPreFilter.toRootMessageFilter()
-    private val messagePreFilter = SailfishFilter(
-        CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
-        protoPreMessageFilter.toCompareSettings()
-    )
-    private val metadataPreFilter: SailfishFilter? = protoPreMessageFilter.metadataFilterOrNull()?.let {
-            SailfishFilter(
-                CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
-                it.toComparisonSettings()
-            )
+    protected class Refs(
+        rootEvent: Event,
+        onTaskFinished: ((EventStatus) -> Unit),
+        val protoMessageFilters: List<RootMessageFilter>,
+        val protoPreMessageFilter: RootMessageFilter,
+        val messagePreFilter: SailfishFilter,
+        val metadataPreFilter: SailfishFilter?,
+    ) : AbstractCheckTask.Refs(rootEvent, onTaskFinished) {
+        val preFilterEvent: Event by lazy {
+            Event.start()
+                .type("preFiltering")
+                .bodyData(protoPreMessageFilter.toReadableBodyCollection())
+        }
+
+        val preFilteringResults: MutableMap<MessageID, ComparisonContainer> = LinkedHashMap()
+
+        /**
+         * List of filters which haven't matched yet. It is created from the requested filters and reduced after every match
+         */
+        lateinit var messageFilters: MutableList<MessageFilterContainer>
+
+        val messageFilteringResults: MutableMap<MessageID, ComparisonContainer> = LinkedHashMap()
+        val matchedByKeys: MutableSet<MessageFilterContainer> = HashSet(protoMessageFilters.size)
     }
-    private lateinit var preFilteringResults: MutableMap<MessageID, ComparisonContainer>
+    override val refsKeeper = RefsKeeper(protoPreFilter.toRootMessageFilter().let { protoPreMessageFilter ->
+        Refs(
+            rootEvent = createRootEvent(),
+            onTaskFinished = onTaskFinished,
+            protoMessageFilters = protoMessageFilters,
+            protoPreMessageFilter = protoPreMessageFilter,
+            messagePreFilter = SailfishFilter(
+                PROTO_CONVERTER.fromProtoPreFilter(protoPreMessageFilter),
+                protoPreMessageFilter.toCompareSettings()
+            ),
+            metadataPreFilter = protoPreMessageFilter.metadataFilterOrNull()?.let {
+                SailfishFilter(
+                    PROTO_CONVERTER.fromMetadataFilter(it, VerificationUtil.METADATA_MESSAGE_NAME),
+                    it.toComparisonSettings()
+                )
+            }
+        )
+    })
 
-    /**
-     * List of filters which haven't matched yet. It is created from the requested filters and reduced after every match
-     */
-    private lateinit var messageFilters: MutableList<MessageFilterContainer>
-
-    private lateinit var messageFilteringResults: MutableMap<MessageID, ComparisonContainer>
-
-    private lateinit var preFilterEvent: Event
+    private val refs get() = refsKeeper.refs
 
     private var reordered: Boolean = false
-    private lateinit var matchedByKeys: MutableSet<MessageFilterContainer>
 
-    override fun onStart() {
-        super.onStart()
-
-        //Init or re-init variable in TASK_SCHEDULER thread
-        preFilteringResults = LinkedHashMap()
-
-        messageFilteringResults = LinkedHashMap()
-        messageFilters = protoMessageFilters.map {
+    override fun onStartInit() {
+        refs.messageFilters = refs.protoMessageFilters.map {
             MessageFilterContainer(
                 it,
-                SailfishFilter(CONVERTER.fromProtoPreFilter(it), it.toCompareSettings()),
+                SailfishFilter(PROTO_CONVERTER.fromProtoPreFilter(it), it.toCompareSettings()),
                 it.metadataFilterOrNull()?.let { metadataFilter ->
-                    SailfishFilter(CONVERTER.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
-                        metadataFilter.toComparisonSettings())
+                    SailfishFilter(
+                        PROTO_CONVERTER.fromMetadataFilter(metadataFilter, VerificationUtil.METADATA_MESSAGE_NAME),
+                        metadataFilter.toComparisonSettings()
+                    )
                 }
             )
         }.toMutableList()
 
-        matchedByKeys = HashSet(messageFilters.size)
-
-        preFilterEvent = Event.start()
-            .type("preFiltering")
-            .bodyData(protoPreMessageFilter.toReadableBodyCollection())
-
-        rootEvent.addSubEvent(preFilterEvent)
+        refs.rootEvent.addSubEvent(refs.preFilterEvent)
     }
 
     override fun Observable<MessageContainer>.taskPipeline(): Observable<MessageContainer> =
-        preFilterBy(this, protoPreMessageFilter, messagePreFilter, metadataPreFilter, LOGGER) { preFilterContainer -> // Update pre-filter state
+        preFilterBy(
+            this,
+            refs.protoPreMessageFilter,
+            refs.messagePreFilter,
+            refs.metadataPreFilter,
+            LOGGER
+        ) { preFilterContainer -> // Update pre-filter state
             with(preFilterContainer) {
-                preFilterEvent.appendEventsWithVerification(preFilterContainer)
-                preFilterEvent.messageID(protoActual.metadata.id)
-
-                preFilteringResults[protoActual.metadata.id] = preFilterContainer
+                refs.preFilterEvent.appendEventsWithVerification(preFilterContainer)
+                refs.preFilterEvent.messageID(holderActual.id)
+                refs.preFilteringResults[holderActual.id] = preFilterContainer
             }
         }
 
     override fun onNext(messageContainer: MessageContainer) {
-        for (index in messageFilters.indices) {
-            val messageFilterContainer = messageFilters[index]
+        for (index in refs.messageFilters.indices) {
+            val messageFilterContainer = refs.messageFilters[index]
 
             val messageFilter: SailfishFilter = messageFilterContainer.messageFilter
             val metadataFilter: SailfishFilter? = messageFilterContainer.metadataFilter
@@ -147,29 +168,28 @@ class SequenceCheckRuleTask(
             if (comparisonContainer.matchesByKeys) {
                 reordered = reordered || index != 0
 
-                messageFilters.removeAt(index)
+                refs.messageFilters.removeAt(index)
 
-                messageFilteringResults[messageContainer.protoMessage.metadata.id] = comparisonContainer
-                matchedByKeys.add(messageFilterContainer)
+                refs.messageFilteringResults[messageContainer.messageHolder.id] = comparisonContainer
+                refs.matchedByKeys.add(messageFilterContainer)
 
                 requireNotNull(result.messageResult) {
                     "Message result must not be null because the result said the message is matched by key fields. Filter: " +
-                        shortDebugString(messageFilterContainer.protoMessageFilter)
+                            shortDebugString(messageFilterContainer.protoMessageFilter)
                 }
                 break
             }
         }
 
-        val expectedMatches = protoMessageFilters.size
+        val expectedMatches = refs.protoMessageFilters.size
         // rule has found complete match for all filters or each filter has found a match by key fields at least
-        if (messageFilters.isEmpty() || (matchedByKeys.size == expectedMatches && messageFilteringResults.size >= expectedMatches)) {
+        if (refs.messageFilters.isEmpty() || (refs.matchedByKeys.size == expectedMatches && refs.messageFilteringResults.size >= expectedMatches)) {
             checkComplete()
         }
     }
 
     override fun completeEvent(taskState: State) {
-        preFilterEvent.name("Pre-filtering (filtered ${preFilteringResults.size} / processed $handledMessageCounter) messages")
-
+        refs.preFilterEvent.name("Pre-filtering (filtered ${refs.preFilteringResults.size} / processed $handledMessageCounter) messages")
         fillSequenceEvent()
         fillCheckMessagesEvent()
     }
@@ -179,21 +199,21 @@ class SequenceCheckRuleTask(
     override fun type(): String = "checkSequenceRule"
 
     override fun setup(rootEvent: Event) {
-        rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$sessionAlias ($direction direction)"} }"))
+        rootEvent.bodyData(createMessageBean("Check sequence rule for messages from ${sessionKey.run { "$bookName $sessionAlias ($direction direction)" }}"))
     }
 
     /**
      * Creates events for check messages
      */
     private fun fillCheckMessagesEvent() {
-        val checkMessagesEvent = rootEvent.addSubEventWithSamePeriod()
+        val checkMessagesEvent = refs.rootEvent.addSubEventWithSamePeriod()
             .name("Check messages")
             .type(CHECK_MESSAGES_TYPE)
-            .appendEventWithVerificationsAndFilters(protoMessageFilters, messageFilteringResults.values)
-        if (protoMessageFilters.size != messageFilteringResults.size) {
-            messageFilteringResults.values.map(ComparisonContainer::protoFilter)
+            .appendEventWithVerificationsAndFilters(refs.protoMessageFilters, refs.messageFilteringResults.values)
+        if (refs.protoMessageFilters.size != refs.messageFilteringResults.size) {
+            refs.messageFilteringResults.values.map(ComparisonContainer::protoFilter)
             checkMessagesEvent.status(FAILED)
-                .bodyData(createMessageBean("Incorrect number of comparisons (expected ${protoMessageFilters.size} / actual ${messageFilteringResults.size})"))
+                .bodyData(createMessageBean("Incorrect number of comparisons (expected ${refs.protoMessageFilters.size} / actual ${refs.messageFilteringResults.size})"))
         } else {
             checkMessagesEvent.bodyData(createMessageBean("Contains comparisons"))
         }
@@ -204,30 +224,49 @@ class SequenceCheckRuleTask(
      */
     private fun fillSequenceEvent() {
         val sequenceTable = TableBuilder<CheckSequenceRow>()
-        preFilteringResults.forEach { (messageID: MessageID, comparisonContainer: ComparisonContainer) ->
-            val container = messageFilteringResults[messageID]
+        refs.preFilteringResults.forEach { (messageID: MessageID, comparisonContainer: ComparisonContainer) ->
+            val container = refs.messageFilteringResults[messageID]
             sequenceTable.row(
                 container?.let {
-                    CheckSequenceUtils.createBothSide(it.sailfishActual, it.protoActual.metadata, it.protoFilter, sessionKey.sessionAlias)
-                } ?: CheckSequenceUtils.createOnlyActualSide(comparisonContainer.sailfishActual, sessionKey.sessionAlias)
+                    CheckSequenceUtils.createBothSide(
+                        it.sailfishActual,
+                        it.holderActual.properties,
+                        it.protoFilter,
+                        sessionKey.sessionAlias
+                    )
+                } ?: CheckSequenceUtils.createOnlyActualSide(
+                    comparisonContainer.sailfishActual,
+                    sessionKey.sessionAlias
+                )
             )
         }
-        messageFilters.forEach { messageFilter: MessageFilterContainer ->
-            sequenceTable.row(CheckSequenceUtils.createOnlyExpectedSide(messageFilter.protoMessageFilter, sessionKey.sessionAlias))
+        refs.messageFilters.forEach { messageFilter: MessageFilterContainer ->
+            sequenceTable.row(
+                CheckSequenceUtils.createOnlyExpectedSide(
+                    messageFilter.protoMessageFilter,
+                    sessionKey.sessionAlias
+                )
+            )
         }
 
-        rootEvent.addSubEventWithSamePeriod()
-            .name("Check sequence (expected ${protoMessageFilters.size} / actual ${preFilteringResults.size} , check order $checkOrder)")
+        refs.rootEvent.addSubEventWithSamePeriod()
+            .name("Check sequence (expected ${refs.protoMessageFilters.size} / actual ${refs.preFilteringResults.size} , check order $checkOrder)")
             .type("checkSequence")
-            .status(if (protoMessageFilters.size == preFilteringResults.size
-                && !(checkOrder && reordered)) PASSED else FAILED)
-            .bodyData(MessageBuilder()
-                .text("Expected ${protoMessageFilters.size}, Actual ${preFilteringResults.size}" +
-                    if (checkOrder)
-                        ", " + if (reordered) "Out of order"
-                        else "In order"
-                    else "")
-                .build())
+            .status(
+                if (refs.protoMessageFilters.size == refs.preFilteringResults.size
+                    && !(checkOrder && reordered)
+                ) PASSED else FAILED
+            )
+            .bodyData(
+                MessageBuilder()
+                    .text(
+                        "Expected ${refs.protoMessageFilters.size}, Actual ${refs.preFilteringResults.size}" +
+                                if (checkOrder)
+                                    ", " + if (reordered) "Out of order"
+                                    else "In order"
+                                else ""
+                    ).build()
+            )
             .bodyData(sequenceTable.build())
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,7 +31,6 @@ import com.exactpro.th2.common.message.messageFilter
 import com.exactpro.th2.common.value.nullValue
 import com.exactpro.th2.common.value.toValue
 import com.exactpro.th2.common.value.toValueFilter
-import com.exactpro.th2.sailfish.utils.ProtoToIMessageConverter
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -45,15 +44,17 @@ internal class TestVerificationUtil {
     internal fun convertsMetadataFilterToMetaContainer() {
         val metaContainer = VerificationUtil.toMetaContainer(
             MetadataFilter.newBuilder()
-                .putPropertyFilters("keyProp", "42".toSimpleFilter(FilterOperation.EQUAL, true))
+                .putPropertyFilters("keyProp", "42".toPropertyFilter(FilterOperation.EQUAL, true))
                 .build()
         )
         Assertions.assertTrue(metaContainer.hasKeyFields()) {
             "MetaContainer does not have key fields: $metaContainer"
         }
-        Assertions.assertEquals(mapOf(
-            "keyProp" to false /*not transitive*/
-        ), metaContainer.keyFields)
+        Assertions.assertEquals(
+            mapOf(
+                "keyProp" to false /*not transitive*/
+            ), metaContainer.keyFields
+        )
     }
 
     @ParameterizedTest
@@ -61,13 +62,16 @@ internal class TestVerificationUtil {
     fun `fail unexpected test`(valueFilter: ValueFilter, value: Value) {
         val filter: RootMessageFilter = RootMessageFilter.newBuilder()
             .setMessageType("Test")
-            .setMessageFilter(MessageFilter.newBuilder()
-                .putFields("A", valueFilter)
-                .setComparisonSettings(ComparisonSettings.newBuilder()
-                    .setFailUnexpected(FailUnexpected.FIELDS_AND_MESSAGES)
+            .setMessageFilter(
+                MessageFilter.newBuilder()
+                    .putFields("A", valueFilter)
+                    .setComparisonSettings(
+                        ComparisonSettings.newBuilder()
+                            .setFailUnexpected(FailUnexpected.FIELDS_AND_MESSAGES)
+                            .build()
+                    )
                     .build()
-                )
-                .build())
+            )
             .build()
 
         val actual = message("Test").apply {
@@ -91,7 +95,7 @@ internal class TestVerificationUtil {
     }
 
     companion object {
-        private val converter = AbstractCheckTask.CONVERTER
+        private val converter = AbstractCheckTask.PROTO_CONVERTER
 
         @JvmStatic
         fun failUnexpectedByFieldsAndMessages(): Stream<Arguments> = Stream.of(

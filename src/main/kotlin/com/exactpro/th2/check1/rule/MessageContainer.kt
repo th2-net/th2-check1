@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,22 +15,22 @@ package com.exactpro.th2.check1.rule
 import com.exactpro.sf.common.impl.messages.DefaultMessageFactory
 import com.exactpro.sf.common.messages.IMessage
 import com.exactpro.sf.comparison.ComparatorSettings
-import com.exactpro.sf.comparison.ComparisonResult
-import com.exactpro.th2.check1.util.VerificationUtil
+import com.exactpro.th2.check1.util.VerificationUtil.toSailfishMessage
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.utils.message.MessageHolder
+import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 
 class MessageContainer(
-    val protoMessage: Message,
+    val messageHolder: MessageHolder,
     val sailfishMessage: IMessage
 ) {
-    val metadataMessage: IMessage by lazy {
-        VerificationUtil.toMessage(protoMessage.metadata)
-    }
+    val metadataMessage: IMessage by lazy { toSailfishMessage(messageHolder.properties) }
 
     companion object {
         private val EMPTY_MESSAGE = DefaultMessageFactory.getFactory().createMessage("empty", "empty")
+
         @JvmField
-        val FAKE = MessageContainer(Message.getDefaultInstance(), EMPTY_MESSAGE)
+        val FAKE = MessageContainer(ProtoMessageHolder(Message.getDefaultInstance()), EMPTY_MESSAGE)
     }
 }
 

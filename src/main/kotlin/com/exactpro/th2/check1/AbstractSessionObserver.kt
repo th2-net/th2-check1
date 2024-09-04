@@ -13,6 +13,7 @@
 package com.exactpro.th2.check1
 
 import io.reactivex.observers.DisposableObserver
+import mu.KotlinLogging
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -26,8 +27,7 @@ abstract class AbstractSessionObserver<T> : DisposableObserver<T>() {
     }
 
     companion object {
-        @Suppress("JAVA_CLASS_ON_COMPANION")
         @JvmField
-        val LOGGER: Logger = LoggerFactory.getLogger(javaClass.enclosingClass)
+        val LOGGER: Logger = LoggerFactory.getLogger(AbstractSessionObserver::class.java)
     }
 }

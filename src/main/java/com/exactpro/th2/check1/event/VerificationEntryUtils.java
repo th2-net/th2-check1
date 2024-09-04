@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.exactpro.th2.check1.event;
 
-import java.util.LinkedHashMap;
-import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
-import org.jetbrains.annotations.Nullable;
-
-import com.exactpro.sf.aml.scriptutil.StaticUtil.IFilter;
 import com.exactpro.sf.comparison.ComparisonResult;
+import com.exactpro.sf.comparison.ComparisonUtil;
 import com.exactpro.sf.comparison.Formatter;
+import com.exactpro.sf.comparison.IComparisonFilter;
 import com.exactpro.sf.scriptrunner.StatusType;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
 import com.exactpro.th2.common.grpc.FilterOperation;
 import com.exactpro.th2.sailfish.utils.filter.IOperationFilter;
 import com.exactpro.th2.sailfish.utils.filter.util.FilterUtils;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.LinkedHashMap;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class VerificationEntryUtils {
 
@@ -38,7 +39,7 @@ public class VerificationEntryUtils {
         VerificationEntry verificationEntry = new VerificationEntry();
         verificationEntry.setActual(convertActual(result));
         verificationEntry.setExpected(convertExpectedResult(result));
-        verificationEntry.setStatus(toVerificationStatus(result.getStatus()));
+        verificationEntry.setStatus(toVerificationStatus(result));
         verificationEntry.setKey(result.isKey());
         verificationEntry.setOperation(resolveOperation(result));
         verificationEntry.setHint(extractHint(result));
@@ -68,11 +69,11 @@ public class VerificationEntryUtils {
 
     private static String resolveOperation(ComparisonResult result) {
         Object expected = result.getExpected();
-        if (expected instanceof IFilter) {
+        if (expected instanceof IComparisonFilter) {
             if (expected instanceof IOperationFilter) {
-                return ((IOperationFilter)expected).getOperation().name();
+                return ((IOperationFilter) expected).getOperation().name();
             }
-            String condition = ((IFilter)expected).getCondition();
+            String condition = ((IComparisonFilter) expected).getCondition();
             if (condition.contains("!=")) {
                 return FilterOperation.NOT_EQUAL.name();
             }
@@ -86,20 +87,21 @@ public class VerificationEntryUtils {
         return FilterOperation.EQUAL.name();
     }
 
-    private static VerificationStatus toVerificationStatus(StatusType statusType) {
+    private static VerificationStatus toVerificationStatus(ComparisonResult result) {
+        StatusType statusType = result.getStatus();
         if (statusType == null) {
-            return null;
+            statusType = ComparisonUtil.getStatusType(result);
         }
 
         switch (statusType) {
-        case NA:
-            return VerificationStatus.NA;
-        case FAILED:
-            return VerificationStatus.FAILED;
-        case PASSED:
-            return VerificationStatus.PASSED;
-        default:
-            throw new IllegalArgumentException("Unsupported status type '" + statusType + '\'');
+            case NA:
+                return VerificationStatus.NA;
+            case FAILED:
+                return VerificationStatus.FAILED;
+            case PASSED:
+                return VerificationStatus.PASSED;
+            default:
+                throw new IllegalArgumentException("Unsupported status type '" + statusType + '\'');
         }
     }
 
