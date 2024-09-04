@@ -395,6 +395,22 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Migrated `common` version from `3.44.0` to `3.44.1`
 + Updated bom to `4.2.0`
 
+### 3.10.3
+
+#### Changed:
++ Excluded `apache-mina-core` from dependencies list
+
+### 3.10.2
+
+#### Changed:
++ Excluded `junit` from dependencies list
+
+### 3.10.1
+
+#### Changed:
++ Migrated `common` version from `3.44.0` to `3.44.1`
++ Updated bom to `4.2.0`
+
 ### 3.10.0
 
 #### Added:
