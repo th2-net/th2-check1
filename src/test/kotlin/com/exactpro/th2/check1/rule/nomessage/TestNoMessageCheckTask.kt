@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2024 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,12 @@ import com.exactpro.th2.check1.entities.TaskTimeout
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
 import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
+import com.exactpro.th2.common.grpc.EventStatus.FAILED
+import com.exactpro.th2.common.grpc.EventStatus.SUCCESS
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.utils.message.MessageHolder
@@ -32,6 +35,7 @@ import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.exactpro.th2.common.value.toValue
 import io.reactivex.Observable
+import io.reactivex.subjects.PublishSubject
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -73,7 +77,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         val eventsList = eventBatch.flatMap(EventBatch::getEventsList)
 
         assertAll({
-            assertTrue(eventsList.all { it.status == EventStatus.SUCCESS }, "Has messages outside the prefilter")
+            assertTrue(eventsList.all { it.status == SUCCESS }, "Has messages outside the prefilter")
         }, {
             val rootEvent = eventsList.first()
             assertEquals(5, rootEvent.attachedMessageIdsCount, "Message sequences: ${rootEvent.attachedMessageIdsList.map(MessageID::getSequence)}")
@@ -123,7 +127,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
 
         assertAll({
             val rootEvent = eventsList.first()
-            assertEquals(rootEvent.status, EventStatus.FAILED, "Event status should be failed")
+            assertEquals(rootEvent.status, FAILED, "Event status should be failed")
             assertEquals(4, rootEvent.attachedMessageIdsCount)
             assertEquals((2..5L).toList(), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
@@ -171,7 +175,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
 
         assertAll({
             val rootEvent = eventsList.first()
-            assertEquals(rootEvent.status, EventStatus.FAILED, "Root event should be failed due to timeout")
+            assertEquals(rootEvent.status, FAILED, "Root event should be failed due to timeout")
             assertEquals(5, rootEvent.attachedMessageIdsCount)
             assertEquals((1..5L).toList(), rootEvent.attachedMessageIdsList.map { it.sequence })
         }, {
@@ -192,6 +196,234 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
     }
 
 
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `check messages without message timeout without new messages incoming`(useTransport: Boolean) {
+        val checkpointTimestamp = Instant.now()
+        val sequence = 1L
+        val startMessage = createMessage(
+            useTransport,
+            MessageData("A", "1", getTimestamp(checkpointTimestamp, 0)),
+            sequence
+        )
+
+        val publisher = PublishSubject.create<MessageHolder>()
+
+        val streams = publisher.groupBy { wrapper ->
+            wrapper.id.run { SessionKey(bookName, connectionId.sessionAlias, direction) }
+        }.map { group -> StreamContainer(group.key!!, 100, group) }
+            .replay().apply { connect() }
+
+        publisher.onNext(startMessage)
+
+        val eventID = createRootEventId()
+        val task = noMessageCheckTask(
+            eventID,
+            streams,
+            createPreFilter("B", "2"),
+            TaskTimeout(100, 0)
+        )
+        task.begin(createCheckpoint(checkpointTimestamp, sequence))
+
+        val eventBatch = awaitEventBatchRequest(1000L, 4)
+        val eventsList = eventBatch.flatMap(EventBatch::getEventsList)
+
+        assertAll(
+            { assertEquals(5, eventsList.size, "Incorrect number of events") },
+            { eventsList.assertEvent("noMessageCheck", "No message check - Test") },
+            { eventsList.assertEvent("noMessagesCheckResult", "Check passed") },
+            {
+                eventsList.assertEvent(
+                    "noMessageCheckExecutionStop",
+                    "Task has been completed because: TIMEOUT"
+                )
+            },
+            {
+                eventsList.assertEvent(
+                    "ruleStartPoint",
+                    "Rule works from the 1 sequence in session $SESSION_ALIAS and direction ${Direction.FIRST}",
+                    messageIds = listOf(startMessage.id.withoutSessionGroup())
+                )
+            },
+            { eventsList.assertEvent("preFiltering", "Prefilter: 0 messages were filtered.") },
+        )
+    }
+
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `check messages without message timeout when new messages aren't matched by pre filter`(useTransport: Boolean) {
+        val checkpointTimestamp = Instant.now()
+        val sequence = 1L
+        val startMessage = createMessage(
+            useTransport,
+            MessageData("A", "1", getTimestamp(checkpointTimestamp, 0)),
+            sequence
+        )
+        val newMessage = createMessage(
+            useTransport,
+            MessageData("A", "1", getTimestamp(checkpointTimestamp, 10)),
+            sequence + 1
+        )
+
+        val publisher = PublishSubject.create<MessageHolder>()
+
+        val streams = publisher.groupBy { wrapper ->
+            wrapper.id.run { SessionKey(bookName, connectionId.sessionAlias, direction) }
+        }.map { group -> StreamContainer(group.key!!, 100, group) }
+            .replay().apply { connect() }
+
+        publisher.onNext(startMessage)
+        publisher.onNext(newMessage)
+
+        val eventID = createRootEventId()
+        val task = noMessageCheckTask(
+            eventID,
+            streams,
+            createPreFilter("B", "2"),
+            TaskTimeout(100, 0)
+        )
+        task.begin(createCheckpoint(checkpointTimestamp, sequence))
+
+        val eventBatch = awaitEventBatchRequest(1000L, 4)
+        val eventsList = eventBatch.flatMap(EventBatch::getEventsList)
+
+        assertAll(
+            { assertEquals(5, eventsList.size, "Incorrect number of events") },
+            { eventsList.assertEvent("noMessageCheck", "No message check - Test", messageIds = listOf(newMessage.id)) },
+            { eventsList.assertEvent("noMessagesCheckResult", "Check passed") },
+            {
+                eventsList.assertEvent(
+                    "noMessageCheckExecutionStop",
+                    "Task has been completed because: TIMEOUT"
+                )
+            },
+            {
+                eventsList.assertEvent(
+                    "ruleStartPoint",
+                    "Rule works from the 1 sequence in session $SESSION_ALIAS and direction ${Direction.FIRST}",
+                    messageIds = listOf(startMessage.id.withoutSessionGroup())
+                )
+            },
+            { eventsList.assertEvent("preFiltering", "Prefilter: 0 messages were filtered.") },
+        )
+    }
+
+    @ParameterizedTest(name = "useTransport = {0}")
+    @ValueSource(booleans = [true, false])
+    fun `check messages without message timeout when new messages are matched by pre filter`(useTransport: Boolean) {
+        val checkpointTimestamp = Instant.now()
+        val sequence = 1L
+        val startMessage = createMessage(
+            useTransport,
+            MessageData("A", "1", getTimestamp(checkpointTimestamp, 0)),
+            sequence
+        )
+        val newMessage = createMessage(
+            useTransport,
+            MessageData("B", "2", getTimestamp(checkpointTimestamp, 10)),
+            sequence + 1
+        )
+
+        val publisher = PublishSubject.create<MessageHolder>()
+
+        val streams = publisher.groupBy { wrapper ->
+            wrapper.id.run { SessionKey(bookName, connectionId.sessionAlias, direction) }
+        }.map { group -> StreamContainer(group.key!!, 100, group) }
+            .replay().apply { connect() }
+
+        publisher.onNext(startMessage)
+        publisher.onNext(newMessage)
+
+        val eventID = createRootEventId()
+        val task = noMessageCheckTask(
+            eventID,
+            streams,
+            createPreFilter("B", "2"),
+            TaskTimeout(100, 0)
+        )
+        task.begin(createCheckpoint(checkpointTimestamp, sequence))
+
+        val eventBatch = awaitEventBatchRequest(1000L, 6)
+        val eventsList = eventBatch.flatMap(EventBatch::getEventsList)
+
+        assertAll(
+            { assertEquals(6, eventsList.size, "Incorrect number of events") },
+            { eventsList.assertEvent("noMessageCheck", "No message check - Test", FAILED, listOf(newMessage.id)) },
+            {
+                eventsList.assertEvent(
+                    "noMessagesCheckResult",
+                    "Check failed: 1 extra messages were found.",
+                    FAILED,
+                    listOf(newMessage.id)
+                )
+            },
+            {
+                eventsList.assertEvent(
+                    "noMessageCheckExecutionStop",
+                    "Task has been completed because: TIMEOUT",
+                    SUCCESS
+                )
+            },
+            {
+                eventsList.assertEvent(
+                    "ruleStartPoint",
+                    "Rule works from the 1 sequence in session $SESSION_ALIAS and direction ${Direction.FIRST}",
+                    messageIds = listOf(startMessage.id.withoutSessionGroup())
+                )
+            },
+            {
+                eventsList.assertEvent(
+                    "preFiltering",
+                    "Prefilter: 1 messages were filtered.",
+                    messageIds = listOf(newMessage.id)
+                )
+            },
+            {
+                eventsList.assertEvent(
+                    "Verification",
+                    "Verification '$MESSAGE_TYPE' message",
+                    messageIds = listOf(newMessage.id)
+                )
+            },
+        )
+    }
+
+    private fun MessageID.withoutSessionGroup() = this.toBuilder().apply {
+        connectionIdBuilder.sessionGroup = ""
+    }.build()
+
+    private fun List<Event>.assertEvent(
+        type: String,
+        name: String,
+        status: EventStatus = SUCCESS,
+        messageIds: List<MessageID> = emptyList()
+    ) {
+        val event = findEventByType(type)
+        assertNotNull(event, "Missed $type event in ${map(Event::getType)} event list")
+        assertEquals(status, event.status, "Incorrect event status for $type event type")
+        assertEquals(name, event.name, "Incorrect event name for $type event type")
+        assertEquals(
+            messageIds.size,
+            event.attachedMessageIdsCount,
+            "Incorrect number of attache message ids for $type event type"
+        )
+        assertEquals(
+            messageIds,
+            event.attachedMessageIdsList,
+            "Incorrect attache message ids for $type event type"
+        )
+    }
+
+    private fun createMessage(
+        useTransport: Boolean,
+        messageData: MessageData,
+        sequence: Long
+    ): MessageHolder = if (useTransport) {
+        createTransportMessage(messageData, sequence)
+    } else {
+        createProtoMessage(messageData, sequence)
+    }
+
     private fun createMessages(
         useTransport: Boolean,
         vararg messageData: MessageData,
@@ -201,22 +433,46 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
         createProtoMessages(*messageData)
     }
 
+    private fun createProtoMessage(
+        data: MessageData,
+        sequence: Long
+    ): ProtoMessageHolder {
+        return ProtoMessageHolder(
+            constructProtoMessage(
+                sequence,
+                SESSION_ALIAS,
+                type = MESSAGE_TYPE,
+                direction = Direction.FIRST,
+                timestamp = data.timestamp.toTimestamp()
+            ).putFields(data.fieldName, data.value.toValue())
+                .build()
+        )
+    }
+
     private fun createProtoMessages(
         vararg messageData: MessageData,
     ): List<MessageHolder> {
         var sequence = 1L
         return messageData.map { data ->
-            ProtoMessageHolder(
-                constructProtoMessage(
-                    sequence++,
-                    SESSION_ALIAS,
-                    MESSAGE_TYPE,
-                    Direction.FIRST,
-                    data.timestamp.toTimestamp()
-                ).putFields(data.fieldName, data.value.toValue())
-                    .build()
-            )
+            createProtoMessage(data, sequence++)
         }
+    }
+
+    private fun createTransportMessage(
+        data: MessageData,
+        sequence: Long
+    ): TransportMessageHolder {
+        return TransportMessageHolder(
+            constructTransportMessage(
+                sequence,
+                SESSION_ALIAS,
+                MESSAGE_TYPE,
+                TransportDirection.INCOMING,
+                data.timestamp
+            ).setBody(hashMapOf(data.fieldName to data.value)).build(),
+            BOOK_NAME,
+            ""
+        )
     }
 
     private fun createTransportMessages(
@@ -224,17 +480,7 @@ class TestNoMessageCheckTask : AbstractCheckTaskTest() {
     ): List<MessageHolder> {
         var sequence = 1L
         return messageData.map { data ->
-            TransportMessageHolder(
-                constructTransportMessage(
-                    sequence++,
-                    SESSION_ALIAS,
-                    MESSAGE_TYPE,
-                    TransportDirection.INCOMING,
-                    data.timestamp
-                ).setBody(hashMapOf(data.fieldName to data.value)).build(),
-                BOOK_NAME,
-                ""
-            )
+            createTransportMessage(data, sequence++)
         }
     }
 
