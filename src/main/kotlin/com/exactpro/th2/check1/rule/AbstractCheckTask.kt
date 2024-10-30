@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +106,7 @@ abstract class AbstractCheckTask(
     private val refs get() = refsKeeper.refs
 
     val description: String? = ruleConfiguration.description
-    private val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
+    protected val taskTimeout: TaskTimeout = ruleConfiguration.taskTimeout
 
     protected var handledMessageCounter: Long = 0
 

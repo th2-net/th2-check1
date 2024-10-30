@@ -83,6 +83,7 @@ abstract class AbstractCheckTaskTest {
     fun constructProtoMessage(
         sequence: Long = 1,
         alias: String = SESSION_ALIAS,
+        group: String = alias,
         type: String = MESSAGE_TYPE,
         direction: Direction = FIRST,
         timestamp: Timestamp = Instant.now().toTimestamp()
@@ -92,7 +93,8 @@ abstract class AbstractCheckTaskTest {
             idBuilder.apply {
                 this.sequence = sequence
                 this.direction = direction
-                connectionIdBuilder.sessionAlias = alias
+                connectionIdBuilder.setSessionGroup(group)
+                    .setSessionAlias(alias)
                 this.bookName = BOOK_NAME
                 this.timestamp = timestamp
             }

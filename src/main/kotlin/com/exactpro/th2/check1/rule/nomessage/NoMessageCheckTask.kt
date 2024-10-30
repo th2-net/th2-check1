@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2024 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,9 @@ class NoMessageCheckTask(
     eventBatchRouter: MessageRouter<EventBatch>,
     onTaskFinished: ((EventStatus) -> Unit) = EMPTY_STATUS_CONSUMER
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
+
+    private val hasMessageTimeout: Boolean
+        get() = taskTimeout.messageTimeout != 0L
 
     protected class Refs(
         rootEvent: Event,
@@ -141,7 +144,7 @@ class NoMessageCheckTask(
             val executionStopEvent = Event.start()
                 .name("Task has been completed because: ${taskState.name}")
                 .type("noMessageCheckExecutionStop")
-            if (taskState != State.TIMEOUT || !isCheckpointLastReceivedMessage()) {
+            if (taskState != State.TIMEOUT || (hasMessageTimeout && !isCheckpointLastReceivedMessage())) {
                 executionStopEvent.status(Event.Status.FAILED)
             }
             refs.resultEvent.addSubEvent(executionStopEvent)

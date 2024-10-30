@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,7 +100,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
     private val protoMessagesInCorrectOrder: List<MessageHolder> = listOf(
         ProtoMessageHolder(
-            constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
+            constructProtoMessage(1, SESSION_ALIAS, type = MESSAGE_TYPE)
                 .putAllFields(
                     mapOf(
                         "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -122,7 +122,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
             ""
         ),
         ProtoMessageHolder(
-            constructProtoMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
+            constructProtoMessage(3, SESSION_ALIAS, type = MESSAGE_TYPE)
                 .putAllFields(
                     mapOf(
                         "A" to Value.newBuilder().setSimpleValue("44").build(),
@@ -242,7 +242,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `check sequence should drop a message filter after match by key fields`(checkOrder: Boolean) {
         val messagesWithKeyFields: List<MessageHolder> = listOf(
             ProtoMessageHolder(
-                constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(1, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -252,7 +252,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     .build()
             ),
             ProtoMessageHolder(
-                constructProtoMessage(2, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(2, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -314,7 +314,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `check sequence of messages with the same value of key field`() {
         val messagesWithKeyFields: List<MessageHolder> = listOf(
             ProtoMessageHolder(
-                constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(1, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -324,7 +324,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     .build()
             ),
             ProtoMessageHolder(
-                constructProtoMessage(2, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(2, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -334,7 +334,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     .build()
             ),
             ProtoMessageHolder(
-                constructProtoMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(3, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -399,7 +399,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     1,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 100)
                 )
                     .putAllFields(
@@ -414,7 +414,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 100)
                 )
                     .putAllFields(
@@ -429,7 +429,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     3,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 200)
                 )
                     .putAllFields(
@@ -444,7 +444,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     4,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 300)
                 )
                     .putAllFields(
@@ -517,7 +517,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     1,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 100)
                 )
                     .putAllFields(
@@ -532,7 +532,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 500)
                 )
                     .putAllFields(
@@ -547,7 +547,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     3,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 600)
                 )
                     .putAllFields(
@@ -562,7 +562,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     4,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 700)
                 )
                     .putAllFields(
@@ -630,7 +630,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     1,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 500)
                 )
                     .putAllFields(
@@ -645,7 +645,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 600)
                 )
                     .putAllFields(
@@ -718,7 +718,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 500)
                 )
                     .putAllFields(
@@ -733,7 +733,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     3,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE,
+                    type = MESSAGE_TYPE,
                     timestamp = getProtoTimestamp(checkpointTimestamp, 600)
                 )
                     .putAllFields(
@@ -799,7 +799,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `check ordering is not failed in case key fields are matches the order but the rest are not`() {
         val messagesWithKeyFields: List<MessageHolder> = listOf(
             ProtoMessageHolder(
-                constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(1, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -809,7 +809,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     .build()
             ),
             ProtoMessageHolder(
-                constructProtoMessage(2, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(2, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("43").build(),
@@ -819,7 +819,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     .build()
             ),
             ProtoMessageHolder(
-                constructProtoMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(3, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("44").build(),
@@ -891,7 +891,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
     fun `rules stops when all filters found match by key fields`() {
         val messagesWithKeyFields: List<MessageHolder> = listOf(
             ProtoMessageHolder(
-                constructProtoMessage(1, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(1, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("42").build(),
@@ -904,7 +904,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                 constructProtoMessage(
                     2,
                     SESSION_ALIAS,
-                    MESSAGE_TYPE
+                    type = MESSAGE_TYPE
                 ) // goes to processed messages but should not go to the actual comparison
                     .putAllFields(
                         mapOf(
@@ -914,7 +914,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     .build()
             ),
             ProtoMessageHolder(
-                constructProtoMessage(3, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(3, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("43").build(),
@@ -924,7 +924,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     .build()
             ),
             ProtoMessageHolder(
-                constructProtoMessage(4, SESSION_ALIAS, MESSAGE_TYPE)
+                constructProtoMessage(4, SESSION_ALIAS, type = MESSAGE_TYPE)
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("44").build(),
@@ -934,7 +934,7 @@ class TestSequenceCheckTask : AbstractCheckTaskTest() {
                     .build()
             ),
             ProtoMessageHolder(
-                constructProtoMessage(5, SESSION_ALIAS, MESSAGE_TYPE) // should not be processed
+                constructProtoMessage(5, SESSION_ALIAS, type = MESSAGE_TYPE) // should not be processed
                     .putAllFields(
                         mapOf(
                             "A" to Value.newBuilder().setSimpleValue("42").build(),
