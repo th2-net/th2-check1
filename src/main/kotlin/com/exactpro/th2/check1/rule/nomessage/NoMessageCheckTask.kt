@@ -48,7 +48,8 @@ class NoMessageCheckTask(
     onTaskFinished: ((EventStatus) -> Unit) = EMPTY_STATUS_CONSUMER
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
-    private val hasMessageTimeout = ruleConfiguration.taskTimeout.messageTimeout != 0L
+    private val hasMessageTimeout: Boolean
+        get() = taskTimeout.messageTimeout != 0L
 
     protected class Refs(
         rootEvent: Event,
