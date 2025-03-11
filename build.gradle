@@ -1,13 +1,11 @@
 plugins {
     id "org.jetbrains.kotlin.jvm" version "$kotlin_version"
     id "application"
-    id "com.exactpro.th2.gradle.component" version "0.1.3"
+    id "com.exactpro.th2.gradle.component" version "0.2.4"
 }
 
 group = 'com.exactpro.th2'
 version = release_version
-
-kotlin.jvmToolchain(11)
 
 ext {
     commonVersion = '5.14.0-dev'
@@ -21,28 +19,6 @@ ext {
 }
 
 repositories {
-    maven {
-        name 'Sonatype_snapshots'
-        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
-        content {
-            excludeSailfish(it)
-        }
-    }
-
-    // ignoreGradleMetadataRedirection is used for sonatype because
-    // Sailfish dependencies have constrains that interfere with our BOM
-    // so we exclude Gradle metadata for this repositories.
-    // We've checked these versions - they are compatible and safe to use
-    maven {
-        name 'Sonatype_snapshots'
-        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
-        metadataSources {
-            mavenPom()
-            artifact()
-            ignoreGradleMetadataRedirection()
-        }
-    }
-
     maven {
         name 'Sonatype_releases'
         url 'https://s01.oss.sonatype.org/content/repositories/releases/'

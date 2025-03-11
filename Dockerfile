@@ -1,4 +1,4 @@
-FROM gradle:8.7-jdk11 AS build
+FROM gradle:8.11.1-jdk11 AS build
 ARG release_version
 
 COPY ./ .
