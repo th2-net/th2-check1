@@ -8,8 +8,6 @@ group = 'com.exactpro.th2'
 version = release_version
 
 ext {
-    commonVersion = '5.14.0-dev'
-    sailfishVersion = '3.3.241'
     excludeSailfish = { rcd ->
         rcd.excludeModule("com.exactpro.sf", "sailfish-core")
         rcd.excludeModule("com.exactpro.sf", "sailfish-common")
@@ -47,7 +45,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.exactpro.th2:common:$commonVersion"
+    implementation "com.exactpro.th2:common:5.14.0-dev"
     implementation "com.exactpro.th2:grpc-check1:4.4.1-dev"
     implementation "com.exactpro.th2:common-utils:2.3.0-dev"
     implementation("com.exactpro.th2:sailfish-utils:4.1.1-dev") {
@@ -59,7 +57,7 @@ dependencies {
 
     implementation "org.slf4j:slf4j-api"
 
-    implementation ("com.exactpro.sf:sailfish-common:$sailfishVersion") {
+    implementation ("com.exactpro.sf:sailfish-common:3.3.241") {
         exclude group: "commons-configuration", module: "commons-configuration" // because of the vulnerability
         exclude group: "com.fasterxml.jackson.dataformat", module: "jackson-dataformat-yaml" // because of the vulnerability
         exclude group: "com.exactpro.mina", module: "apache-mina-core" // because of the vulnerability
