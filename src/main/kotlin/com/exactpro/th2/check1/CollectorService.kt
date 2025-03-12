@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,9 +37,9 @@ import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.grpc.RequestStatus
 import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.schema.message.DeliveryMetadata
-import com.exactpro.th2.common.grpc.RequestStatus
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
@@ -49,18 +49,18 @@ import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.fasterxml.jackson.core.JsonProcessingException
-import io.reactivex.Observable
-import io.reactivex.subjects.PublishSubject
+import io.reactivex.rxjava3.core.Observable
+import io.reactivex.rxjava3.subjects.PublishSubject
 import mu.KotlinLogging
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ForkJoinPool
-import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicLong
+import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 
 class CollectorService(
     protoMessageRouter: MessageRouter<MessageBatch>,
@@ -182,7 +182,7 @@ class CollectorService(
         val silenceCheck = if (request.hasSilenceCheck()) request.silenceCheck.value else defaultAutoSilenceCheck
 
         val (silenceCheckTask, silenceFuture) = if (silenceCheck) {
-            val (_, resultFutureSilence, onTaskFinishedSilence) = prepareStoringResults(request.storeResult)
+            val (_, resultFutureSilence, _) = prepareStoringResults(request.storeResult)
             ruleFactory.createSilenceCheck(
                 request,
                 olderThanTimeUnit.duration.toMillis() * olderThanDelta,
@@ -258,7 +258,7 @@ class CollectorService(
                 }
             }
         } catch (e: TimeoutException) {
-            logger.debug("Timeout expired")
+            logger.debug("Timeout expired", e)
             RuleResult.TIMEOUT
         } catch (e: Exception) {
             logger.error("Failed to retrieve rule result: ", e)

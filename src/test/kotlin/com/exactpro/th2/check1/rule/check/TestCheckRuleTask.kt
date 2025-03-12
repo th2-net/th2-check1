@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import com.exactpro.th2.check1.grpc.ChainID
 import com.exactpro.th2.check1.grpc.CheckRuleRequest
 import com.exactpro.th2.check1.rule.AbstractCheckTask.Companion.EMPTY_STATUS_CONSUMER
 import com.exactpro.th2.check1.rule.AbstractCheckTaskTest
-import com.exactpro.th2.check1.util.createDefaultMessage
 import com.exactpro.th2.check1.rule.RuleFactory
+import com.exactpro.th2.check1.util.createDefaultMessage
 import com.exactpro.th2.check1.util.createVerificationEntry
 import com.exactpro.th2.check1.util.toPropertyFilter
 import com.exactpro.th2.check1.util.toValueFilter
@@ -57,7 +57,7 @@ import com.exactpro.th2.common.value.toValueFilter
 import com.google.protobuf.BoolValue
 import com.google.protobuf.StringValue
 import com.google.protobuf.TextFormat
-import io.reactivex.Observable
+import io.reactivex.rxjava3.core.Observable
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
@@ -67,12 +67,11 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.verify
 import org.mockito.kotlin.timeout
-import java.lang.IllegalArgumentException
+import org.mockito.kotlin.verify
 import java.time.Instant
-import java.util.stream.Stream
 import java.util.concurrent.Executors
+import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 

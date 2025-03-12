@@ -281,6 +281,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ### 4.7.0
 + Updated th2 gradle plugin: `0.2.4` (bom: `4.11.0`)
++ Updated rxjava: `3.1.10`
 
 ### 4.6.1
 + `NoMessageCheck` rule publishes `noMessageCheckExecutionStop` event with status `SUCCESS` 
