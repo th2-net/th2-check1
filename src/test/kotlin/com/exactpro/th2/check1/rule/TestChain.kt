@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
 import com.exactpro.th2.common.value.toValue
 import com.google.protobuf.util.Timestamps
-import io.reactivex.Observable
+import io.reactivex.rxjava3.core.Observable
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.params.ParameterizedTest

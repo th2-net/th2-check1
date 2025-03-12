@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,14 +32,14 @@ import com.exactpro.th2.check1.rule.nomessage.NoMessageCheckTask
 import com.exactpro.th2.check1.rule.sequence.SequenceCheckRuleTask
 import com.exactpro.th2.check1.rule.sequence.SilenceCheckTask
 import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toJson
-import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.schema.message.MessageRouter
-import io.reactivex.Observable
+import io.reactivex.rxjava3.core.Observable
 import mu.KotlinLogging
 import org.slf4j.Logger
 import java.time.Instant

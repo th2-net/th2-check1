@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,10 +40,12 @@ import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.grpc.Value
 import com.exactpro.th2.common.grpc.ValueFilter
 import com.exactpro.th2.common.message.messageFilter
+import com.exactpro.th2.common.message.toJson
 import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
-import io.reactivex.Observable
+import io.reactivex.rxjava3.core.Observable
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.assertThrows
@@ -57,8 +59,6 @@ import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import com.exactpro.th2.common.message.toJson
-import org.junit.jupiter.api.Assertions
 
 class TestSequenceCheckTask : AbstractCheckTaskTest() {
 
