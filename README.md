@@ -1,4 +1,4 @@
-# th2 check1 (4.6.1)
+# th2 check1 (4.7.0)
 
 ## Overview
 
@@ -278,6 +278,9 @@ The `th2_check1_actual_cache_number` metric separate messages with three labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 4.7.0
++ Updated th2 gradle plugin: `0.2.4` (bom: `4.11.0`)
 
 ### 4.6.1
 + `NoMessageCheck` rule publishes `noMessageCheckExecutionStop` event with status `SUCCESS` 
