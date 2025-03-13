@@ -57,7 +57,7 @@ dependencies {
 
     implementation "org.slf4j:slf4j-api"
 
-    implementation ("com.exactpro.sf:sailfish-common:3.3.241") {
+    implementation ("com.exactpro.sf:sailfish-common:3.4.260") {
         exclude group: "commons-configuration", module: "commons-configuration" // because of the vulnerability
         exclude group: "com.fasterxml.jackson.dataformat", module: "jackson-dataformat-yaml" // because of the vulnerability
         exclude group: "com.exactpro.mina", module: "apache-mina-core" // because of the vulnerability
