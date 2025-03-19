@@ -45,7 +45,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.exactpro.th2:common:5.14.0-dev"
+    implementation "com.exactpro.th2:common:5.15.0-dev"
     implementation "com.exactpro.th2:grpc-check1:4.4.1-dev"
     implementation "com.exactpro.th2:common-utils:2.3.1-dev"
     implementation("com.exactpro.th2:sailfish-utils:4.1.1-dev") {
