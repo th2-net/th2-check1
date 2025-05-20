@@ -14,6 +14,31 @@ The buffer size is configurable, and it is set to 1000 by default.
 When the component starts, the grpc server also starts and then the component waits for incoming grpc requests for
 verification.
 
+# Requests
+
+## `submitNoMessageCheck` Rule
+
+This rule verifies that no messages are received by `check1` within a specified interval.
+
+#### Behavior and Configuration
+
+- The message stream is defined using the **connectivity_id** and **direction** options.
+- Filtering of incoming messages can be configured using the **pre_filter** option if the option is provided.
+- The start of the check interval is determined by:
+  - A checkpoint message corresponding to the specified **connectivity_id** and **direction**, if the **checkpoint** option is provided.
+  - The last checked message in the chain, if **chain_id** is specified and `check1` maintains state for that chain.
+
+#### Completion Conditions
+
+The rule completes under the following conditions:
+
+- **Passed**:
+  - If **message_timeout** is specified, the rule completes with a **PASSED** result when `check1` receives a message for **connectivity_id** and **direction**, and the message’s timeout exceeds the start message's timestamp by more than the **message_timeout** value.
+  - If **timeout** is specified (or the default **rule-execution-timeout** is used), the rule completes with a **PASSED** result when this duration elapses without receiving any matching message.
+- **Failed**:
+  - The rule completes with a **FAILED** result if a message matching the **pre_filter** is received during the check interval.
+  - If **pre_filter** is not specified, any message received during the check interval will cause the rule to fail.
+
 # Verification requests
 
 Available requests are described
