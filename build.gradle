@@ -1,7 +1,7 @@
 plugins {
-    id "org.jetbrains.kotlin.jvm" version "$kotlin_version"
     id "application"
-    id "com.exactpro.th2.gradle.component" version "0.2.4"
+    alias(libs.plugins.kotlin)
+    alias(libs.plugins.th2.component)
 }
 
 group = 'com.exactpro.th2'
@@ -45,10 +45,10 @@ repositories {
 }
 
 dependencies {
-    implementation "com.exactpro.th2:common:5.15.0-dev"
-    implementation "com.exactpro.th2:grpc-check1:4.4.1-dev"
-    implementation "com.exactpro.th2:common-utils:2.3.1-dev"
-    implementation("com.exactpro.th2:sailfish-utils:4.1.1-dev") {
+    implementation(libs.th2.common)
+    implementation(libs.th2.common.utils)
+    implementation(libs.th2.grpc.check1)
+    implementation(libs.th2.sailfish.utils) {
         exclude group: "commons-configuration", module: "commons-configuration" // because of the vulnerability
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
         exclude group: 'junit', module: 'junit' // because of the vulnerability
@@ -57,14 +57,19 @@ dependencies {
 
     implementation "org.slf4j:slf4j-api"
 
-    implementation ("com.exactpro.sf:sailfish-common:3.4.260") {
+    implementation (libs.sailfish.common) {
         exclude group: "commons-configuration", module: "commons-configuration" // because of the vulnerability
         exclude group: "com.fasterxml.jackson.dataformat", module: "jackson-dataformat-yaml" // because of the vulnerability
         exclude group: "com.exactpro.mina", module: "apache-mina-core" // because of the vulnerability
         exclude group: "javax.activation", module: "javax.activation-api" // because of the license
     }
 
-    implementation 'io.reactivex.rxjava3:rxjava:3.1.10'
+    implementation(libs.commons.beanutils) {
+        because("Add commentMore actions CVE-2025-48734 vulnerability in 1.9.4 version. " +
+                "FIXME: look at this dependency after update opencsv:5.11")
+    }
+
+    implementation(libs.rxjava)
 
     implementation("io.prometheus:simpleclient") {
         because('metrics from messages and rules')
@@ -72,7 +77,7 @@ dependencies {
 
     testImplementation "org.junit.jupiter:junit-jupiter"
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit5"
-    testImplementation "org.mockito.kotlin:mockito-kotlin:5.4.0"
+    testImplementation(libs.mockito.kotlin)
 }
 
 test.useJUnitPlatform()

@@ -1,0 +1,22 @@
+[versions]
+kotlin = "2.1.21"
+th2-plugin = "0.2.4"
+
+[libraries]
+
+th2-common-utils = { group = "com.exactpro.th2", name = "common-utils", version = "2.3.1-dev" }
+th2-common = { group = "com.exactpro.th2", name = "common", version = "5.15.0-dev" }
+th2-grpc-check1 = { group = "com.exactpro.th2", name = "grpc-check1", version = "4.4.1-dev" }
+th2-sailfish-utils = { group = "com.exactpro.th2", name = "sailfish-utils", version = "4.1.1-dev" }
+
+sailfish-common = { group = "com.exactpro.sf", name = "sailfish-common", version = "3.4.260" }
+
+commons-beanutils = { group = 'commons-beanutils', name = 'commons-beanutils', version = '1.11.0' } # CVE-2025-48734 vulnerability in 1.10.0 version
+
+rxjava = { group = "io.reactivex.rxjava3", name = "rxjava", version = "3.1.10" }
+
+mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version = "5.4.0" }
+
+[plugins]
+kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+th2-component = { id = "com.exactpro.th2.gradle.component", version.ref = "th2-plugin" }
