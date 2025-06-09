@@ -302,8 +302,12 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 ## Release Notes
 
 ### 4.7.0
-+ Updated th2 gradle plugin: `0.2.4` (bom: `4.11.0`)
-+ Updated rxjava: `3.1.10`
++ Updated 
+  + rxjava: `3.1.10`
+  + kotlin: `2.1.21`
+  + th2 gradle plugin: `0.2.4` (bom: `4.11.0`)
+  + common `5.15.0-dev`
+  + common-utils `2.3.1-dev`
 
 ### 4.6.1
 + `NoMessageCheck` rule publishes `noMessageCheckExecutionStop` event with status `SUCCESS` 
@@ -315,6 +319,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 + Updated grpc-check1: `4.4.1-dev`
 + Updated common: `5.14.0-dev`
 + Updated common-utils `2.3.0-dev`
++ Updated sailfish-utils `4.4.1-dev`
 + workflows update
 
 ### 4.5.0
