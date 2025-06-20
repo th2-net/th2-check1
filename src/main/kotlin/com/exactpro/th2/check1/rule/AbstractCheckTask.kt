@@ -75,6 +75,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
+import com.exactpro.th2.common.grpc.Event as ProtoEvent
+
+typealias OnTaskFinished = (EventStatus, EventID?) -> Unit
 
 /**
  * Implements common logic for check task.
@@ -91,7 +94,7 @@ abstract class AbstractCheckTask(
 
     protected open class Refs(
         val rootEvent: Event,
-        val onTaskFinished: (EventStatus) -> Unit
+        val onTaskFinished: OnTaskFinished
     )
 
     protected class RefsKeeper<T : Refs>(refs: T) {
@@ -407,7 +410,7 @@ abstract class AbstractCheckTask(
     }
 
     private fun taskFinished() {
-        var ruleEventStatus = EventStatus.FAILED
+        var ruleStatus = RuleStatus.FAILED
         try {
             val currentState = taskState.updateAndGet {
                 when (it) {
@@ -421,28 +424,29 @@ abstract class AbstractCheckTask(
             if (currentState.callOnTimeoutCallback) {
                 callOnTimeoutCallback()
             }
-            ruleEventStatus = publishEvent()
+            ruleStatus = publishEvent()
             LOGGER.info("Task '$description' has been finished")
         } catch (ex: Exception) {
             val message = "Cannot finish task '$description'"
             LOGGER.error(message, ex)
+            val event = Event.start()
+                .name("Check rule $description problem")
+                .type("Exception")
+                .status(FAILED)
+                .bodyData(createMessageBean(message))
+                .exception(ex, true)
+                .toProto(parentEventID)
             eventBatchRouter.send(
                 EventBatch.newBuilder()
                     .setParentEventId(parentEventID)
-                    .addEvents(
-                        Event.start()
-                            .name("Check rule $description problem")
-                            .type("Exception")
-                            .status(FAILED)
-                            .bodyData(createMessageBean(message))
-                            .exception(ex, true)
-                            .toProto(parentEventID)
-                    ).build()
+                    .addEvents(event)
+                    .build()
             )
+            ruleStatus = RuleStatus(EventStatus.FAILED, event)
         } finally {
             RuleMetric.decrementActiveRule(type())
 
-            refs.onTaskFinished(ruleEventStatus)
+            refs.onTaskFinished(ruleStatus.status, ruleStatus.event?.id)
             refsKeeper.eraseRefs()
             val sequenceData = SequenceData(
                 lastSequence = lastSequence,
@@ -513,9 +517,10 @@ abstract class AbstractCheckTask(
     /**
      * Publishes the event to [eventBatchRouter].
      */
-    private fun publishEvent(): EventStatus {
+    private fun publishEvent(): RuleStatus {
         val prevState = taskState.getAndSet(State.PUBLISHED)
         var ruleEventStatus: EventStatus = executionStatus
+        var ruleEvent: ProtoEvent? = null
         if (prevState != State.PUBLISHED) {
             val hasError = completeEventOrReportError(prevState)
             _endTime = Instant.now()
@@ -524,7 +529,8 @@ abstract class AbstractCheckTask(
                 LOGGER.info("Skip event publication for task ${type()} '$description' (${hashCode()})")
             } else {
                 val batches = refs.rootEvent.disperseToBatches(ruleConfiguration.maxEventBatchContentSize, parentEventID)
-                ruleEventStatus = batches[0].getEvents(0).status
+                ruleEvent = batches[0].getEvents(0)
+                ruleEventStatus = ruleEvent.status
                 executionStatus = ruleEventStatus
 
                 RESPONSE_EXECUTOR.execute {
@@ -545,7 +551,7 @@ abstract class AbstractCheckTask(
             LOGGER.debug("Event tree id '{}' parent id '{}' is already published", refs.rootEvent.id, parentEventID)
         }
 
-        return ruleEventStatus
+        return RuleStatus(ruleEventStatus, ruleEvent)
     }
 
     private fun completeEventOrReportError(prevState: State): Boolean {
@@ -741,7 +747,7 @@ abstract class AbstractCheckTask(
             }
             return timestamp != null && !Timestamp.getDefaultInstance().equals(timestamp)
         }
-        val EMPTY_STATUS_CONSUMER: (EventStatus) -> Unit = {}
+        val EMPTY_STATUS_CONSUMER: OnTaskFinished = { _, _ -> }
     }
 
     protected fun RootMessageFilter.metadataFilterOrNull(): MetadataFilter? =
@@ -962,6 +968,20 @@ abstract class AbstractCheckTask(
     ) {
         companion object {
             val DEFAULT = PreviousExecutionData()
+        }
+    }
+
+    private data class RuleStatus(
+        val status: EventStatus,
+        val event: ProtoEvent? = null,
+    ) {
+        init {
+            require(event == null || event.status == status) {
+                "Publish event status '${event?.status}' isn't matched to status ($status)"
+            }
+        }
+        companion object {
+            val FAILED = RuleStatus(EventStatus.FAILED)
         }
     }
 }

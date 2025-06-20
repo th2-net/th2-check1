@@ -26,6 +26,7 @@ import com.exactpro.th2.check1.grpc.CheckpointRequestOrBuilder
 import com.exactpro.th2.check1.grpc.NoMessageCheckRequest
 import com.exactpro.th2.check1.metrics.BufferMetric
 import com.exactpro.th2.check1.rule.AbstractCheckTask
+import com.exactpro.th2.check1.rule.OnTaskFinished
 import com.exactpro.th2.check1.rule.RuleFactory
 import com.exactpro.th2.check1.utils.ExecutorPool
 import com.exactpro.th2.check1.utils.generateChainID
@@ -45,6 +46,7 @@ import com.exactpro.th2.common.schema.message.SubscriberMonitor
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageGroup
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.ParsedMessage
+import com.exactpro.th2.common.utils.event.logId
 import com.exactpro.th2.common.utils.message.MessageHolder
 import com.exactpro.th2.common.utils.message.ProtoMessageHolder
 import com.exactpro.th2.common.utils.message.TransportMessageHolder
@@ -52,6 +54,7 @@ import com.fasterxml.jackson.core.JsonProcessingException
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.PublishSubject
 import mu.KotlinLogging
+import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.CompletableFuture
@@ -60,16 +63,18 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.max
 import com.exactpro.th2.common.grpc.Checkpoint as GrpcCheckpoint
 
 class CollectorService(
     protoMessageRouter: MessageRouter<MessageBatch>,
     transportMessageRouter: MessageRouter<GroupBatch>,
     private val eventBatchRouter: MessageRouter<EventBatch>,
-    private val configuration: Check1Configuration
+    private val configuration: Check1Configuration,
+    private val waitEvent: WaitEvent,
 ) {
 
-    private val logger = KotlinLogging.logger(javaClass.name + '@' + hashCode())
+    private val kLogger = KotlinLogging.logger(javaClass.name + '@' + hashCode())
 
     /**
      * Queue name to subscriber. Messages with different connectivity can be transferred with one queue.
@@ -80,7 +85,7 @@ class CollectorService(
     private val checkpointSubscriber: CheckpointSubscriber
     private val mqSubject: PublishSubject<MessageHolder>
     private val eventIdToLastCheckTask: MutableMap<CheckTaskKey, AbstractCheckTask> = ConcurrentHashMap()
-    private val ruleIdToResult: MutableMap<Long, CompletableFuture<Pair<EventStatus, Instant>>> = ConcurrentHashMap()
+    private val ruleIdToResult: MutableMap<Long, CompletableFuture<RuleResultMetadata>> = ConcurrentHashMap()
     private val ruleIdCounter = AtomicLong()
 
     private val olderThanDelta = configuration.cleanupOlderThan
@@ -102,7 +107,7 @@ class CollectorService(
                 }
             }))
         }.onFailure {
-            logger.warn(it) {"Can not subscribe for listening protobuf messages" }
+            kLogger.warn(it) { "Can not subscribe for listening protobuf messages" }
         }.getOrNull()
         transportSubscriberMonitor = runCatching {
             checkNotNull(transportMessageRouter.subscribeAll({ _: DeliveryMetadata, batch: GroupBatch ->
@@ -118,7 +123,7 @@ class CollectorService(
                     }
             }))
         }.onFailure {
-            logger.warn(it) {"Can not subscribe for listening transport messages" }
+            kLogger.warn(it) { "Can not subscribe for listening transport messages" }
         }.getOrNull()
 
         if (protoSubscriberMonitor == null && transportSubscriberMonitor == null) {
@@ -140,15 +145,15 @@ class CollectorService(
 
     private data class StoringResult(
         val id: Long,
-        val resultFuture: CompletableFuture<Pair<EventStatus, Instant>>?,
-        val onTaskFinished: (EventStatus) -> Unit,
+        val resultFuture: CompletableFuture<RuleResultMetadata>?,
+        val onTaskFinished: OnTaskFinished,
     )
 
     private fun prepareStoringResults(storeResult: Boolean): StoringResult {
         return if (storeResult) {
-            val future = CompletableFuture<Pair<EventStatus, Instant>>()
+            val future = CompletableFuture<RuleResultMetadata>()
             val ruleId = ruleIdCounter.incrementAndGet()
-            StoringResult(ruleId, future) { future.complete(it to Instant.now()) }
+            StoringResult(ruleId, future) { status, eventId -> future.complete(RuleResultMetadata(status,Instant.now(), eventId)) }
         } else {
             EMPTY_STORING_RESULT
         }
@@ -203,7 +208,7 @@ class CollectorService(
             ruleIdToResult[ruleId] = if (silenceFuture == null)
                 resultFuture
             else
-                resultFuture.thenCompose { if (it.first == EventStatus.SUCCESS) silenceFuture else resultFuture }
+                resultFuture.thenCompose { if (it.status == EventStatus.SUCCESS) silenceFuture else resultFuture }
         }
         return RuleAndChainIds(ruleId, chainID)
     }
@@ -243,25 +248,39 @@ class CollectorService(
         val statusFuture = ruleIdToResult[id]
 
         if (statusFuture == null) {
-            logger.debug("No rule with specified id found")
+            kLogger.debug { "No rule with specified id found" }
             return RuleResult.NOT_FOUND
         }
 
         return try {
-            val (status, _) = statusFuture.get(timeoutNano, TimeUnit.NANOSECONDS)
-            when (status) {
+            val awaitStart = System.nanoTime()
+            val result: RuleResultMetadata = statusFuture.get(timeoutNano, TimeUnit.NANOSECONDS)
+            when (result.status) {
                 EventStatus.SUCCESS -> RuleResult.PASSED
-                EventStatus.FAILED -> RuleResult.FAILED
+                EventStatus.FAILED -> {
+                    if (result.eventId == null) {
+                        kLogger.error { "Await event storing can't be executed for null event id" }
+                        RuleResult.ERROR
+                    } else {
+                        if (waitEvent.wait(result.eventId, Duration.ofNanos(max(0, timeoutNano - (System.nanoTime() - awaitStart))))) {
+                            kLogger.debug { "Waiting '${result.eventId.logId}' event succeed" }
+                            RuleResult.FAILED
+                        } else {
+                            kLogger.error { "Timeout expired for waiting event: ${result.eventId.logId}" }
+                            RuleResult.TIMEOUT
+                        }
+                    }
+                }
                 else -> {
-                    logger.error("Invalid rule status: $status")
+                    kLogger.error { "Invalid rule status: ${result.status}" }
                     RuleResult.ERROR
                 }
             }
         } catch (e: TimeoutException) {
-            logger.debug("Timeout expired", e)
+            kLogger.debug(e) { "Timeout expired" }
             RuleResult.TIMEOUT
         } catch (e: Exception) {
-            logger.error("Failed to retrieve rule result: ", e)
+            kLogger.error(e) { "Failed to retrieve rule result" }
             RuleResult.ERROR
         }
     }
@@ -286,8 +305,8 @@ class CollectorService(
                 else -> {
                     !task.hasNextRule().also { canBeRemoved ->
                         when {
-                            canBeRemoved -> logger.info { "Removed task ${task.description} ($endTime) from tasks map" }
-                                else -> logger.debug { "Task ${task.description} can't be removed because it has a continuation" }
+                            canBeRemoved -> kLogger.info { "Removed task ${task.description} ($endTime) from tasks map" }
+                                else -> kLogger.debug { "Task ${task.description} can't be removed because it has a continuation" }
                         }
                     }
                 }
@@ -307,16 +326,16 @@ class CollectorService(
 
     @Throws(JsonProcessingException::class)
     private fun sendEvents(parentEventID: EventID, event: Event) {
-        logger.debug { "Sending event thee id '${event.id}' parent id '${parentEventID.toJson()}'" }
+        kLogger.debug { "Sending event thee id '${event.id}' parent id '${parentEventID.toJson()}'" }
 
         val batch = event.toBatchProto(parentEventID)
 
         ForkJoinPool.commonPool().execute {
             try {
                 eventBatchRouter.send(batch, "publish", "event")
-                logger.debug { "Sent event batch '${batch.toJson()}'" }
+                kLogger.debug { "Sent event batch '${batch.toJson()}'" }
             } catch (e: Exception) {
-                logger.error(e) { "Can not send event batch '${batch.toJson()}'" }
+                kLogger.error(e) { "Can not send event batch '${batch.toJson()}'" }
             }
         }
     }
@@ -331,11 +350,11 @@ class CollectorService(
     fun close() {
         protoSubscriberMonitor?.let {
             runCatching(protoSubscriberMonitor::unsubscribe)
-                .onFailure { logger.error(it) { "Close protobuf subscriber failure" } }
+                .onFailure { kLogger.error(it) { "Close protobuf subscriber failure" } }
         }
         transportSubscriberMonitor?.let {
             runCatching(transportSubscriberMonitor::unsubscribe)
-                .onFailure { logger.error(it) { "Close transport subscriber failure" } }
+                .onFailure { kLogger.error(it) { "Close transport subscriber failure" } }
             mqSubject.onComplete()
         }
         mqSubject.onComplete()
@@ -344,7 +363,7 @@ class CollectorService(
 
     private fun publishCheckpoint(request: CheckpointRequestOrBuilder, checkpoint: Checkpoint, event: Event) {
         if (!request.hasParentEventId()) {
-            logger.warn { "Parent id missed in request ${request.toJson()}" }
+            kLogger.warn { "Parent id missed in request ${request.toJson()}" }
             return
         }
         val rootEvent: Event = event
@@ -372,10 +391,10 @@ class CollectorService(
                 if (request.hasParentEventId()) {
                     sendEvents(request.parentEventId, rootEvent)
                 } else {
-                    logger.warn {"Parent id missed in request" }
+                    kLogger.warn {"Parent id missed in request" }
                 }
             } catch (e: Exception) {
-                logger.error(e) {
+                kLogger.error(e) {
                     "Sending events '$rootEvent' with a parent '${request.parentEventId.toJson()}' failed "
                 }
             }
@@ -400,4 +419,8 @@ class CollectorService(
     }
 
     data class RuleAndChainIds(val ruleId: Long, val chainID: ChainID)
+}
+
+fun interface WaitEvent {
+    fun wait(id: EventID, duration: Duration): Boolean
 }

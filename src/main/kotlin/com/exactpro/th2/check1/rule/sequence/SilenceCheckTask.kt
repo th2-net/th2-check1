@@ -22,6 +22,7 @@ import com.exactpro.th2.check1.entities.RuleConfiguration
 import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.MessageContainer
+import com.exactpro.th2.check1.rule.OnTaskFinished
 import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.rule.preFilterBy
 import com.exactpro.th2.check1.util.VerificationUtil
@@ -30,7 +31,6 @@ import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils.createMessageBean
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.RootMessageFilter
 import com.exactpro.th2.common.message.toReadableBodyCollection
 import com.exactpro.th2.common.schema.message.MessageRouter
@@ -46,12 +46,12 @@ class SilenceCheckTask(
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>,
-    onTaskFinished: ((EventStatus) -> Unit) = EMPTY_STATUS_CONSUMER
+    onTaskFinished: OnTaskFinished = EMPTY_STATUS_CONSUMER
 ) : AbstractCheckTask(ruleConfiguration, submitTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
         rootEvent: Event,
-        onTaskFinished: ((EventStatus) -> Unit),
+        onTaskFinished: OnTaskFinished,
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
         val metadataPreFilter: SailfishFilter?
