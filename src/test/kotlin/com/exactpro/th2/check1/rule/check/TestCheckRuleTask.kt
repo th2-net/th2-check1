@@ -248,7 +248,7 @@ internal class TestCheckRuleTask : AbstractCheckTaskTest() {
         assertEquals(1, eventList.size)
         assertEquals(FAILED, eventList[0].status)
 
-        verify(onTaskFinishedMock, timeout(1000).only()).invoke(FAILED, null)
+        verify(onTaskFinishedMock, timeout(1000).only()).invoke(eq(FAILED), notNull())
     }
 
     @Test
