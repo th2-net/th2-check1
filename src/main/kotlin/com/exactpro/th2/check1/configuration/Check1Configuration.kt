@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,5 +66,8 @@ class Check1Configuration(
     val rulesExecutionThreads: Int = 1,
 
     @field:JsonProperty(value = "max-event-batch-content-size", defaultValue = "1048576")
-    val maxEventBatchContentSize: Int = 1048576
+    val maxEventBatchContentSize: Int = 1048576,
+
+    @field:JsonProperty(value = "await-root-event-storing-on-wait-for-result", defaultValue = "false")
+    val awaitRootEventStoringOnWaitForResult: Boolean = false,
 )

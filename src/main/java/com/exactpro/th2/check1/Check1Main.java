@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,9 @@ import com.exactpro.th2.common.schema.factory.CommonFactory;
 import com.exactpro.th2.common.schema.grpc.router.GrpcRouter;
 import com.exactpro.th2.common.schema.message.MessageRouter;
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch;
+import com.exactpro.th2.dataprovider.lw.grpc.DataProviderService;
+import com.exactpro.th2.lwdataprovider.EventWaiter;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +51,8 @@ public class Check1Main {
                     protoMessageRouter,
                     transportMessageRouter,
                     commonFactory.getEventBatchRouter(),
-                    configuration
+                    configuration,
+                    createWaitEvent(grpcRouter, configuration)
             );
             toDispose.add(collectorService::close);
 
@@ -61,6 +65,22 @@ public class Check1Main {
             LOGGER.error("Fatal error: {}", e.getMessage(), e);
             System.exit(-1);
         }
+    }
+
+    private static @NotNull WaitEvent createWaitEvent(GrpcRouter grpcRouter, Check1Configuration configuration) throws ClassNotFoundException {
+        WaitEvent waitEvent = (id, duration) -> true;
+        if (configuration.getAwaitRootEventStoringOnWaitForResult()) {
+            final EventWaiter eventWaiter = new EventWaiter(grpcRouter.getService(DataProviderService.class));
+            waitEvent = (id, duration) -> {
+                try {
+                    return eventWaiter.waitEventResponseOrNull(id, duration) != null;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+            };
+        }
+        return waitEvent;
     }
 
     /**

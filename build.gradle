@@ -25,6 +25,11 @@ repositories {
         }
     }
 
+    maven { // FIXME: remove when release
+        name 'Sonatype_snapshots'
+        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+    }
+
     maven {
         name 'Sonatype_releases'
         url 'https://s01.oss.sonatype.org/content/repositories/releases/'
@@ -47,7 +52,9 @@ repositories {
 dependencies {
     implementation(libs.th2.common)
     implementation(libs.th2.common.utils)
+    implementation(libs.th2.lw.data.provider.utils)
     implementation(libs.th2.grpc.check1)
+    implementation(libs.th2.grpc.lw.data.provider)
     implementation(libs.th2.sailfish.utils) {
         exclude group: "commons-configuration", module: "commons-configuration" // because of the vulnerability
         exclude group: 'com.fasterxml.jackson.dataformat', module: 'jackson-dataformat-yaml' // because of the vulnerability
