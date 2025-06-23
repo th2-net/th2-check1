@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.1.21"
+kotlin = "2.2.0"
 th2-plugin = "0.2.4"
 
 [libraries]
