@@ -1,4 +1,4 @@
-# th2 check1 (4.7.0)
+# th2 check1 (4.8.0)
 
 ## Overview
 
@@ -125,14 +125,15 @@ the same as `SubmitMultipleRules` but returns immediately with `Empty` response
 General view of the component will look like this:
 
 ```yaml
-apiVersion: th2.exactpro.com/v1
+apiVersion: th2.exactpro.com/v2
 kind: Th2Box
 metadata:
   name: check1
 spec:
-  image-name: ghcr.io/th2-net/th2-check1
-  image-version: <image version>
-  custom-config:
+  imageName: ghcr.io/th2-net/th2-check1
+  imageVersion: <image version>
+  type: th2-check1
+  customConfig:
     message-cache-size: '1000'
     cleanup-older-than: '60'
     cleanup-time-unit: 'SECONDS'
@@ -141,18 +142,34 @@ spec:
     auto-silence-check-after-sequence-rule: false
     time-precision: 'PT0.000000001S'
     decimal-precision: '0.00001'
+    check-null-value-as-empty: false
     enable-checkpoint-events-publication: true
+    await-root-event-storing-on-wait-for-result: false
     rules-execution-threads: 1
-  type: th2-check1
   pins:
-    - name: server
-      connection-type: grpc
-    - name: from_codec_proto
-      connection-type: mq
-      attributes: [ 'subscribe', 'parsed' ]
-    - name: from_codec_transport
-      connection-type: mq
-      attributes: [ 'subscribe', 'transport-group' ]
+    mq:
+      subscribers:
+        - name: from_codec_transport
+          attributes: [subscribe, transport-group]
+          linkTo:
+            - box: <box name>
+              pin: <box's pin name>
+        - name: from_codec_proto # optional, deprecated
+          attributes: [subscribe, parsed]
+          linkTo:
+            - box: codec-fix-sf
+              pin: out_codec_decode
+    grpc:
+      server:
+        - name: server
+          serviceClasses:
+            - com.exactpro.th2.check1.grpc.Check1Service
+      client: 
+        - name: to_lw_data_provider # required when `await-root-event-storing-on-wait-for-result` is true
+          serviceClass: com.exactpro.th2.dataprovider.lw.grpc.DataProviderService
+          linkTo:
+          - box: lw-data-provider
+            pin: server
   extended-settings:
     service:
       enabled: true
@@ -174,20 +191,20 @@ This block describes the configuration for check1.
 
 ### Configuration example
 
-```json
-{
-  "message-cache-size": 1000,
-  "cleanup-older-than": 60,
-  "cleanup-time-unit": "SECONDS",
-  "max-event-batch-content-size": "1048576",
-  "rule-execution-timeout": 5000,
-  "auto-silence-check-after-sequence-rule": false,
-  "time-precision": "PT0.000000001S",
-  "decimal-precision": 0.00001,
-  "check-null-value-as-empty": false,
-  "enable-checkpoint-events-publication": true,
-  "rules-execution-threads": 1
-}
+```yaml
+spec:
+  customConfig:
+    message-cache-size: '1000'
+    cleanup-older-than: '60'
+    cleanup-time-unit: 'SECONDS'
+    max-event-batch-content-size: '1048576'
+    rule-execution-timeout: '5000'
+    auto-silence-check-after-sequence-rule: false
+    time-precision: 'PT0.000000001S'
+    decimal-precision: '0.00001'
+    enable-checkpoint-events-publication: true
+    await-root-event-storing-on-wait-for-result: false
+    rules-execution-threads: 1
 ```
 
 ### Properties description
@@ -255,33 +272,49 @@ This option can help to increase performance when you are going to calculate hea
 otherwise use `1` thread for rule execution.
 The default value is `1`
 
+#### await-root-event-storing-on-wait-for-result
+
+Enables functionality to wait rule root event storing during `waitForResult` gRPC method execution.
+When user calls `waitForResult` gRPC method, check1 waits rule completion. If the rule is completed with FAILURE status, check1 pulls `getEvent` gRPC method of `lw-data-provider` to verify that rule root event is stored.
+The grpc client pin  is required when the option is true:
+```yaml
+spec:
+  customConfig:
+    await-root-event-storing-on-wait-for-result: ture
+  pins:
+    grpc:
+      client: 
+        - name: to_lw_data_provider
+          serviceClass: com.exactpro.th2.dataprovider.lw.grpc.DataProviderService
+          linkTo:
+            - box: lw-data-provider
+              pin: server
+```
+_Disabled by default._
+
 ## Required pins
 
 The Check1 component has two types of pin:
 
 * gRPC server pin: it allows other components to connect via `com.exactpro.th2.check1.grpc.Check1Service` class.
-* MQ pins: they are used for listening to protobuf and th2 transport parsed messages. You can link several sources with
+* MQ pins: they are used for listening to th2 transport parsed messages. You can link several sources with
   different directions and session aliases to it.
 
 ```yaml
-apiVersion: th2.exactpro.com/v1
-kind: Th2Box
-metadata:
-  name: check1
 spec:
   pins:
-    - name: server
-      connection-type: grpc
-    - name: from_codec_proto
-      connection-type: mq
-      attributes:
-        - 'subscribe'
-        - 'parsed'
-    - name: from_codec_transport
-      connection-type: mq
-      attributes:
-        - 'subscribe'
-        - 'transport-group'
+    mq:
+      subscribers:
+        - name: from_codec_transport
+          attributes: [subscribe, transport-group]
+          linkTo:
+            - box: <box name>
+              pin: <box's pin name>
+    grpc:
+      server:
+        - name: server
+          serviceClasses:
+            - com.exactpro.th2.check1.grpc.Check1Service
 ```
 
 ## Prometheus metrics
@@ -300,6 +333,12 @@ The `th2_check1_actual_cache_number` metric separate messages with three labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 4.8.0
++ Added `await-root-event-storing-on-wait-for-result` option.
++ Update:
+  + lw-data-provider-utils: `0.0.5-dev`
+  + grpc-lw-data-provider: `2.4.0-dev`
 
 ### 4.7.0
 + Updated 

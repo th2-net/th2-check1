@@ -26,6 +26,7 @@ import com.exactpro.th2.check1.rule.AbstractCheckTask
 import com.exactpro.th2.check1.rule.AggregatedFilterResult
 import com.exactpro.th2.check1.rule.ComparisonContainer
 import com.exactpro.th2.check1.rule.MessageContainer
+import com.exactpro.th2.check1.rule.OnTaskFinished
 import com.exactpro.th2.check1.rule.SailfishFilter
 import com.exactpro.th2.check1.rule.preFilterBy
 import com.exactpro.th2.check1.util.VerificationUtil
@@ -37,7 +38,6 @@ import com.exactpro.th2.common.event.bean.builder.MessageBuilder
 import com.exactpro.th2.common.event.bean.builder.TableBuilder
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.EventStatus
 import com.exactpro.th2.common.grpc.MessageFilter
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RootMessageFilter
@@ -66,12 +66,12 @@ class SequenceCheckRuleTask(
     parentEventID: EventID,
     messageStream: Observable<StreamContainer>,
     eventBatchRouter: MessageRouter<EventBatch>,
-    onTaskFinished: ((EventStatus) -> Unit) = EMPTY_STATUS_CONSUMER
+    onTaskFinished: OnTaskFinished = EMPTY_STATUS_CONSUMER
 ) : AbstractCheckTask(ruleConfiguration, startTime, sessionKey, parentEventID, messageStream, eventBatchRouter) {
 
     protected class Refs(
         rootEvent: Event,
-        onTaskFinished: ((EventStatus) -> Unit),
+        onTaskFinished: OnTaskFinished,
         val protoMessageFilters: List<RootMessageFilter>,
         val protoPreMessageFilter: RootMessageFilter,
         val messagePreFilter: SailfishFilter,
