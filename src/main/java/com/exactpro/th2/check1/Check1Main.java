@@ -70,15 +70,19 @@ public class Check1Main {
     private static @NotNull WaitEvent createWaitEvent(GrpcRouter grpcRouter, Check1Configuration configuration) throws ClassNotFoundException {
         WaitEvent waitEvent = (id, duration) -> true;
         if (configuration.getAwaitRootEventStoringOnWaitForResult()) {
-            final EventWaiter eventWaiter = new EventWaiter(grpcRouter.getService(DataProviderService.class));
-            waitEvent = (id, duration) -> {
-                try {
-                    return eventWaiter.waitEventResponseOrNull(id, duration) != null;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(e);
-                }
-            };
+            try {
+                final EventWaiter eventWaiter = new EventWaiter(grpcRouter.getService(DataProviderService.class));
+                waitEvent = (id, duration) -> {
+                    try {
+                        return eventWaiter.waitEventResponseOrNull(id, duration) != null;
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                    }
+                };
+            } catch (RuntimeException e) {
+                LOGGER.error("Event waiter can't be configured", e);
+            }
         }
         return waitEvent;
     }
