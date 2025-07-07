@@ -15,7 +15,7 @@ sailfish-common = { group = "com.exactpro.sf", name = "sailfish-common", version
 
 commons-beanutils = { group = 'commons-beanutils', name = 'commons-beanutils', version = '1.11.0' } # CVE-2025-48734 vulnerability in 1.10.0 version
 
-rxjava = { group = "io.reactivex.rxjava3", name = "rxjava", version = "3.1.10" }
+rxjava = { group = "io.reactivex.rxjava3", name = "rxjava", version = "3.1.11" }
 
 mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version = "5.4.0" }
 
