@@ -70,4 +70,7 @@ class Check1Configuration(
 
     @field:JsonProperty(value = "await-root-event-storing-on-wait-for-result", defaultValue = "false")
     val awaitRootEventStoringOnWaitForResult: Boolean = false,
+
+    @field:JsonProperty(value = "hide-operation-in-expected", defaultValue = "false")
+    val hideOperationInExpected: Boolean = false
 )

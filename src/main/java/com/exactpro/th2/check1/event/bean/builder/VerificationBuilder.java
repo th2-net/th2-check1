@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2020 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,13 +19,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.exactpro.sf.comparison.ComparisonResult;
-import com.exactpro.th2.check1.event.VerificationEntryUtils;
 import com.exactpro.th2.common.event.IBodyData;
 import com.exactpro.th2.common.event.bean.Verification;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.grpc.MessageFilter;
 import com.exactpro.th2.common.grpc.MetadataFilter;
 
+import static com.exactpro.th2.check1.event.VerificationEntryUtils.createVerificationEntry;
+
+@SuppressWarnings("unused")
 public class VerificationBuilder {
 
     public static final String VERIFICATION_TYPE = "verification";
@@ -33,7 +35,16 @@ public class VerificationBuilder {
     public static final String FAILED_STATUS = "FAILED";
 
     protected String status;
-    protected Map<String, VerificationEntry> fields = new HashMap<>();
+    protected final Map<String, VerificationEntry> fields = new HashMap<>();
+    protected final boolean hideOperationInExpected;
+
+    public VerificationBuilder(boolean hideOperationInExpected) {
+        this.hideOperationInExpected = hideOperationInExpected;
+    }
+
+    public VerificationBuilder() {
+        this(false);
+    }
 
     public VerificationBuilder status(String status) {
         this.status = status;
@@ -41,12 +52,12 @@ public class VerificationBuilder {
     }
 
     public VerificationBuilder verification(String fieldName, ComparisonResult comparisonResult, MessageFilter messageFilter, boolean listItemAsSeparate) {
-        fields.put(fieldName, VerificationEntryUtils.createVerificationEntry(comparisonResult));
+        fields.put(fieldName, createVerificationEntry(comparisonResult, hideOperationInExpected));
         return this;
     }
 
     public VerificationBuilder verification(String fieldName, ComparisonResult comparisonResult, MetadataFilter messageFilter) {
-        fields.put(fieldName, VerificationEntryUtils.createVerificationEntry(comparisonResult));
+        fields.put(fieldName, createVerificationEntry(comparisonResult, hideOperationInExpected));
         return this;
     }
 

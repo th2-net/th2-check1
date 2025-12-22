@@ -63,8 +63,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.MethodSource
-import org.junit.jupiter.params.provider.ValueSource
 import strikt.api.Assertion
 import strikt.api.expectThat
 import strikt.assertions.hasSize
@@ -77,24 +77,22 @@ import java.util.stream.Stream
 class TestVerificationEntryUtils {
     private val converter = AbstractCheckTask.PROTO_CONVERTER
 
-    @ParameterizedTest
-    @ValueSource(booleans = [true, false])
-    fun `simple not key fields test`(isKey: Boolean) {
+    @ParameterizedTest(name = "[{index}] hide operation in expected: {0}, is key: {1}")
+    @CsvSource(textBlock = """
+        true,true
+        false,true
+        true,false
+        false,false""")
+    fun `simple fields test`(hideOperationInExpected: Boolean, isKey: Boolean) {
         val filter = rootFilter(timePrecision = Duration.ofMillis(1), decimalPrecision = 0.001) {
             simpleFilter("simple-equal", "test-equal", EQUAL, isKey)
             simpleFilter("simple-not_equal", "test-not_equal", NOT_EQUAL, isKey)
             emptyFilter("simple-empty", isKey)
             notEmptyFilter("simple-not_empty", isKey)
-            inFilter("simple-in", listOf("test-1", "test-2", "test-3"), isKey)
-            notInFilter("simple-not_in", listOf("test-1", "test-2", "test-3"), isKey)
-            simpleFilter("simple-like", ".*-like", LIKE, isKey)
-            simpleFilter("simple-not_like", ".*-not_like", NOT_LIKE, isKey)
             simpleFilter("simple-more", "10", MORE, isKey)
             simpleFilter("simple-not_more", "10", NOT_MORE, isKey)
             simpleFilter("simple-less", "10", LESS, isKey)
             simpleFilter("simple-not_less", "10", NOT_LESS, isKey)
-            simpleFilter("simple-wildcard", "t?*-wildcard", WILDCARD, isKey)
-            simpleFilter("simple-not_wildcard", "t?*-not_wildcard", NOT_WILDCARD, isKey)
             simpleFilter("simple-eq_time_precision", "2025-12-22T12:36:27.123456789", EQ_TIME_PRECISION, isKey)
             simpleFilter("simple-eq_decimal_precision", "10.123456789", EQ_DECIMAL_PRECISION, isKey)
         }
@@ -104,16 +102,10 @@ class TestVerificationEntryUtils {
             .putFields("simple-not_equal", "test-equal".toValue())
 //            .putFields("simple-empty", nullValue())
             .putFields("simple-not_empty", "test-not_empty".toValue())
-            .putFields("simple-in", "test-2".toValue())
-            .putFields("simple-not_in", "test-4".toValue())
-            .putFields("simple-like", "test-like".toValue())
-            .putFields("simple-not_like", "test-like".toValue())
             .putFields("simple-more", "11".toValue())
             .putFields("simple-not_more", "10".toValue())
             .putFields("simple-less", "9".toValue())
             .putFields("simple-not_less", "10".toValue())
-            .putFields("simple-wildcard", "test-wildcard".toValue())
-            .putFields("simple-not_wildcard", "test-wildcard".toValue())
             .putFields("simple-eq_time_precision", "2025-12-22T12:36:27.123".toValue())
             .putFields("simple-eq_decimal_precision", "10.123".toValue())
             .build()
@@ -132,10 +124,10 @@ class TestVerificationEntryUtils {
         val result = MessageComparator.compare(actual, expected, settings)
             .assertNotNull { "Result must not be null" }
 
-        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val entry = VerificationEntryUtils.createVerificationEntry(result, hideOperationInExpected)
         expectThat(entry) {
-            expectCollection("16", "15") {
-                hasSize(16)
+            expectCollection("10", "9") {
+                hasSize(10)
                 get { get("simple-equal") }.isNotNull() and {
                     expectField("test-equal", "test-equal", isKey = isKey)
                 }
@@ -147,18 +139,6 @@ class TestVerificationEntryUtils {
                 }
                 get { get("simple-not_empty") }.isNotNull() and {
                     expectField("*", "test-not_empty", operation = NOT_EMPTY, isKey = isKey)
-                }
-                get { get("simple-in") }.isNotNull() and {
-                    expectField("IN [test-1, test-2, test-3]", "test-2", operation = IN, isKey = isKey)
-                }
-                get { get("simple-not_in") }.isNotNull() and {
-                    expectField("NOT_IN [test-1, test-2, test-3]", "test-4", operation = NOT_IN, isKey = isKey)
-                }
-                get { get("simple-like") }.isNotNull() and {
-                    expectField("LIKE .*-like", "test-like", operation = LIKE, isKey = isKey)
-                }
-                get { get("simple-not_like") }.isNotNull() and {
-                    expectField("NOT_LIKE .*-not_like", "test-like", operation = NOT_LIKE, isKey = isKey)
                 }
                 get { get("simple-more") }.isNotNull() and {
                     expectField(">10", "11", operation = MORE, isKey = isKey)
@@ -172,17 +152,123 @@ class TestVerificationEntryUtils {
                 get { get("simple-not_less") }.isNotNull() and {
                     expectField(">=10", "10", operation = NOT_LESS, isKey = isKey)
                 }
-                get { get("simple-wildcard") }.isNotNull() and {
-                    expectField("WILDCARD t?*-wildcard", "test-wildcard", operation = WILDCARD, isKey = isKey)
-                }
-                get { get("simple-not_wildcard") }.isNotNull() and {
-                    expectField("NOT_WILDCARD t?*-not_wildcard", "test-wildcard", operation = NOT_WILDCARD, isKey = isKey)
-                }
                 get { get("simple-eq_time_precision") }.isNotNull() and {
                     expectField("2025-12-22T12:36:27.123456789 ± 0.001s", "2025-12-22T12:36:27.123", operation = EQ_TIME_PRECISION, isKey = isKey)
                 }
                 get { get("simple-eq_decimal_precision") }.isNotNull() and {
                     expectField("10.123456789 ± 0.001", "10.123", operation = EQ_DECIMAL_PRECISION, isKey = isKey)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `not hide operation in expected test`() {
+        val filter = rootFilter(timePrecision = Duration.ofMillis(1), decimalPrecision = 0.001) {
+            inFilter("simple-in", listOf("test-1", "test-2", "test-3"))
+            notInFilter("simple-not_in", listOf("test-1", "test-2", "test-3"))
+            simpleFilter("simple-like", ".*-like", LIKE)
+            simpleFilter("simple-not_like", ".*-not_like", NOT_LIKE)
+            simpleFilter("simple-wildcard", "t?*-wildcard", WILDCARD)
+            simpleFilter("simple-not_wildcard", "t?*-not_wildcard", NOT_WILDCARD)
+        }
+
+        val message = message("test")
+            .putFields("simple-in", "test-2".toValue())
+            .putFields("simple-not_in", "test-4".toValue())
+            .putFields("simple-like", "test-like".toValue())
+            .putFields("simple-not_like", "test-like".toValue())
+            .putFields("simple-wildcard", "test-wildcard".toValue())
+            .putFields("simple-not_wildcard", "test-wildcard".toValue())
+            .build()
+
+        val expected = converter.fromProtoFilter(
+            filter.messageFilter,
+            convertToFilterSettings(filter.comparisonSettings),
+            filter.messageType,
+        )
+        val actual = converter.fromProtoMessage(message, false)
+        val settings = ComparatorSettings().apply { isKeepResultGroupOrder = true }
+        val result = MessageComparator.compare(actual, expected, settings)
+            .assertNotNull { "Result must not be null" }
+
+        val entry = VerificationEntryUtils.createVerificationEntry(result, false)
+        expectThat(entry) {
+            expectCollection("6", "6") {
+                hasSize(6)
+                get { get("simple-in") }.isNotNull() and {
+                    expectField("IN [test-1, test-2, test-3]", "test-2", operation = IN)
+                }
+                get { get("simple-not_in") }.isNotNull() and {
+                    expectField("NOT_IN [test-1, test-2, test-3]", "test-4", operation = NOT_IN)
+                }
+                get { get("simple-like") }.isNotNull() and {
+                    expectField("LIKE .*-like", "test-like", operation = LIKE)
+                }
+                get { get("simple-not_like") }.isNotNull() and {
+                    expectField("NOT_LIKE .*-not_like", "test-like", operation = NOT_LIKE)
+                }
+                get { get("simple-wildcard") }.isNotNull() and {
+                    expectField("WILDCARD t?*-wildcard", "test-wildcard", operation = WILDCARD)
+                }
+                get { get("simple-not_wildcard") }.isNotNull() and {
+                    expectField("NOT_WILDCARD t?*-not_wildcard", "test-wildcard", operation = NOT_WILDCARD)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `hide operation in expected test`() {
+        val filter = rootFilter(timePrecision = Duration.ofMillis(1), decimalPrecision = 0.001) {
+            inFilter("simple-in", listOf("test-1", "test-2", "test-3"))
+            notInFilter("simple-not_in", listOf("test-1", "test-2", "test-3"))
+            simpleFilter("simple-like", ".*-like", LIKE)
+            simpleFilter("simple-not_like", ".*-not_like", NOT_LIKE)
+            simpleFilter("simple-wildcard", "t?*-wildcard", WILDCARD)
+            simpleFilter("simple-not_wildcard", "t?*-not_wildcard", NOT_WILDCARD)
+        }
+
+        val message = message("test")
+            .putFields("simple-in", "test-2".toValue())
+            .putFields("simple-not_in", "test-4".toValue())
+            .putFields("simple-like", "test-like".toValue())
+            .putFields("simple-not_like", "test-like".toValue())
+            .putFields("simple-wildcard", "test-wildcard".toValue())
+            .putFields("simple-not_wildcard", "test-wildcard".toValue())
+            .build()
+
+        val expected = converter.fromProtoFilter(
+            filter.messageFilter,
+            convertToFilterSettings(filter.comparisonSettings),
+            filter.messageType,
+        )
+        val actual = converter.fromProtoMessage(message, false)
+        val settings = ComparatorSettings().apply { isKeepResultGroupOrder = true }
+        val result = MessageComparator.compare(actual, expected, settings)
+            .assertNotNull { "Result must not be null" }
+
+        val entry = VerificationEntryUtils.createVerificationEntry(result, true)
+        expectThat(entry) {
+            expectCollection("6", "6") {
+                hasSize(6)
+                get { get("simple-in") }.isNotNull() and {
+                    expectField("[test-1, test-2, test-3]", "test-2", operation = IN)
+                }
+                get { get("simple-not_in") }.isNotNull() and {
+                    expectField("[test-1, test-2, test-3]", "test-4", operation = NOT_IN)
+                }
+                get { get("simple-like") }.isNotNull() and {
+                    expectField(".*-like", "test-like", operation = LIKE)
+                }
+                get { get("simple-not_like") }.isNotNull() and {
+                    expectField(".*-not_like", "test-like", operation = NOT_LIKE)
+                }
+                get { get("simple-wildcard") }.isNotNull() and {
+                    expectField("t?*-wildcard", "test-wildcard", operation = WILDCARD)
+                }
+                get { get("simple-not_wildcard") }.isNotNull() and {
+                    expectField("t?*-not_wildcard", "test-wildcard", operation = NOT_WILDCARD)
                 }
             }
         }
@@ -205,7 +291,7 @@ class TestVerificationEntryUtils {
 
         val result = MessageComparator.compare(actual, expected, settings)
             .assertNotNull { "Result must not be null" }
-        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val entry = VerificationEntryUtils.createVerificationEntry(result, false)
         expectThat(entry) {
             expectCollection("1", "2", status = FAILED) {
                 hasSize(2)
@@ -248,7 +334,7 @@ class TestVerificationEntryUtils {
         val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
         val result = MessageComparator.compare(actualIMessage, filterIMessage, settings)
             .assertNotNull { "Result must not be null" }
-        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val entry = VerificationEntryUtils.createVerificationEntry(result, false)
         expectThat(entry) {
             expectCollection("2", "2") {
                 hasSize(2)
@@ -311,7 +397,7 @@ class TestVerificationEntryUtils {
             filterIMessage,
             settings
         )
-        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val entry = VerificationEntryUtils.createVerificationEntry(result, false)
         expectThat(entry) {
             expectCollection("2", "2") {
                 hasSize(2)
@@ -371,7 +457,7 @@ class TestVerificationEntryUtils {
         val filterIMessage = converter.fromProtoFilter(filter.messageFilter, filter.messageType)
         val result = MessageComparator.compare(actualIMessage, filterIMessage, settings)
             .assertNotNull { "Result must not be null" }
-        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val entry = VerificationEntryUtils.createVerificationEntry(result, false)
 
         expectThat(entry) {
             expectCollection("2", "2") {
@@ -422,7 +508,7 @@ class TestVerificationEntryUtils {
         val result = MessageComparator.compare(actualIMessage, filterIMessage, settings)
             .assertNotNull { "Result must not be null" }
 
-        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val entry = VerificationEntryUtils.createVerificationEntry(result, false)
         expectThat(entry) {
             expectCollection("1", "2") {
                 hasSize(2)
@@ -454,7 +540,7 @@ class TestVerificationEntryUtils {
         val result = MessageComparator.compare(actualIMessage, filterIMessage, settings)
             .assertNotNull { "Result must not be null" }
 
-        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val entry = VerificationEntryUtils.createVerificationEntry(result, false)
         expectThat(entry) {
             expectCollection("2", "1", status = FAILED) {
                 hasSize(2)
@@ -486,7 +572,7 @@ class TestVerificationEntryUtils {
         val result = MessageComparator.compare(actualIMessage, filterIMessage, ComparatorSettings())
             .assertNotNull { "Result must not be null" }
 
-        val entry = VerificationEntryUtils.createVerificationEntry(result)
+        val entry = VerificationEntryUtils.createVerificationEntry(result, false)
         val keyEntry = entry.fields["B"].assertNotNull { "The key 'B' is missing in ${entry.toDebugString()}" }
         assertEquals(expectedHint, keyEntry.hint, "Hint must be equal")
     }
@@ -511,7 +597,7 @@ class TestVerificationEntryUtils {
             converter.fromProtoMessage(actualMessage, false),
             settings,
         ).assertNotNull { "Result must not be null" }
-        val verification = VerificationEntryUtils.createVerificationEntry(result)
+        val verification = VerificationEntryUtils.createVerificationEntry(result, false)
 
         expectThat(verification) {
             expectCollection("1", "1", status = FAILED) {

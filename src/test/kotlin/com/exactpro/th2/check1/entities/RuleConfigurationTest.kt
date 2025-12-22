@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,11 +27,14 @@ class RuleConfigurationTest {
     fun `check that time precision is negative`() {
         val exception = assertThrows<IllegalArgumentException> {
             RuleConfiguration(
-                    TaskTimeout(0, 0), null, Duration.ofSeconds(-1),
-                    0.005,
-                    1,
-                    true,
-                    true
+                taskTimeout = TaskTimeout(0, 0),
+                description = null,
+                timePrecision = Duration.ofSeconds(-1),
+                decimalPrecision = 0.005,
+                maxEventBatchContentSize = 1,
+                isCheckNullValueAsEmpty = true,
+                defaultCheckSimpleCollectionsOrder = true,
+                hideOperationInExpected = false,
             )
         }
         assertEquals(exception.message, "Time precision cannot be negative")
@@ -41,11 +44,14 @@ class RuleConfigurationTest {
     fun `check that decimal precision is negative`() {
         val exception = assertThrows<IllegalArgumentException> {
             RuleConfiguration(
-                    TaskTimeout(0, 0), null, Duration.ofSeconds(1),
-                    -0.005,
-                    1,
-                    true,
-                    true
+                taskTimeout = TaskTimeout(0, 0),
+                description = null,
+                timePrecision = Duration.ofSeconds(1),
+                decimalPrecision = -0.005,
+                maxEventBatchContentSize = 1,
+                isCheckNullValueAsEmpty = true,
+                defaultCheckSimpleCollectionsOrder = true,
+                hideOperationInExpected = false,
             )
         }
         assertEquals(exception.message, "Decimal precision cannot be negative")
@@ -57,13 +63,14 @@ class RuleConfigurationTest {
 
         val exception = assertThrows<IllegalArgumentException> {
             RuleConfiguration(
-                    TaskTimeout(0, 0),
-                    null,
-                    Duration.ofSeconds(1),
-                    0.005,
-                    maxEventBatchContentSize,
-                    true,
-                    true
+                taskTimeout = TaskTimeout(0, 0),
+                description = null,
+                timePrecision = Duration.ofSeconds(1),
+                decimalPrecision = 0.005,
+                maxEventBatchContentSize = maxEventBatchContentSize,
+                isCheckNullValueAsEmpty = true,
+                defaultCheckSimpleCollectionsOrder = true,
+                hideOperationInExpected = false,
             )
         }
         assertEquals(exception.message, "'maxEventBatchContentSize' should be greater than zero, actual: $maxEventBatchContentSize")
@@ -75,13 +82,14 @@ class RuleConfigurationTest {
 
         val exception = assertThrows<IllegalArgumentException> {
             RuleConfiguration(
-                    TaskTimeout(timeout, 0),
-                    null,
-                    Duration.ofSeconds(1),
-                    0.005,
-                    1,
-                    true,
-                    true
+                taskTimeout = TaskTimeout(timeout, 0),
+                description = null,
+                timePrecision = Duration.ofSeconds(1),
+                decimalPrecision = 0.005,
+                maxEventBatchContentSize = 1,
+                isCheckNullValueAsEmpty = true,
+                defaultCheckSimpleCollectionsOrder = true,
+                hideOperationInExpected = false,
             )
         }
         assertEquals(exception.message, "'timeout' should be set or be greater than zero, actual: $timeout")

@@ -55,6 +55,7 @@ class RuleFactory(
     private val decimalPrecision = configuration.decimalPrecision
     private val isCheckNullValueAsEmpty = configuration.isCheckNullValueAsEmpty
     private val defaultCheckSimpleCollectionsOrder = configuration.isDefaultCheckSimpleCollectionsOrder
+    private val hideOperationInExpected = configuration.hideOperationInExpected
 
     fun createCheckRule(
         request: CheckRuleRequest,
@@ -81,7 +82,8 @@ class RuleFactory(
                     timePrecision,
                     decimalPrecision, maxEventBatchContentSize,
                     isCheckNullValueAsEmpty,
-                    defaultCheckSimpleCollectionsOrder
+                    defaultCheckSimpleCollectionsOrder,
+                    hideOperationInExpected,
                 )
 
                 CheckRuleTask(
@@ -129,7 +131,8 @@ class RuleFactory(
                     decimalPrecision,
                     maxEventBatchContentSize,
                     isCheckNullValueAsEmpty,
-                    defaultCheckSimpleCollectionsOrder
+                    defaultCheckSimpleCollectionsOrder,
+                    hideOperationInExpected,
                 )
 
                 SequenceCheckRuleTask(
@@ -177,7 +180,8 @@ class RuleFactory(
                     decimalPrecision,
                     maxEventBatchContentSize,
                     isCheckNullValueAsEmpty,
-                    defaultCheckSimpleCollectionsOrder
+                    defaultCheckSimpleCollectionsOrder,
+                    hideOperationInExpected,
                 )
 
                 NoMessageCheckTask(
@@ -219,7 +223,8 @@ class RuleFactory(
                         decimalPrecision,
                         maxEventBatchContentSize,
                         isCheckNullValueAsEmpty,
-                        defaultCheckSimpleCollectionsOrder
+                        defaultCheckSimpleCollectionsOrder,
+                        hideOperationInExpected,
                 )
 
                 SilenceCheckTask(
