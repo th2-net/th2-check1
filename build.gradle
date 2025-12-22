@@ -80,6 +80,7 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter"
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit5"
     testImplementation(libs.mockito.kotlin)
+    testImplementation(libs.strikt.core)
 }
 
 test.useJUnitPlatform()
