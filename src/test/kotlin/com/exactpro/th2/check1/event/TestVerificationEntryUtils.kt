@@ -64,6 +64,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
+import org.junit.jupiter.params.provider.ValueSource
 import strikt.api.Assertion
 import strikt.api.expectThat
 import strikt.assertions.hasSize
@@ -76,25 +77,26 @@ import java.util.stream.Stream
 class TestVerificationEntryUtils {
     private val converter = AbstractCheckTask.PROTO_CONVERTER
 
-    @Test
-    fun `simple not key fields test`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `simple not key fields test`(isKey: Boolean) {
         val filter = rootFilter(timePrecision = Duration.ofMillis(1), decimalPrecision = 0.001) {
-            simpleFilter("simple-equal", "test-equal", EQUAL, false)
-            simpleFilter("simple-not_equal", "test-not_equal", NOT_EQUAL, false)
-            emptyFilter("simple-empty", false)
-            notEmptyFilter("simple-not_empty", false)
-            inFilter("simple-in", listOf("test-1", "test-2", "test-3"), false)
-            notInFilter("simple-not_in", listOf("test-1", "test-2", "test-3"), false)
-            simpleFilter("simple-like", ".*-like", LIKE, false)
-            simpleFilter("simple-not_like", ".*-not_like", NOT_LIKE, false)
-            simpleFilter("simple-more", "10", MORE, false)
-            simpleFilter("simple-not_more", "10", NOT_MORE, false)
-            simpleFilter("simple-less", "10", LESS, false)
-            simpleFilter("simple-not_less", "10", NOT_LESS, false)
-            simpleFilter("simple-wildcard", "t?*-wildcard", WILDCARD, false)
-            simpleFilter("simple-not_wildcard", "t?*-not_wildcard", NOT_WILDCARD, false)
-            simpleFilter("simple-eq_time_precision", "2025-12-22T12:36:27.123456789", EQ_TIME_PRECISION, false)
-            simpleFilter("simple-eq_decimal_precision", "10.123456789", EQ_DECIMAL_PRECISION, false)
+            simpleFilter("simple-equal", "test-equal", EQUAL, isKey)
+            simpleFilter("simple-not_equal", "test-not_equal", NOT_EQUAL, isKey)
+            emptyFilter("simple-empty", isKey)
+            notEmptyFilter("simple-not_empty", isKey)
+            inFilter("simple-in", listOf("test-1", "test-2", "test-3"), isKey)
+            notInFilter("simple-not_in", listOf("test-1", "test-2", "test-3"), isKey)
+            simpleFilter("simple-like", ".*-like", LIKE, isKey)
+            simpleFilter("simple-not_like", ".*-not_like", NOT_LIKE, isKey)
+            simpleFilter("simple-more", "10", MORE, isKey)
+            simpleFilter("simple-not_more", "10", NOT_MORE, isKey)
+            simpleFilter("simple-less", "10", LESS, isKey)
+            simpleFilter("simple-not_less", "10", NOT_LESS, isKey)
+            simpleFilter("simple-wildcard", "t?*-wildcard", WILDCARD, isKey)
+            simpleFilter("simple-not_wildcard", "t?*-not_wildcard", NOT_WILDCARD, isKey)
+            simpleFilter("simple-eq_time_precision", "2025-12-22T12:36:27.123456789", EQ_TIME_PRECISION, isKey)
+            simpleFilter("simple-eq_decimal_precision", "10.123456789", EQ_DECIMAL_PRECISION, isKey)
         }
 
         val message = message("test")
@@ -122,8 +124,10 @@ class TestVerificationEntryUtils {
             filter.messageType,
         )
         val actual = converter.fromProtoMessage(message, false)
+        val container = VerificationUtil.toMetaContainer(filter.messageFilter, false)
         val settings = ComparatorSettings().apply {
             isKeepResultGroupOrder = true
+            metaContainer = container
         }
         val result = MessageComparator.compare(actual, expected, settings)
             .assertNotNull { "Result must not be null" }
@@ -133,52 +137,52 @@ class TestVerificationEntryUtils {
             expectCollection("16", "15") {
                 hasSize(16)
                 get { get("simple-equal") }.isNotNull() and {
-                    expectField("test-equal", "test-equal")
+                    expectField("test-equal", "test-equal", isKey = isKey)
                 }
                 get { get("simple-not_equal") }.isNotNull() and {
-                    expectField("test-not_equal", "test-equal", operation = NOT_EQUAL)
+                    expectField("test-not_equal", "test-equal", operation = NOT_EQUAL, isKey = isKey)
                 }
                 get { get("simple-empty") }.isNotNull() and {
-                    expectField("#", null, operation = EMPTY)
+                    expectField("#", null, operation = EMPTY, isKey = isKey)
                 }
                 get { get("simple-not_empty") }.isNotNull() and {
-                    expectField("*", "test-not_empty", operation = NOT_EMPTY)
+                    expectField("*", "test-not_empty", operation = NOT_EMPTY, isKey = isKey)
                 }
                 get { get("simple-in") }.isNotNull() and {
-                    expectField("IN [test-1, test-2, test-3]", "test-2", operation = IN)
+                    expectField("IN [test-1, test-2, test-3]", "test-2", operation = IN, isKey = isKey)
                 }
                 get { get("simple-not_in") }.isNotNull() and {
-                    expectField("NOT_IN [test-1, test-2, test-3]", "test-4", operation = NOT_IN)
+                    expectField("NOT_IN [test-1, test-2, test-3]", "test-4", operation = NOT_IN, isKey = isKey)
                 }
                 get { get("simple-like") }.isNotNull() and {
-                    expectField("LIKE .*-like", "test-like", operation = LIKE)
+                    expectField("LIKE .*-like", "test-like", operation = LIKE, isKey = isKey)
                 }
                 get { get("simple-not_like") }.isNotNull() and {
-                    expectField("NOT_LIKE .*-not_like", "test-like", operation = NOT_LIKE)
+                    expectField("NOT_LIKE .*-not_like", "test-like", operation = NOT_LIKE, isKey = isKey)
                 }
                 get { get("simple-more") }.isNotNull() and {
-                    expectField(">10", "11", operation = MORE)
+                    expectField(">10", "11", operation = MORE, isKey = isKey)
                 }
                 get { get("simple-not_more") }.isNotNull() and {
-                    expectField("<=10", "10", operation = NOT_MORE)
+                    expectField("<=10", "10", operation = NOT_MORE, isKey = isKey)
                 }
                 get { get("simple-less") }.isNotNull() and {
-                    expectField("<10", "9", operation = LESS)
+                    expectField("<10", "9", operation = LESS, isKey = isKey)
                 }
                 get { get("simple-not_less") }.isNotNull() and {
-                    expectField(">=10", "10", operation = NOT_LESS)
+                    expectField(">=10", "10", operation = NOT_LESS, isKey = isKey)
                 }
                 get { get("simple-wildcard") }.isNotNull() and {
-                    expectField("WILDCARD t?*-wildcard", "test-wildcard", operation = WILDCARD)
+                    expectField("WILDCARD t?*-wildcard", "test-wildcard", operation = WILDCARD, isKey = isKey)
                 }
                 get { get("simple-not_wildcard") }.isNotNull() and {
-                    expectField("NOT_WILDCARD t?*-not_wildcard", "test-wildcard", operation = NOT_WILDCARD)
+                    expectField("NOT_WILDCARD t?*-not_wildcard", "test-wildcard", operation = NOT_WILDCARD, isKey = isKey)
                 }
                 get { get("simple-eq_time_precision") }.isNotNull() and {
-                    expectField("2025-12-22T12:36:27.123456789 ± 0.001s", "2025-12-22T12:36:27.123", operation = EQ_TIME_PRECISION)
+                    expectField("2025-12-22T12:36:27.123456789 ± 0.001s", "2025-12-22T12:36:27.123", operation = EQ_TIME_PRECISION, isKey = isKey)
                 }
                 get { get("simple-eq_decimal_precision") }.isNotNull() and {
-                    expectField("10.123456789 ± 0.001", "10.123", operation = EQ_DECIMAL_PRECISION)
+                    expectField("10.123456789 ± 0.001", "10.123", operation = EQ_DECIMAL_PRECISION, isKey = isKey)
                 }
             }
         }
