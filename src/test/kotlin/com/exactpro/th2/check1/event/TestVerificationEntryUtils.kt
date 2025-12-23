@@ -89,10 +89,6 @@ class TestVerificationEntryUtils {
             simpleFilter("simple-not_equal", "test-not_equal", NOT_EQUAL, isKey)
             emptyFilter("simple-empty", isKey)
             notEmptyFilter("simple-not_empty", isKey)
-            simpleFilter("simple-more", "10", MORE, isKey)
-            simpleFilter("simple-not_more", "10", NOT_MORE, isKey)
-            simpleFilter("simple-less", "10", LESS, isKey)
-            simpleFilter("simple-not_less", "10", NOT_LESS, isKey)
             simpleFilter("simple-eq_time_precision", "2025-12-22T12:36:27.123456789", EQ_TIME_PRECISION, isKey)
             simpleFilter("simple-eq_decimal_precision", "10.123456789", EQ_DECIMAL_PRECISION, isKey)
         }
@@ -102,10 +98,6 @@ class TestVerificationEntryUtils {
             .putFields("simple-not_equal", "test-equal".toValue())
 //            .putFields("simple-empty", nullValue())
             .putFields("simple-not_empty", "test-not_empty".toValue())
-            .putFields("simple-more", "11".toValue())
-            .putFields("simple-not_more", "10".toValue())
-            .putFields("simple-less", "9".toValue())
-            .putFields("simple-not_less", "10".toValue())
             .putFields("simple-eq_time_precision", "2025-12-22T12:36:27.123".toValue())
             .putFields("simple-eq_decimal_precision", "10.123".toValue())
             .build()
@@ -126,8 +118,8 @@ class TestVerificationEntryUtils {
 
         val entry = VerificationEntryUtils.createVerificationEntry(result, hideOperationInExpected)
         expectThat(entry) {
-            expectCollection("10", "9") {
-                hasSize(10)
+            expectCollection("6", "5") {
+                hasSize(6)
                 get { get("simple-equal") }.isNotNull() and {
                     expectField("test-equal", "test-equal", isKey = isKey)
                 }
@@ -139,18 +131,6 @@ class TestVerificationEntryUtils {
                 }
                 get { get("simple-not_empty") }.isNotNull() and {
                     expectField("*", "test-not_empty", operation = NOT_EMPTY, isKey = isKey)
-                }
-                get { get("simple-more") }.isNotNull() and {
-                    expectField(">10", "11", operation = MORE, isKey = isKey)
-                }
-                get { get("simple-not_more") }.isNotNull() and {
-                    expectField("<=10", "10", operation = NOT_MORE, isKey = isKey)
-                }
-                get { get("simple-less") }.isNotNull() and {
-                    expectField("<10", "9", operation = LESS, isKey = isKey)
-                }
-                get { get("simple-not_less") }.isNotNull() and {
-                    expectField(">=10", "10", operation = NOT_LESS, isKey = isKey)
                 }
                 get { get("simple-eq_time_precision") }.isNotNull() and {
                     expectField("2025-12-22T12:36:27.123456789 ± 0.001s", "2025-12-22T12:36:27.123", operation = EQ_TIME_PRECISION, isKey = isKey)
@@ -171,6 +151,10 @@ class TestVerificationEntryUtils {
             simpleFilter("simple-not_like", ".*-not_like", NOT_LIKE)
             simpleFilter("simple-wildcard", "t?*-wildcard", WILDCARD)
             simpleFilter("simple-not_wildcard", "t?*-not_wildcard", NOT_WILDCARD)
+            simpleFilter("simple-more", "10", MORE)
+            simpleFilter("simple-not_more", "10", NOT_MORE)
+            simpleFilter("simple-less", "10", LESS)
+            simpleFilter("simple-not_less", "10", NOT_LESS)
         }
 
         val message = message("test")
@@ -180,6 +164,10 @@ class TestVerificationEntryUtils {
             .putFields("simple-not_like", "test-like".toValue())
             .putFields("simple-wildcard", "test-wildcard".toValue())
             .putFields("simple-not_wildcard", "test-wildcard".toValue())
+            .putFields("simple-more", "11".toValue())
+            .putFields("simple-not_more", "10".toValue())
+            .putFields("simple-less", "9".toValue())
+            .putFields("simple-not_less", "10".toValue())
             .build()
 
         val expected = converter.fromProtoFilter(
@@ -194,8 +182,8 @@ class TestVerificationEntryUtils {
 
         val entry = VerificationEntryUtils.createVerificationEntry(result, false)
         expectThat(entry) {
-            expectCollection("6", "6") {
-                hasSize(6)
+            expectCollection("10", "10") {
+                hasSize(10)
                 get { get("simple-in") }.isNotNull() and {
                     expectField("IN [test-1, test-2, test-3]", "test-2", operation = IN)
                 }
@@ -214,6 +202,18 @@ class TestVerificationEntryUtils {
                 get { get("simple-not_wildcard") }.isNotNull() and {
                     expectField("NOT_WILDCARD t?*-not_wildcard", "test-wildcard", operation = NOT_WILDCARD)
                 }
+                get { get("simple-more") }.isNotNull() and {
+                    expectField(">10", "11", operation = MORE)
+                }
+                get { get("simple-not_more") }.isNotNull() and {
+                    expectField("<=10", "10", operation = NOT_MORE)
+                }
+                get { get("simple-less") }.isNotNull() and {
+                    expectField("<10", "9", operation = LESS)
+                }
+                get { get("simple-not_less") }.isNotNull() and {
+                    expectField(">=10", "10", operation = NOT_LESS)
+                }
             }
         }
     }
@@ -227,6 +227,10 @@ class TestVerificationEntryUtils {
             simpleFilter("simple-not_like", ".*-not_like", NOT_LIKE)
             simpleFilter("simple-wildcard", "t?*-wildcard", WILDCARD)
             simpleFilter("simple-not_wildcard", "t?*-not_wildcard", NOT_WILDCARD)
+            simpleFilter("simple-more", "10", MORE)
+            simpleFilter("simple-not_more", "10", NOT_MORE)
+            simpleFilter("simple-less", "10", LESS)
+            simpleFilter("simple-not_less", "10", NOT_LESS)
         }
 
         val message = message("test")
@@ -236,6 +240,10 @@ class TestVerificationEntryUtils {
             .putFields("simple-not_like", "test-like".toValue())
             .putFields("simple-wildcard", "test-wildcard".toValue())
             .putFields("simple-not_wildcard", "test-wildcard".toValue())
+            .putFields("simple-more", "11".toValue())
+            .putFields("simple-not_more", "10".toValue())
+            .putFields("simple-less", "9".toValue())
+            .putFields("simple-not_less", "10".toValue())
             .build()
 
         val expected = converter.fromProtoFilter(
@@ -250,8 +258,8 @@ class TestVerificationEntryUtils {
 
         val entry = VerificationEntryUtils.createVerificationEntry(result, true)
         expectThat(entry) {
-            expectCollection("6", "6") {
-                hasSize(6)
+            expectCollection("10", "10") {
+                hasSize(10)
                 get { get("simple-in") }.isNotNull() and {
                     expectField("[test-1, test-2, test-3]", "test-2", operation = IN)
                 }
@@ -269,6 +277,18 @@ class TestVerificationEntryUtils {
                 }
                 get { get("simple-not_wildcard") }.isNotNull() and {
                     expectField("t?*-not_wildcard", "test-wildcard", operation = NOT_WILDCARD)
+                }
+                get { get("simple-more") }.isNotNull() and {
+                    expectField("10", "11", operation = MORE)
+                }
+                get { get("simple-not_more") }.isNotNull() and {
+                    expectField("10", "10", operation = NOT_MORE)
+                }
+                get { get("simple-less") }.isNotNull() and {
+                    expectField("10", "9", operation = LESS)
+                }
+                get { get("simple-not_less") }.isNotNull() and {
+                    expectField("10", "10", operation = NOT_LESS)
                 }
             }
         }

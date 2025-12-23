@@ -353,7 +353,7 @@ The `th2_check1_active_tasks_number` metric separate rules with label `rule_type
 
 ### 4.9.0
 
-+ [[GH-251] Filter with either IN, NOT_IN, LIKE, NOT_LIKE, WILDCARD, NOT_WILDCARD operation adds the operation name before expected value into event](https://github.com/th2-net/th2-check1/issues/251)
++ [[GH-251] Filter with either IN, NOT_IN, LIKE, NOT_LIKE, WILDCARD, NOT_WILDCARD, MORE, NOT_MORE, LESS, NOT_LESS operation adds the operation name before expected value into event](https://github.com/th2-net/th2-check1/issues/251)
   + Added [hide-operation-in-expected](#hide-operation-in-expected)
 + Update:
   + th2-plugin: `0.3.11` (bom: `4.14.3`)

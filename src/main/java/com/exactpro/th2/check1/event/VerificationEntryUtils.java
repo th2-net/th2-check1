@@ -24,6 +24,7 @@ import com.exactpro.sf.scriptrunner.StatusType;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
 import com.exactpro.th2.common.grpc.FilterOperation;
+import com.exactpro.th2.sailfish.utils.filter.CompareFilter;
 import com.exactpro.th2.sailfish.utils.filter.IOperationFilter;
 import com.exactpro.th2.sailfish.utils.filter.ListContainFilter;
 import com.exactpro.th2.sailfish.utils.filter.RegExFilter;
@@ -124,12 +125,14 @@ public class VerificationEntryUtils {
             Object expected = result.getExpected();
 
             if (expected instanceof IComparisonFilter) {
-                if (expected instanceof RegExFilter) {
-                    return ((Pattern)((RegExFilter) expected).getValue()).pattern();
-                } else if (expected instanceof ListContainFilter) {
+                if (expected.getClass().equals(RegExFilter.class)) {
+                    return ((Pattern) ((RegExFilter) expected).getValue()).pattern();
+                } else if (expected.getClass().equals(ListContainFilter.class)) {
                     return ((ListContainFilter) expected).getValue().toString();
-                } else if (expected instanceof WildcardFilter) {
+                } else if (expected.getClass().equals(WildcardFilter.class)) {
                     return ((WildcardFilter) expected).getValue().toString();
+                } else if (expected.getClass().equals(CompareFilter.class)) {
+                    return ((CompareFilter) expected).getValue().toString();
                 }
                 return ((IComparisonFilter) expected).getCondition(result.getActual());
             }
