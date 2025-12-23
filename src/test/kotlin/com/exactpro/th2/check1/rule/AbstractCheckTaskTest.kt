@@ -212,13 +212,14 @@ abstract class AbstractCheckTaskTest {
         maxEventBatchContentSize: Int = 1024 * 1024
     ): RuleConfiguration {
         return RuleConfiguration(
-            taskTimeout,
-            description,
-            configuration.timePrecision,
-            configuration.decimalPrecision,
-            maxEventBatchContentSize,
-            true,
-                true
+            taskTimeout = taskTimeout,
+            description = description,
+            timePrecision = configuration.timePrecision,
+            decimalPrecision = configuration.decimalPrecision,
+            maxEventBatchContentSize = maxEventBatchContentSize,
+            isCheckNullValueAsEmpty = true,
+            defaultCheckSimpleCollectionsOrder = true,
+            hideOperationInExpected = false,
         )
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,21 +24,28 @@ import com.exactpro.sf.scriptrunner.StatusType;
 import com.exactpro.th2.common.event.bean.VerificationEntry;
 import com.exactpro.th2.common.event.bean.VerificationStatus;
 import com.exactpro.th2.common.grpc.FilterOperation;
+import com.exactpro.th2.sailfish.utils.filter.CompareFilter;
 import com.exactpro.th2.sailfish.utils.filter.IOperationFilter;
+import com.exactpro.th2.sailfish.utils.filter.ListContainFilter;
+import com.exactpro.th2.sailfish.utils.filter.RegExFilter;
+import com.exactpro.th2.sailfish.utils.filter.WildcardFilter;
 import com.exactpro.th2.sailfish.utils.filter.util.FilterUtils;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static com.exactpro.sf.comparison.Formatter.formatForHtml;
 
 public class VerificationEntryUtils {
 
-    public static VerificationEntry createVerificationEntry(ComparisonResult result) {
+    public static VerificationEntry createVerificationEntry(ComparisonResult result, boolean hideOperationInExpected) {
         VerificationEntry verificationEntry = new VerificationEntry();
         verificationEntry.setActual(convertActual(result));
-        verificationEntry.setExpected(convertExpectedResult(result));
+        verificationEntry.setExpected(convertExpectedResult(result, hideOperationInExpected));
         verificationEntry.setStatus(toVerificationStatus(result));
         verificationEntry.setKey(result.isKey());
         verificationEntry.setOperation(resolveOperation(result));
@@ -47,7 +54,7 @@ public class VerificationEntryUtils {
             verificationEntry.setFields(result.getResults().entrySet().stream()
                     .collect(Collectors.toMap(
                             Entry::getKey,
-                            entry -> createVerificationEntry(entry.getValue()),
+                            entry -> createVerificationEntry(entry.getValue(), hideOperationInExpected),
                             (entry1, entry2) -> entry1,
                             LinkedHashMap::new)));
             verificationEntry.setType("collection");
@@ -105,8 +112,34 @@ public class VerificationEntryUtils {
         }
     }
 
-    private static String convertExpectedResult(ComparisonResult result) {
-        return result.getExpected() == null ? null : Formatter.formatExpected(result);
+    public static VerificationEntry createVerificationEntry(ComparisonResult result) {
+        return createVerificationEntry(result, false);
+    }
+
+    private static String convertExpectedResult(ComparisonResult result, boolean hideOperationInExpected) {
+        if (result.getExpected() == null) {
+            return null;
+        }
+        if (hideOperationInExpected) {
+            // this code is modified copy of Formatter.formatExpected method
+            Object expected = result.getExpected();
+
+            if (expected instanceof IComparisonFilter) {
+                if (expected.getClass().equals(RegExFilter.class)) {
+                    return ((Pattern) ((RegExFilter) expected).getValue()).pattern();
+                } else if (expected.getClass().equals(ListContainFilter.class)) {
+                    return ((ListContainFilter) expected).getValue().toString();
+                } else if (expected.getClass().equals(WildcardFilter.class)) {
+                    return ((WildcardFilter) expected).getValue().toString();
+                } else if (expected.getClass().equals(CompareFilter.class)) {
+                    return ((CompareFilter) expected).getValue().toString();
+                }
+                return ((IComparisonFilter) expected).getCondition(result.getActual());
+            }
+
+            return formatForHtml(expected, true);
+        }
+        return Formatter.formatExpected(result);
     }
 
     private static String extractHint(ComparisonResult result) {

@@ -781,7 +781,7 @@ abstract class AbstractCheckTask(
         protoFilter: RootMessageFilter,
         comparisonResult: ComparisonResult
     ): Event {
-        val verificationComponent = VerificationBuilder()
+        val verificationComponent = VerificationBuilder(ruleConfiguration.hideOperationInExpected)
         comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
             verificationComponent.verification(key, value, protoFilter.messageFilter, true)
         }
@@ -804,7 +804,7 @@ abstract class AbstractCheckTask(
         metadataFilter: MetadataFilter,
         comparisonResult: ComparisonResult
     ): Event {
-        val verificationComponent = VerificationBuilder()
+        val verificationComponent = VerificationBuilder(ruleConfiguration.hideOperationInExpected)
         comparisonResult.results.forEach { (key: String?, value: ComparisonResult?) ->
             verificationComponent.verification(key, value, metadataFilter)
         }

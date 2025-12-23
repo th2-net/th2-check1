@@ -1,4 +1,4 @@
-# th2 check1 (4.8.0)
+# th2 check1 (4.9.0)
 
 ## Overview
 
@@ -145,6 +145,7 @@ spec:
     check-null-value-as-empty: false
     enable-checkpoint-events-publication: true
     await-root-event-storing-on-wait-for-result: false
+    hide-operation-in-expected: false
     rules-execution-threads: 1
   pins:
     mq:
@@ -204,6 +205,7 @@ spec:
     decimal-precision: '0.00001'
     enable-checkpoint-events-publication: true
     await-root-event-storing-on-wait-for-result: false
+    hide-operation-in-expected: false
     rules-execution-threads: 1
 ```
 
@@ -292,6 +294,21 @@ spec:
 ```
 _Disabled by default._
 
+#### hide-operation-in-expected
+
+Hides operation name from expected values for operations: `IN`, `NOT_IN`, `LIKE`, `NOT_LIKE`, `WILDCARD`, `NOT_WILDCARD`
+
+| operation      | option false              | option true      |
+|----------------|---------------------------|------------------|
+| `IN`           | `IN [opt-1, opt-2]`       | `[opt-1, opt-2]` |
+| `NOT_IN`       | `NOT_IN [opt-1, opt-2]`   | `[opt-1, opt-2]` |
+| `LIKE`         | `LIKE regex.*`            | `regex.*`        |
+| `NOT_LIKE`     | `NOT_LIKE regex.*`        | `regex.*`        |
+| `WILDCARD`     | `WILDCARD wildcard?*`     | `wildcard?*`     |
+| `NOT_WILDCARD` | `NOT_WILDCARD wildcard?*` | `wildcard?*`     |
+
+_Disabled by default._
+
 ## Required pins
 
 The Check1 component has two types of pin:
@@ -333,6 +350,20 @@ The `th2_check1_actual_cache_number` metric separate messages with three labels:
 The `th2_check1_active_tasks_number` metric separate rules with label `rule_type`
 
 ## Release Notes
+
+### 4.9.0
+
++ [[GH-251] Filter with either IN, NOT_IN, LIKE, NOT_LIKE, WILDCARD, NOT_WILDCARD, MORE, NOT_MORE, LESS, NOT_LESS operation adds the operation name before expected value into event](https://github.com/th2-net/th2-check1/issues/251)
+  + Added [hide-operation-in-expected](#hide-operation-in-expected)
++ Update:
+  + th2-plugin: `0.3.11` (bom: `4.14.3`)
+  + kotlin: `2.3.0`
+  + rxjava: `3.1.12`
+  + common: `5.17.0-dev`
+  + common-utils: `2.4.0-dev`
+  + grpc-check1: `4.5.1`
+  + grpc-lw-data-provider: `2.6.0-dev`
+  + lw-data-provider-utils: `0.0.8-dev`
 
 ### 4.8.0
 + Added `await-root-event-storing-on-wait-for-result` option.

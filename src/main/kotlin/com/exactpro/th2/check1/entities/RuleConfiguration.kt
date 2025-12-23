@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,8 @@ data class RuleConfiguration(
     val decimalPrecision: Double,
     val maxEventBatchContentSize: Int,
     val isCheckNullValueAsEmpty: Boolean,
-    val defaultCheckSimpleCollectionsOrder: Boolean
+    val defaultCheckSimpleCollectionsOrder: Boolean,
+    val hideOperationInExpected: Boolean,
 ) {
     init {
         require(!timePrecision.isNegative) { "Time precision cannot be negative" }
