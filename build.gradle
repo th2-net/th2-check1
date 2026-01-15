@@ -81,6 +81,7 @@ dependencies {
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit5"
     testImplementation(libs.mockito.kotlin)
     testImplementation(libs.strikt.core)
+    testRuntimeOnly(libs.kotlinx.coroutines.core)
 }
 
 test.useJUnitPlatform()
