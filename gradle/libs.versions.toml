@@ -17,7 +17,7 @@ commons-beanutils = { group = 'commons-beanutils', name = 'commons-beanutils', v
 
 rxjava = { group = "io.reactivex.rxjava3", name = "rxjava", version = "3.1.12" }
 
-mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version = "6.2.2" }
+mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version = "6.2.3" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version = "1.10.2" }
 strikt-core = { group = "io.strikt", name = "strikt-core", version = "0.34.1" }
 
