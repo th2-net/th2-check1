@@ -7,7 +7,7 @@ th2-plugin = "0.3.14"
 th2-common-utils = { group = "com.exactpro.th2", name = "common-utils", version = "2.4.0-dev" }
 th2-common = { group = "com.exactpro.th2", name = "common", version = "5.17.2-dev" }
 th2-lw-data-provider-utils = { group = "com.exactpro.th2", name = "lw-data-provider-utils", version = "0.0.8-dev" }
-th2-grpc-check1 = { group = "com.exactpro.th2", name = "grpc-check1", version = "4.5.1" }
+th2-grpc-check1 = { group = "com.exactpro.th2", name = "grpc-check1", version = "4.5.2" }
 th2-grpc-lw-data-provider = { group = "com.exactpro.th2", name = "grpc-lw-data-provider", version = "2.6.0-dev" }
 th2-sailfish-utils = { group = "com.exactpro.th2", name = "sailfish-utils", version = "4.1.1-dev" }
 
